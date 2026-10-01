@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalează serverul (hbbs + hbbr) pe un VPS Linux (Ubuntu/Debian testat).
+# Instalează serverul (hbbs + hbbr) pe un server Linux: Ubuntu, Debian, Rocky, Alma (merge și alături de Virtualmin).
 #
 #   sudo ./install.sh remote.firma-mea.ro      # domeniu sau IP public al serverului
 #
@@ -43,6 +43,13 @@ if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   ufw allow 21115:21117/tcp
   ufw allow 21116/udp
   ufw allow 21118:21119/tcp
+fi
+# firewalld: implicit pe Rocky/Alma/CentOS, des întâlnit pe serverele cu Virtualmin.
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+  echo "==> Deschid porturile în firewalld"
+  firewall-cmd --permanent --add-port=21115-21119/tcp
+  firewall-cmd --permanent --add-port=21116/udp
+  firewall-cmd --reload
 fi
 
 echo "==> Pornesc serverul"
