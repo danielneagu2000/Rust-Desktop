@@ -57,13 +57,28 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+# Pagina de descărcare (server/web): pe domeniu cu HTTPS automat, pe IP fix doar HTTP.
+# Se pornește doar dacă porturile 80/443 sunt libere (nu rulează deja Apache/Nginx/Virtualmin);
+# forțezi cu WEB=1 sau dezactivezi cu WEB=0.
+if [[ "$HOST" =~ ^[0-9.]+$ ]]; then WEB_ADDRESS=":80"; else WEB_ADDRESS="$HOST"; fi
+if [[ -z "${WEB:-}" ]]; then
+  WEB=1
+  if ss -Hltn '( sport = :80 or sport = :443 )' 2>/dev/null | grep -q . \
+     && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx rustdesk-web; then
+    WEB=0
+  fi
+fi
+
 umask 077
 cat > .env <<EOF
 SERVER_HOST=$HOST
 PANEL_USER=$PANEL_USER
 PANEL_PASSWORD=$PANEL_PASSWORD
 PANEL_BIND=$PANEL_BIND
+WEB_ADDRESS=$WEB_ADDRESS
 EOF
+[[ "$WEB" == 1 ]] && echo "COMPOSE_PROFILES=web" >> .env
+umask 022
 
 PRIVATE_NETS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
@@ -71,6 +86,7 @@ if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   ufw allow 21114:21117/tcp
   ufw allow 21116/udp
   ufw allow 21118:21119/tcp
+  [[ "$WEB" == 1 ]] && ufw allow 80,443/tcp
   if [[ "$PANEL_BIND" != "127.0.0.1" ]]; then
     for net in $PRIVATE_NETS; do ufw allow from "$net" to any port 21120 proto tcp; done
   fi
@@ -80,6 +96,7 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
   echo "==> Deschid porturile în firewalld"
   firewall-cmd --permanent --add-port=21114-21119/tcp
   firewall-cmd --permanent --add-port=21116/udp
+  [[ "$WEB" == 1 ]] && firewall-cmd --permanent --add-service=http --add-service=https
   if [[ "$PANEL_BIND" != "127.0.0.1" ]]; then
     # Panoul doar din rețeaua locală, niciodată de pe internet.
     for net in $PRIVATE_NETS; do
@@ -104,6 +121,44 @@ fi
 # Asigură-te că relay-ul folosește aceeași cheie ca hbbs.
 docker compose restart hbbr >/dev/null
 
+# Aduce ultimele kituri de instalare de pe GitHub Releases în web/files, acum și zilnic.
+SERVER_DIR="$(pwd)"
+cat > /etc/systemd/system/rdn-downloads.service <<EOF
+[Unit]
+Description=RDN Remote: actualizează kiturile de pe pagina de descărcare
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker run --rm -e SERVER_HOST=$HOST -v $SERVER_DIR/web:/w:z -v $SERVER_DIR/data:/data:z python:3.12-alpine python /w/update_downloads.py
+EOF
+cat > /etc/systemd/system/rdn-downloads.timer <<EOF
+[Unit]
+Description=RDN Remote: verificare zilnică a versiunilor noi
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1d
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now rdn-downloads.timer >/dev/null
+echo "==> Actualizez pagina de descărcare"
+systemctl start rdn-downloads.service || echo "Atenție: actualizarea kiturilor a eșuat; vezi: journalctl -u rdn-downloads" >&2
+
+if [[ "$WEB" == 1 ]]; then
+  if [[ "$WEB_ADDRESS" == ":80" ]]; then WEB_URL="http://$HOST/"; else WEB_URL="https://$HOST/"; fi
+  WEB_HOW="$WEB_URL  (certificatul HTTPS se obține automat la prima accesare dacă domeniul
+  arată spre acest server și porturile 80/443 sunt redirecționate)"
+else
+  WEB_HOW="nepornită: porturile 80/443 sunt ocupate (Apache/Nginx/Virtualmin).
+  Copiază conținutul server/web/ în site-ul tău din Virtualmin (vezi GHID.md)."
+fi
+
 if [[ "$PANEL_BIND" == "127.0.0.1" ]]; then
   PANEL_HOW="Din calculatorul tău:  ssh -L 21120:127.0.0.1:21120 root@$HOST
   apoi deschide în browser  http://localhost:21120/"
@@ -121,6 +176,9 @@ Pune aceste valori în branding/brand.env:
   RENDEZVOUS_SERVER=$HOST
   RS_PUB_KEY=$(cat data/id_ed25519.pub)
 
+Pagina de descărcare:
+  $WEB_HOW
+
 Panoul de securitate:
   $PANEL_HOW
   utilizator: $PANEL_USER
@@ -129,5 +187,6 @@ Panoul de securitate:
 IMPORTANT: fă backup la server/data/id_ed25519 (cheia privată). Dacă o pierzi,
 toți clienții trebuie recompilați cu cheia nouă.
 Dacă serverul e în spatele unui router sau al unui firewall de la provider, deschide/redirecționează
-porturile 21114-21119/tcp și 21116/udp către acest calculator.
+porturile 21114-21119/tcp și 21116/udp (plus 80 și 443/tcp pentru pagina de descărcare)
+către acest calculator.
 EOF

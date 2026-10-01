@@ -1,0 +1,26 @@
+# Pagina de descărcare. WEB_ADDRESS vine din server/.env:
+#   remote.rdndata.ro  -> HTTPS automat (certificat Let's Encrypt), HTTP redirecționat
+#   :80                -> doar HTTP (când ai doar IP fix, fără domeniu)
+{$WEB_ADDRESS} {
+	root * /srv
+	encode zstd gzip
+
+	@manifest path /files/downloads.json /site.json
+	header @manifest Cache-Control "no-cache"
+	@installers path /files/*/*
+	header @installers Cache-Control "public, max-age=86400"
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+		-Server
+	}
+
+	# Nu servi scriptul de actualizare și fișierele temporare.
+	@private path /update_downloads.py /files/.incoming-* /files/*.tmp
+	respond @private 404
+
+	file_server
+}

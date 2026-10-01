@@ -7,6 +7,7 @@
 #   21117/tcp  relay (hbbr)
 #   21118/tcp, 21119/tcp  doar pentru clientul web (opțional)
 #   21114/tcp  API pentru panoul de securitate (clienții trimit aici jurnalele)
+#   80/tcp, 443/tcp  pagina de descărcare (serviciul "web", activ cu COMPOSE_PROFILES=web)
 #
 # Panoul de securitate ascultă pe 21120, implicit doar local (127.0.0.1); vezi GHID.md.
 # ":z" pe volume = etichetă SELinux partajată (necesar pe AlmaLinux/Rocky; ignorat în rest).
@@ -59,4 +60,19 @@ services:
     network_mode: host
     depends_on:
       - hbbr
+    restart: unless-stopped
+
+  # Pagina de descărcare (server/web). Pornește doar cu profilul "web" (install.sh îl
+  # activează dacă porturile 80/443 sunt libere, adică nu ai deja Apache/Nginx/Virtualmin).
+  web:
+    container_name: rustdesk-web
+    image: caddy:2.11-alpine
+    profiles: ["web"]
+    environment:
+      - WEB_ADDRESS=${WEB_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - ./web:/srv:ro,z
+      - ./data/caddy:/data:z
+    network_mode: host
     restart: unless-stopped

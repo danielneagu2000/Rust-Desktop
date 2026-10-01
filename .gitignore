@@ -63,3 +63,4 @@ flutter/web/
 !branding/logo.png
 !branding/logo-small.png
 !branding/logo-original.png
+!server/web/assets/*.png

@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RDN Remote: descărcare</title>
+<meta name="description" content="Descarcă RDN Remote, aplicația de asistență la distanță de la RDN Network Data.">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<style>
+:root {
+  --ink: #1d0a0d; --text: #2b2326; --muted: #6b5f63; --line: #eadfe1; --bg: #ffffff; --soft: #faf5f6;
+  --brand-dark: #3a0b12; --brand: #b3122b; --brand-bright: #e3263a; --ok: #146c3a;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+a { color: var(--brand); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+header.top { border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 5; }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 16px; }
+header.top img { height: 44px; width: auto; display: block; }
+header.top nav { display: flex; gap: 22px; font-size: 15px; }
+header.top nav a { color: var(--text); text-decoration: none; }
+header.top nav a:hover { color: var(--brand); }
+
+.hero { background: radial-gradient(1200px 500px at 85% -10%, rgba(227,38,58,.22), transparent 60%),
+  linear-gradient(135deg, #1d0508 0%, var(--brand-dark) 45%, #6d0f1c 100%); color: #fff; }
+.hero .wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 40px; align-items: center; padding-top: 64px; padding-bottom: 72px; }
+.hero h1 { font-size: 44px; line-height: 1.12; margin: 0 0 16px; letter-spacing: -.5px; }
+.hero p.lead { font-size: 19px; color: #f1dde0; margin: 0 0 28px; max-width: 34em; }
+.cta { display: inline-flex; align-items: center; gap: 12px; background: var(--brand-bright); color: #fff; text-decoration: none;
+  font-weight: 650; font-size: 18px; padding: 15px 26px; border-radius: 12px; box-shadow: 0 10px 30px rgba(227,38,58,.35); }
+.cta:hover { background: #f03a4d; }
+.cta svg { width: 22px; height: 22px; }
+.cta.disabled { background: #5c2a31; box-shadow: none; pointer-events: none; }
+.hero .meta { margin-top: 14px; font-size: 14px; color: #e5c9cd; }
+.hero .meta a { color: #fff; }
+.hero .alt { margin-top: 8px; font-size: 14px; }
+.hero .alt a { color: #ffd5da; }
+.card-hero { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 26px; }
+.card-hero h3 { margin: 0 0 14px; font-size: 16px; color: #ffd5da; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+.card-hero ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
+.card-hero li { counter-increment: s; display: flex; gap: 14px; padding: 10px 0; color: #fbeef0; }
+.card-hero li::before { content: counter(s); flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--brand-bright);
+  color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+
+section.block { padding: 64px 0; }
+section.block.soft { background: var(--soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+h2 { font-size: 30px; margin: 0 0 8px; color: var(--ink); letter-spacing: -.3px; }
+p.sub { color: var(--muted); margin: 0 0 30px; }
+
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.os { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; }
+.os.current { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(179,18,43,.12); }
+.os .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.os .head svg { width: 28px; height: 28px; color: var(--brand-dark); }
+.os h3 { margin: 0; font-size: 19px; color: var(--ink); }
+.os .tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--brand); background: #fde8eb; padding: 2px 8px; border-radius: 999px; }
+.file { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.file:first-of-type { border-top: 0; }
+.file .l { font-size: 15px; line-height: 1.35; }
+.file .s { display: block; font-size: 12px; color: var(--muted); }
+.btn { flex: none; font-size: 14px; font-weight: 600; text-decoration: none; color: var(--brand); border: 1px solid #f0c6cc;
+  padding: 6px 12px; border-radius: 9px; background: #fff; }
+.btn:hover { background: #fde8eb; }
+.os .none { color: var(--muted); font-size: 14px; }
+.ios { margin-top: 18px; font-size: 14px; color: var(--muted); }
+
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.step { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+.step .n { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--brand-dark), var(--brand-bright));
+  color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+.step h3 { margin: 0 0 6px; font-size: 18px; color: var(--ink); }
+.step p { margin: 0; color: var(--muted); font-size: 15px; }
+
+.safety { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.point { display: flex; gap: 14px; padding: 18px; border-radius: 14px; background: #fff; border: 1px solid var(--line); }
+.point svg { flex: none; width: 26px; height: 26px; color: var(--ok); margin-top: 2px; }
+.point.warn svg { color: var(--brand-bright); }
+.point h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); }
+.point p { margin: 0; font-size: 15px; color: var(--muted); }
+
+.contact { display: flex; flex-wrap: wrap; gap: 14px; }
+.contact a, .contact span { display: inline-flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line);
+  background: #fff; text-decoration: none; color: var(--ink); font-weight: 600; }
+.contact svg { width: 20px; height: 20px; color: var(--brand); }
+
+details.sums { margin-top: 26px; font-size: 13px; color: var(--muted); }
+details.sums summary { cursor: pointer; }
+details.sums code { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+details.sums table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+
+footer { border-top: 1px solid var(--line); padding: 26px 0 40px; font-size: 13px; color: var(--muted); }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+
+@media (max-width: 960px) {
+  .grid { grid-template-columns: 1fr; }
+  .hero .wrap { grid-template-columns: 1fr; padding-top: 44px; padding-bottom: 52px; }
+  .hero h1 { font-size: 34px; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px; }
+  header.top nav { display: none; }
+  .grid, .steps, .safety { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 29px; }
+  .hero p.lead { font-size: 17px; }
+  .cta { width: 100%; justify-content: center; }
+  section.block { padding: 46px 0; }
+  h2 { font-size: 25px; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="#"><img src="assets/logo.png" alt="RDN Network Data"></a>
+  <nav><a href="#descarcari">Descărcări</a><a href="#cum">Cum funcționează</a><a href="#siguranta">Siguranță</a><a href="#contact" id="nav-contact">Contact</a></nav>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <h1>Asistență IT la distanță, rapid și în siguranță</h1>
+    <p class="lead">Descarcă <strong>RDN Remote</strong> ca un tehnician RDN Network Data să te poată ajuta direct pe calculatorul tău. Conexiunea este criptată de la un capăt la altul și trece doar prin serverul nostru.</p>
+    <a class="cta disabled" id="cta" href="#descarcari">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span id="cta-text">Se încarcă…</span>
+    </a>
+    <div class="meta" id="cta-meta"></div>
+    <div class="alt"><a href="#descarcari">Alt sistem de operare? Vezi toate descărcările</a></div>
+  </div>
+  <div class="card-hero">
+    <h3>În 3 pași</h3>
+    <ol>
+      <li><span>Descarcă și deschide RDN Remote.</span></li>
+      <li><span>Comunică tehnicianului <strong>ID-ul</strong> și <strong>parola</strong> afișate în aplicație.</span></li>
+      <li><span>Vezi tot ce face tehnicianul și poți închide conexiunea oricând.</span></li>
+    </ol>
+  </div>
+</div></section>
+
+<section class="block" id="descarcari"><div class="wrap">
+  <h2>Descărcări</h2>
+  <p class="sub" id="dl-sub">Alege sistemul tău de operare.</p>
+  <div class="grid" id="grid"></div>
+  <p class="ios">iPhone și iPad: aplicația poate doar controla alte dispozitive (iOS nu permite controlul de la distanță al telefonului). Disponibilă la cerere.</p>
+  <details class="sums" id="sums" hidden><summary>Verificare integritate (SHA-256)</summary><table id="sums-t"></table></details>
+</div></section>
+
+<section class="block soft" id="cum"><div class="wrap">
+  <h2>Cum funcționează</h2>
+  <p class="sub">Fără cont, fără configurare. Aplicația se conectează automat la serverul RDN Network Data.</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Instalezi aplicația</h3><p>Pe Windows rulezi fișierul descărcat; poți folosi aplicația imediat sau o poți instala permanent. Pe Mac o tragi în Applications și permiți „Înregistrare ecran” și „Accesibilitate”.</p></div>
+    <div class="step"><div class="n">2</div><h3>Ne dai ID-ul și parola</h3><p>Aplicația afișează un ID și o parolă unică. Le comunici doar tehnicianului RDN cu care vorbești deja, la telefon sau pe e-mail.</p></div>
+    <div class="step"><div class="n">3</div><h3>Te ajutăm pe loc</h3><p>Vezi în timp real tot ce face tehnicianul. Când ați terminat, închizi aplicația; parola unică expiră și nu mai poate fi folosită.</p></div>
+  </div>
+</div></section>
+
+<section class="block" id="siguranta"><div class="wrap">
+  <h2>Siguranță</h2>
+  <p class="sub">Construită pe tehnologia open-source RustDesk, găzduită pe infrastructura proprie RDN Network Data.</p>
+  <div class="safety">
+    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><h3>Criptare end-to-end</h3><p>Imaginea, tastatura și fișierele sunt criptate între cele două calculatoare. Nici serverul nu le poate vedea.</p></div></div>
+    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><div><h3>Tu ai controlul</h3><p>Vezi tot ce se întâmplă pe ecran și poți închide conexiunea oricând, dintr-un singur click.</p></div></div>
+    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/><path d="m9 12 2 2 4-4"/></svg><div><h3>Server propriu, în România</h3><p>Conexiunile trec prin serverul RDN Network Data, nu prin servere străine. Accesul este jurnalizat și monitorizat.</p></div></div>
+    <div class="point warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div><h3>Atenție la înșelătorii</h3><p>Nu da niciodată ID-ul și parola cuiva care te sună nesolicitat. RDN Network Data nu îți cere acces fără ca tu să ne fi contactat.</p></div></div>
+  </div>
+</div></section>
+
+<section class="block soft" id="contact" hidden><div class="wrap">
+  <h2>Contact</h2>
+  <p class="sub" id="hours"></p>
+  <div class="contact" id="contact-list"></div>
+</div></section>
+
+<footer><div class="wrap">
+  <span id="copy">© RDN Network Data</span>
+  <span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0) · <a id="src" href="#" rel="noopener">Cod sursă</a></span>
+</div></footer>
+
+<script>
+(function () {
+  "use strict";
+  var ICONS = {
+    windows: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>',
+    macos: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.1 2.5-1.8 3.1-.5 7.6 1.3 10.1.8 1.2 1.8 2.6 3.1 2.5 1.3 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.4-4.3zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>',
+    linux: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c-2.2 0-3.5 1.9-3.5 4.4 0 1.6.3 2.7-.9 4.4C6.2 12.6 5 14.6 5 17c0 .6.1 1.1.3 1.6"/><path d="M12 2c2.2 0 3.5 1.9 3.5 4.4 0 1.6-.3 2.7.9 4.4 1.4 1.8 2.6 3.8 2.6 6.2 0 .6-.1 1.1-.3 1.6"/><path d="M8 19.5c-1.4.9-3.2.6-3.8-.6M16 19.5c1.4.9 3.2.6 3.8-.6"/><path d="M8 19.5c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5"/><circle cx="10.3" cy="7" r=".6" fill="currentColor"/><circle cx="13.7" cy="7" r=".6" fill="currentColor"/><path d="M10.5 9.2c.5.5 1 .7 1.5.7s1-.2 1.5-.7"/></svg>',
+    android: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10a7 7 0 0 1 14 0v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="m7 4 1.5 2.5M17 4l-1.5 2.5"/><circle cx="9.5" cy="9.5" r=".6" fill="currentColor"/><circle cx="14.5" cy="9.5" r=".6" fill="currentColor"/><path d="M9 18v3M15 18v3M2.5 11v5M21.5 11v5"/></svg>'
+  };
+  var NAMES = { windows: "Windows", macos: "macOS", linux: "Linux", android: "Android" };
+  var ORDER = ["windows", "macos", "linux", "android"];
+  var PRIMARY = { windows: "win-x64", macos: "mac-arm64", linux: "deb-x64", android: "apk-universal" };
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function mb(n) { return n ? (n / 1048576).toFixed(n > 104857600 ? 0 : 1).replace(".", ",") + " MB" : ""; }
+  function detect() {
+    var ua = navigator.userAgent || "", p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    if (/android/i.test(ua)) return "android";
+    if (/iphone|ipad|ipod/i.test(ua)) return "ios";
+    if (/win/i.test(p) || /windows/i.test(ua)) return "windows";
+    if (/mac/i.test(p) || /mac os/i.test(ua)) return "macos";
+    if (/linux|x11/i.test(p + ua)) return "linux";
+    return "";
+  }
+
+  function render(m, site) {
+    var os = detect(), items = (m && m.items) || [], byKey = {};
+    items.forEach(function (it) { byKey[it.key] = it; });
+
+    var order = ORDER.filter(function (p) { return p === os; }).concat(ORDER.filter(function (p) { return p !== os; }));
+    document.getElementById("grid").innerHTML = order.map(function (p) {
+      var list = items.filter(function (it) { return it.platform === p; });
+      var rows = list.length ? list.map(function (it) {
+        return '<div class="file"><span class="l">' + esc(it.label) + '<span class="s">' + esc(mb(it.size)) + "</span></span>" +
+          '<a class="btn" href="' + esc(it.file) + '" download>Descarcă</a></div>';
+      }).join("") : '<div class="none">În curând</div>';
+      return '<div class="os' + (p === os ? " current" : "") + '"><div class="head">' + ICONS[p] + "<h3>" + NAMES[p] + "</h3>" +
+        (p === os ? '<span class="tag">SISTEMUL TĂU</span>' : "") + "</div>" + rows + "</div>";
+    }).join("");
+
+    var cta = document.getElementById("cta"), text = document.getElementById("cta-text"), meta = document.getElementById("cta-meta");
+    var main = byKey[PRIMARY[os]] || (os === "macos" && byKey["mac-x64"]);
+    if (main) {
+      cta.href = main.file; cta.setAttribute("download", ""); cta.classList.remove("disabled");
+      text.textContent = "Descarcă pentru " + NAMES[os];
+      var extra = os === "macos" && byKey["mac-x64"] && main.key === "mac-arm64"
+        ? ' · Mac cu Intel? <a href="' + esc(byKey["mac-x64"].file) + '" download>descarcă aici</a>' : "";
+      meta.innerHTML = esc(main.label) + " · " + esc(mb(main.size)) + " · versiunea " + esc(m.version) + extra;
+    } else if (items.length) {
+      cta.classList.remove("disabled"); cta.removeAttribute("download"); cta.href = "#descarcari";
+      text.textContent = os === "ios" ? "Vezi variantele disponibile" : "Alege sistemul tău";
+      meta.textContent = "Versiunea " + m.version;
+    } else {
+      text.textContent = "Disponibil în curând";
+      meta.textContent = "Aplicația este în pregătire. Revino în curând sau contactează-ne.";
+    }
+    if (m && m.version) document.getElementById("dl-sub").textContent =
+      "Versiunea " + m.version + (m.published ? ", publicată pe " + new Date(m.published * 1000).toLocaleDateString("ro-RO") : "") + ".";
+
+    if (items.length) {
+      document.getElementById("sums").hidden = false;
+      document.getElementById("sums-t").innerHTML = items.map(function (it) {
+        return "<tr><td>" + esc(it.file.split("/").pop()) + "</td><td><code>" + esc(it.sha256) + "</code></td></tr>";
+      }).join("");
+    }
+
+    if (site) {
+      var c = [];
+      if (site.phone) c.push('<a href="tel:' + esc(site.phone.replace(/[^+\d]/g, "")) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>' + esc(site.phone) + "</a>");
+      if (site.email) c.push('<a href="mailto:' + esc(site.email) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>' + esc(site.email) + "</a>");
+      if (c.length) {
+        document.getElementById("contact-list").innerHTML = c.join("");
+        document.getElementById("contact").hidden = false;
+        if (site.hours) document.getElementById("hours").textContent = site.hours;
+      } else {
+        document.getElementById("nav-contact").remove();
+      }
+      if (site.source_url) document.getElementById("src").href = site.source_url;
+      document.getElementById("copy").textContent = "© " + new Date().getFullYear() + " " + (site.company || "RDN Network Data");
+    }
+  }
+
+  function get(url) {
+    return fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+  Promise.all([get("files/downloads.json"), get("site.json")]).then(function (r) { render(r[0], r[1]); });
+})();
+</script>
+</body>
+</html>

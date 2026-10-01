@@ -81,6 +81,33 @@ Funcționează la fel, cu AlmaLinux sau altă distribuție de mai sus:
 5. Setează mini PC-ul să nu intre în sleep și, din BIOS, să pornească singur după o pană de
    curent (*Restore on AC power loss → Power On*).
 
+## Pagina de descărcare
+
+`install.sh` pornește și o pagină web de unde clienții tăi descarcă aplicația, la
+`https://remote.rdndata.ro/` (sau `http://IP-FIX/` dacă folosești doar IP). Pagina:
+
+- detectează sistemul vizitatorului și îi arată butonul potrivit (Windows, macOS, Linux, Android);
+- listează toate variantele, cu dimensiune și sumă de control SHA-256;
+- explică pașii (ID + parolă) și avertizează împotriva înșelătoriilor telefonice.
+
+**Fișierele se actualizează singure:** zilnic (și la pornire) serverul verifică release-urile
+din GitHub și descarcă ultima versiune compilată în `server/web/files/`. Manual:
+`sudo systemctl start rdn-downloads`. Până la primul release, pagina afișează „În curând”.
+
+**Ce trebuie să faci:**
+
+1. În DNS-ul domeniului `rdndata.ro`, creează un record **A**: `remote` → IP-ul public al
+   serverului / al routerului de acasă.
+2. Pe router redirecționează și **80/tcp** și **443/tcp** către mini PC (pentru certificatul
+   HTTPS gratuit Let's Encrypt, obținut automat de Caddy).
+3. Completează datele de contact în `server/web/site.json` (`phone`, `email`, `hours`);
+   secțiunea Contact apare doar dacă le completezi.
+
+Dacă pe server rulează deja Apache/Nginx (de exemplu Virtualmin), `install.sh` nu pornește
+pagina ca să nu intre în conflict. În Virtualmin creează site-ul `remote.rdndata.ro` cu SSL
+(Let's Encrypt din Virtualmin) și setează-i ca director rădăcină `.../Rust-Desktop/server/web`
+(sau copiază acolo conținutul lui); `update_downloads.py` și folderul `files/` rămân la fel.
+
 ## Panoul de securitate
 
 Rulează pe același server și primește automat jurnalele de la toate calculatoarele care
