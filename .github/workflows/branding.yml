@@ -26,13 +26,26 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Check that branding is configured
+        id: configured
+        run: |
+          if grep -q '=CHANGE_ME' branding/brand.env; then
+            echo "::notice::branding/brand.env still has CHANGE_ME values; fill them in (see GHID.md) to brand the sources."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Pillow
+        if: steps.configured.outputs.ready == 'true'
         run: python3 -m pip install --user pillow
 
       - name: Apply branding
+        if: steps.configured.outputs.ready == 'true'
         run: python3 branding/apply.py
 
       - name: Commit branded sources
+        if: steps.configured.outputs.ready == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
