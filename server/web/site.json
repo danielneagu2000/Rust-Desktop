@@ -1,8 +1,13 @@
 {
   "company": "RDN Network Data",
+  "legal_name": "",
+  "cui": "",
+  "reg_com": "",
+  "address": "",
   "product": "RDN Remote",
-  "phone": "",
-  "email": "",
+  "phone": "0723 122 097",
+  "email": "office@rdndata.ro",
   "hours": "",
-  "source_url": "https://github.com/danielneagu2000/Rust-Desktop"
+  "source_url": "https://github.com/danielneagu2000/Rust-Desktop",
+  "privacy_updated": "2026-10-01"
 }

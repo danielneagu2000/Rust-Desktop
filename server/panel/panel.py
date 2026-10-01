@@ -592,6 +592,7 @@ def housekeeping():
             cutoff = time.time() - RETENTION_DAYS * 86400
             x("DELETE FROM sessions WHERE started < ?", (cutoff,))
             x("DELETE FROM alarms WHERE ts < ?", (cutoff,))
+            x("DELETE FROM devices WHERE last_seen < ?", (cutoff,))
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
             # Sessions whose close never arrived (client crashed, network lost).

@@ -114,6 +114,10 @@ def load_config():
     if email and not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", email):
         fail("SUPPORT_EMAIL is not a valid e-mail address")
     cfg["SUPPORT_EMAIL"] = email
+    phone = cfg.get("SUPPORT_PHONE", "")
+    if phone and not re.fullmatch(r"\+?[0-9 ()./-]{6,20}", phone):
+        fail("SUPPORT_PHONE may contain digits, spaces and + ( ) . / -")
+    cfg["SUPPORT_PHONE"] = phone
 
     if not LOGO_FILE.exists():
         fail(f"missing {LOGO_FILE.relative_to(ROOT)} (square PNG, ideally 1024x1024, transparent background)")
@@ -239,7 +243,60 @@ def publisher_patches(cfg):
     ]
     if cfg["SUPPORT_EMAIL"]:
         patches.append(("build.py", r"(?m)^Maintainer: .*$", const(f"Maintainer: {vendor}")))
+    # The MSI shows this as its license page; the whole file is ours.
+    patches.append(("res/msi/Package/License.rtf", r"\A[\s\S]*\Z", const(msi_license_rtf(cfg))))
     return patches
+
+
+def rtf_text(text):
+    out = []
+    for ch in text:
+        if ch in "\\{}":
+            out.append("\\" + ch)
+        elif ord(ch) < 128:
+            out.append(ch)
+        else:
+            out.append(f"\\u{ord(ch) if ord(ch) < 32768 else ord(ch) - 65536}?")
+    # res/msi/preprocess.py rewrites "RustDesk" and "Purslane ... Ltd" to the app name;
+    # an empty RTF group splits the words so the attribution survives that rewrite.
+    return "".join(out).replace("RustDesk", "Rust{}Desk").replace("Purslane", "Purs{}lane")
+
+
+def msi_license_rtf(cfg):
+    company, display = cfg["COMPANY"], cfg["DISPLAY_NAME"]
+    contact = ", ".join(x for x in (cfg["SUPPORT_EMAIL"], cfg["SUPPORT_PHONE"], cfg["WEBSITE_URL"]) if x)
+    sections = [
+        (None, f"{display}: licență și informații de utilizare"),
+        ("1. Licența programului",
+         f"{display} este software liber, bazat pe RustDesk (Copyright © Purslane Tech Pte. Ltd.) și distribuit "
+         f"de {company} sub licența GNU Affero General Public License, versiunea 3 (AGPL-3.0). Poți folosi, copia, "
+         f"modifica și redistribui programul în condițiile acestei licențe; nicio prevedere din acest document nu "
+         f"restrânge drepturile pe care ți le dă AGPL-3.0. Codul sursă complet: {cfg['SOURCE_URL']}. "
+         f"Textul integral al licenței: https://www.gnu.org/licenses/agpl-3.0.html"),
+        ("2. Fără garanție",
+         "Conform secțiunilor 15 și 16 din AGPL-3.0, programul este furnizat „ca atare”, fără nicio garanție, "
+         "expresă sau implicită, în limita permisă de lege. Răspunderea pentru serviciile de asistență oferite "
+         f"de {company} este cea stabilită prin contractul sau înțelegerea ta cu {company}."),
+        ("3. Cum funcționează asistența la distanță",
+         f"Programul se conectează la serverul {company}. Un tehnician se poate conecta la calculatorul tău "
+         "numai cu ID-ul și parola afișate de program, pe care le comunici tu, sau, dacă ai convenit cu "
+         f"{company} acces nesupravegheat, cu parola permanentă stabilită de comun acord. Conexiunea este criptată de la "
+         "un capăt la altul. Vezi tot ce face tehnicianul și poți închide conexiunea oricând. Nu comunica ID-ul "
+         "și parola persoanelor care te contactează nesolicitat."),
+        ("4. Date personale",
+         "Pentru funcționare și securitate, programul transmite serverului date tehnice: ID-ul dispozitivului, "
+         "numele calculatorului și al utilizatorului, sistemul de operare, adresa IP și jurnalul conexiunilor. "
+         f"Detalii despre ce date prelucrăm, cât timp le păstrăm și drepturile tale: {cfg['PRIVACY_URL']}"),
+        ("5. Contact", f"{company}: {contact}"),
+    ]
+    body = []
+    for title, text in sections:
+        if title is None:
+            body.append(f"{{\\b\\fs24 {rtf_text(text)}\\par}}\\par")
+        else:
+            body.append(f"{{\\b {rtf_text(title)}\\par}}{rtf_text(text)}\\par\\par")
+    return ("{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}"
+            "\\f0\\fs18\n" + "\n".join(body) + "\n}\n")
 
 
 def apply_text(cfg, check):
