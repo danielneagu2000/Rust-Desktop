@@ -12,6 +12,8 @@ on:
       - "branding/brand.env"
       - "branding/logo.png"
       - "branding/logo-small.png"
+      - "branding/logo-app.png"
+      - "branding/logo-app-dark.png"
       - "branding/apply.py"
 
 permissions:
@@ -53,6 +55,7 @@ jobs:
           # Icons are *.png, which the upstream .gitignore excludes; add tracked changes only.
           git add -u
           git add -f branding/.applied
+          git add -f flutter/assets/logo.png flutter/assets/logo_dark.png 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "Sources already branded; nothing to commit."
             exit 0

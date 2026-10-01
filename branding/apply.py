@@ -16,6 +16,7 @@ import hashlib
 import io
 import re
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,9 @@ LOGO_FILE = BRAND_DIR / "logo.png"
 # Optional simplified mark for icons of SMALL_MAX px and below (tray, taskbar, notifications).
 LOGO_SMALL_FILE = BRAND_DIR / "logo-small.png"
 SMALL_MAX = 48
+# Optional wide logo shown inside the app (main window header, max 300x60).
+LOGO_APP_FILE = BRAND_DIR / "logo-app.png"
+LOGO_APP_DARK_FILE = BRAND_DIR / "logo-app-dark.png"
 STAMP_FILE = BRAND_DIR / ".applied"
 PLACEHOLDER = "CHANGE_ME"
 
@@ -87,6 +91,30 @@ def load_config():
         fail("DISPLAY_NAME may use letters, digits, single spaces, '.' and '-' (max 40)")
     cfg["DISPLAY_NAME"] = display.strip()
 
+    company = cfg.get("COMPANY") or display
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .,&\-]{0,59}", company):
+        fail("COMPANY may use letters, digits, spaces and . , & - (max 60)")
+    cfg["COMPANY"] = company
+    year = cfg.get("COPYRIGHT_YEAR") or time.strftime("%Y")
+    if not re.fullmatch(r"\d{4}", year):
+        fail("COPYRIGHT_YEAR must be a year, e.g. 2026")
+    cfg["COPYRIGHT_YEAR"] = year
+
+    url_re = r"https?://[A-Za-z0-9._~:/?#\[\]@!&()*+,;=%-]+"
+    host = re.sub(r":\d+$", "", server).strip("[]")
+    cfg["WEBSITE_URL"] = cfg.get("WEBSITE_URL") or f"https://{host}"
+    cfg["PRIVACY_URL"] = cfg.get("PRIVACY_URL") or cfg["WEBSITE_URL"]
+    cfg["SOURCE_URL"] = cfg.get("SOURCE_URL", "")
+    if not cfg["SOURCE_URL"]:
+        fail("SOURCE_URL is required: AGPL-3.0 obliges you to offer the source code to your users")
+    for k in ("WEBSITE_URL", "PRIVACY_URL", "SOURCE_URL"):
+        if not re.fullmatch(url_re, cfg[k]):
+            fail(f"{k} must be an http(s) URL without quotes or spaces")
+    email = cfg.get("SUPPORT_EMAIL", "")
+    if email and not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", email):
+        fail("SUPPORT_EMAIL is not a valid e-mail address")
+    cfg["SUPPORT_EMAIL"] = email
+
     if not LOGO_FILE.exists():
         fail(f"missing {LOGO_FILE.relative_to(ROOT)} (square PNG, ideally 1024x1024, transparent background)")
     return cfg
@@ -142,19 +170,89 @@ def text_patches(cfg):
         # Only the first Name= (the [Desktop Entry] one), not the actions' names.
         ("res/rustdesk.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
         ("res/rustdesk-link.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
+    ] + publisher_patches(cfg)
+
+
+def publisher_patches(cfg):
+    """Publisher metadata and in-app legal notices: the company replaces Purslane
+    as publisher, while the RustDesk copyright and AGPL notice stay visible."""
+    company, year, display = cfg["COMPANY"], cfg["COPYRIGHT_YEAR"], cfg["DISPLAY_NAME"]
+    web, privacy, source = cfg["WEBSITE_URL"], cfg["PRIVACY_URL"], cfg["SOURCE_URL"]
+    web_host = re.sub(r"^https?://", "", web).rstrip("/")
+    legal = f"Copyright \u00a9 {year} {company}. Based on RustDesk, \u00a9 Purslane Tech Pte. Ltd., AGPL-3.0."
+    vendor = f"{company} <{cfg['SUPPORT_EMAIL']}>" if cfg["SUPPORT_EMAIL"] else company
+    const = lambda text: (lambda m: text)  # literal replacement, no backslash processing
+    winres = (r'(\[package\.metadata\.winres\]\n)LegalCopyright = "[^"]*"\n(?:CompanyName = "[^"]*"\n)?',
+              lambda m: f'{m.group(1)}LegalCopyright = "{legal}"\nCompanyName = "{company}"\n')
+    dart_notice = (f"'Copyright \u00a9 ${{DateTime.now().toString().substring(0, 4)}} {company}\\n"
+                   f"Based on RustDesk, Copyright \u00a9 Purslane Tech Pte. Ltd.\\n"
+                   f"Licensed under AGPL-3.0. Source code: {source}\\n$license'")
+    tis_notice = (f"Copyright &copy; {year} {company}<br />Based on RustDesk, Copyright &copy; "
+                  f"Purslane Tech Pte. Ltd., AGPL-3.0<br />Source code: {source}")
+    patches = [
+        ("flutter/windows/runner/Runner.rc", r'VALUE "CompanyName", "[^"]*"', const(f'VALUE "CompanyName", "{company}"')),
+        ("flutter/windows/runner/Runner.rc", r'VALUE "LegalCopyright", "[^"]*"', const(f'VALUE "LegalCopyright", "{legal}"')),
+        ("Cargo.toml", *winres),
+        ("Cargo.toml", r'(?m)^ProductName = "[^"]*"$', const(f'ProductName = "{display}"')),
+        ("Cargo.toml", r'(?m)^FileDescription = "[^"]*"$', const(f'FileDescription = "{display}"')),
+        ("libs/portable/Cargo.toml", *winres),
+        ("libs/portable/Cargo.toml", r'(?m)^ProductName = "[^"]*"$', const(f'ProductName = "{display}"')),
+        ("libs/portable/Cargo.toml", r'(?m)^FileDescription = "[^"]*"$', const(f'FileDescription = "{display}"')),
+        ("flutter/macos/Runner/Configs/AppInfo.xcconfig", r'(?m)^PRODUCT_COPYRIGHT = .*$', const(f"PRODUCT_COPYRIGHT = {legal}")),
+        ("res/msi/preprocess.py", r'("--manufacturer",\n\s*type=str,\n\s*default=)"[^"]*"',
+         lambda m: f'{m.group(1)}"{company}"'),
+        ("res/rpm.spec", r'(?m)^Vendor: .*$', const(f"Vendor:     {vendor}")),
+        ("res/rpm-flutter.spec", r'(?m)^Vendor: .*$', const(f"Vendor:     {vendor}")),
+        ("res/rpm-flutter-suse.spec", r'(?m)^Vendor: .*$', const(f"Vendor:     {vendor}")),
+        # Desktop "About" page: links and the legal notice.
+        ("flutter/lib/desktop/pages/desktop_setting_page.dart",
+         r"(launchUrlString\(')[^']*('\);\n\s*\},\n\s*child: Text\(\n\s*translate\('Privacy Statement'\))",
+         lambda m: f"{m.group(1)}{privacy}{m.group(2)}"),
+        ("flutter/lib/desktop/pages/desktop_setting_page.dart",
+         r"(launchUrlString\(')[^']*('\);\n\s*\},\n\s*child: Text\(\n\s*translate\('Website'\))",
+         lambda m: f"{m.group(1)}{web}{m.group(2)}"),
+        ("flutter/lib/desktop/pages/desktop_setting_page.dart",
+         r"'Copyright \u00a9 \$\{DateTime\.now\(\)\.toString\(\)\.substring\(0, 4\)\}[^']*\$license'",
+         const(dart_notice)),
+        ("flutter/lib/desktop/pages/install_page.dart",
+         r"(launchUrlString\(\n\s*')[^']*('\),\n\s*child: Tooltip\(\n\s*message: ')[^']*(',)",
+         lambda m: f"{m.group(1)}{privacy}{m.group(2)}{privacy}{m.group(3)}"),
+        # Mobile settings: website and privacy links.
+        ("flutter/lib/mobile/pages/settings_page.dart", r"(?m)^const url = '[^']*';$", const(f"const url = '{web}/';")),
+        ("flutter/lib/mobile/pages/settings_page.dart",
+         r"(child: Text\(')[^']*(',\n\s*style: TextStyle\(\n\s*decoration: TextDecoration\.underline,)",
+         lambda m: f"{m.group(1)}{web_host}{m.group(2)}", 2),
+        ("flutter/lib/mobile/pages/settings_page.dart",
+         r"(launchUrlString\(')[^']*('\),\n\s*leading: Icon\(Icons\.privacy_tip\))",
+         lambda m: f"{m.group(1)}{privacy}{m.group(2)}"),
+        ("flutter/lib/mobile/pages/settings_page.dart",
+         r"(\n\s+const url = ')[^']*(';\n\s+await launchUrl)", lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
+        # Legacy Sciter UI (Windows 7 build).
+        ("src/ui/index.tis", r"""(url=')[^']*('>" \+ translate\("Privacy Statement"\))""",
+         lambda m: f"{m.group(1)}{privacy}{m.group(2)}"),
+        ("src/ui/index.tis", r"""(url=')[^']*('>" \+ translate\("Website"\))""",
+         lambda m: f"{m.group(1)}{web}{m.group(2)}"),
+        ("src/ui/index.tis", r"(margin-top: 1em;'>)Copyright &copy; [^\n]*?(\\\n)",
+         lambda m: f"{m.group(1)}{tis_notice}{m.group(2)}"),
+        ("src/ui/install.tis", r'(event click \$\(#agreement\) \{\n\s*view\.open_url\(")[^"]*(")',
+         lambda m: f"{m.group(1)}{privacy}{m.group(2)}"),
     ]
+    if cfg["SUPPORT_EMAIL"]:
+        patches.append(("build.py", r"(?m)^Maintainer: .*$", const(f"Maintainer: {vendor}")))
+    return patches
 
 
 def apply_text(cfg, check):
     # Compute every patch before writing anything, so a mismatch never leaves
     # the tree half-branded.
     contents = {}
-    for rel, pattern, repl in text_patches(cfg):
+    for rel, pattern, repl, *count in text_patches(cfg):
+        expected = count[0] if count else 1
         if rel not in contents:
             contents[rel] = (ROOT / rel).read_text(encoding="utf-8")
         new, n = re.subn(pattern, repl, contents[rel])
-        if n != 1:
-            fail(f"{rel}: expected exactly one match for {pattern!r}, found {n} "
+        if n != expected:
+            fail(f"{rel}: expected {expected} match(es) for {pattern!r}, found {n} "
                  "(upstream changed? update branding/apply.py)")
         contents[rel] = new
 
@@ -297,6 +395,25 @@ def apply_icons(check):
     for rel in ("flutter/assets/icon.svg", "res/logo.svg", "res/scalable.svg"):
         (ROOT / rel).write_text(svg, encoding="utf-8")
         written.append(rel)
+
+    # Optional wide logo for the app's main window (shown at most 300x60); the dark-theme
+    # copy turns dark strokes light so they stay readable on a dark background.
+    if LOGO_APP_FILE.exists():
+        app = Image.open(LOGO_APP_FILE).convert("RGBA")
+        app = app.crop(app.getbbox())
+        app.save(ROOT / "flutter/assets/logo.png", format="PNG", optimize=True)
+        if LOGO_APP_DARK_FILE.exists():
+            dark = Image.open(LOGO_APP_DARK_FILE).convert("RGBA").crop(app.getbbox())
+        else:
+            dark = app.copy()
+            px = dark.load()
+            for y in range(dark.height):
+                for x in range(dark.width):
+                    r_, g, b_, a_ = px[x, y]
+                    if a_ and (r_ * 299 + g * 587 + b_ * 114) // 1000 < 70:
+                        px[x, y] = (245, 238, 239, a_)
+        dark.save(ROOT / "flutter/assets/logo_dark.png", format="PNG", optimize=True)
+        written += ["flutter/assets/logo.png", "flutter/assets/logo_dark.png"]
     return written
 
 
@@ -306,6 +423,9 @@ def fingerprint():
     h.update(LOGO_FILE.read_bytes())
     if LOGO_SMALL_FILE.exists():
         h.update(LOGO_SMALL_FILE.read_bytes())
+    for extra in (LOGO_APP_FILE, LOGO_APP_DARK_FILE):
+        if extra.exists():
+            h.update(extra.read_bytes())
     h.update(Path(__file__).read_bytes())
     return h.hexdigest()
 
