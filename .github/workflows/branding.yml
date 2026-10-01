@@ -1,0 +1,47 @@
+name: Apply branding
+
+# Edit branding/brand.env (and optionally branding/logo.png) on GitHub, push,
+# and this workflow regenerates the branded sources and commits them back.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "branding/brand.env"
+      - "branding/logo.png"
+      - "branding/apply.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-branding
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Pillow
+        run: python3 -m pip install --user pillow
+
+      - name: Apply branding
+        run: python3 branding/apply.py
+
+      - name: Commit branded sources
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Icons are *.png, which the upstream .gitignore excludes; add tracked changes only.
+          git add -u
+          git add -f branding/.applied
+          if git diff --cached --quiet; then
+            echo "Sources already branded; nothing to commit."
+            exit 0
+          fi
+          git commit -m "Apply branding from branding/brand.env"
+          git push

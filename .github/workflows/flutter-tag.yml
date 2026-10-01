@@ -10,7 +10,15 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+-[0-9]+'
 
 jobs:
+  check-branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Verify the sources carry the branding from branding/brand.env
+        run: python3 branding/apply.py --check
+
   run-flutter-tag-build:
+    needs: check-branding
     uses: ./.github/workflows/flutter-build.yml
     secrets: inherit
     with:

@@ -1,3 +1,5 @@
+> **Fork personalizat.** Pentru configurarea cu numele, logo-ul și serverul tău vezi **[GHID.md](GHID.md)** (în română).
+
 <p align="center">
   <img src="res/logo-header.svg" alt="RustDesk - Your remote desktop"><br>
   <a href="#raw-steps-to-build">Build</a> •

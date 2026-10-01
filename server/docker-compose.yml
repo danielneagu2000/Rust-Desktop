@@ -1,0 +1,33 @@
+# Serverul propriu: hbbs (ID/rendezvous) + hbbr (relay).
+# Pornește cu:  docker compose up -d     (sau folosește ./install.sh)
+#
+# Porturi necesare în firewall:
+#   21115/tcp  test NAT
+#   21116/tcp  + 21116/udp  ID/rendezvous (hbbs)
+#   21117/tcp  relay (hbbr)
+#   21118/tcp, 21119/tcp  doar pentru clientul web (opțional)
+
+services:
+  hbbs:
+    container_name: hbbs
+    image: rustdesk/rustdesk-server:1.1.16
+    # -r: unde le spune clienților să găsească relay-ul.
+    # -k _: acceptă doar clienții care au cheia publică a acestui server.
+    command: hbbs -r ${SERVER_HOST:?setează SERVER_HOST în server/.env}:21117 -k _
+    volumes:
+      - ./data:/root
+    # host network: hbbs vede IP-urile reale ale clienților (necesar pentru conexiuni directe/NAT).
+    network_mode: host
+    restart: unless-stopped
+
+  hbbr:
+    container_name: hbbr
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbr -k _
+    volumes:
+      - ./data:/root
+    network_mode: host
+    # hbbs generează perechea de chei la primul start; hbbr o folosește pe aceeași.
+    depends_on:
+      - hbbs
+    restart: unless-stopped
