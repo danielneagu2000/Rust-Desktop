@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panou securitate</title>
+<style>
+:root {
+  --bg: #f4f6f9; --card: #ffffff; --text: #18202b; --muted: #5d6878; --line: #e2e7ee;
+  --accent: #1d4ed8; --accent-weak: #e6edff; --ok: #157a3f; --ok-weak: #e3f5ea;
+  --warn: #9a5b00; --warn-weak: #fff1d6; --bad: #b42318; --bad-weak: #fde7e5;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f141b; --card: #171e27; --text: #e6ebf2; --muted: #98a3b3; --line: #273140;
+    --accent: #7aa2ff; --accent-weak: #1c2a4a; --ok: #5fd08a; --ok-weak: #15301f;
+    --warn: #f0b44c; --warn-weak: #3a2b10; --bad: #ff7b6e; --bad-weak: #3d1714;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 16px 24px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+h1 { font-size: 18px; margin: 0; }
+.sub { color: var(--muted); font-size: 12px; }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input[type=search], input[type=text] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--text); font: inherit; min-width: 0; }
+input[type=search] { width: 260px; max-width: 60vw; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button.small { padding: 3px 9px; font-size: 12px; }
+main { padding: 20px 24px 48px; max-width: 1400px; margin: 0 auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tile .l { color: var(--muted); font-size: 12px; }
+.tile.bad .v { color: var(--bad); } .tile.warn .v { color: var(--warn); } .tile.ok .v { color: var(--ok); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
+nav button { border-radius: 999px; }
+nav button.on { background: var(--accent-weak); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+section { display: none; } section.on { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+.card h2 { font-size: 14px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.card p.hint { margin: 0; padding: 10px 16px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; background: var(--card); }
+tr:last-child td { border-bottom: 0; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.pill.ok { background: var(--ok-weak); color: var(--ok); }
+.pill.warn { background: var(--warn-weak); color: var(--warn); }
+.pill.bad { background: var(--bad-weak); color: var(--bad); }
+.pill.mute { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+.ipcell { display: inline-flex; gap: 6px; align-items: center; }
+a.ip { color: var(--accent); cursor: pointer; text-decoration: none; }
+a.ip:hover { text-decoration: underline; }
+form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+#toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+#toast.show { opacity: 1; }
+@media (max-width: 640px) { header, main { padding-left: 16px; padding-right: 16px; } input[type=search] { width: 100%; max-width: none; } .tools { width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Panou securitate</h1>
+    <div class="sub" id="status">Se încarcă…</div>
+  </div>
+  <div class="tools">
+    <input type="search" id="q" placeholder="Caută IP, ID, nume…" autocomplete="off">
+    <button id="refresh">Reîmprospătează</button>
+  </div>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <nav id="tabs">
+    <button data-tab="conns" class="on">Istoric conexiuni</button>
+    <button data-tab="brute">Brute-force pe IP</button>
+    <button data-tab="blocked">IP-uri blocate</button>
+    <button data-tab="alarms">Alarme</button>
+    <button data-tab="devices">Dispozitive</button>
+  </nav>
+
+  <section id="conns" class="on"><div class="card">
+    <h2>Istoric conexiuni (ultimele 300)</h2>
+    <p class="hint">Fiecare rând e o conexiune către unul din calculatoarele tale. „Eșuată” = s-a conectat dar nu s-a autentificat (parolă greșită, respinsă sau abandonată).</p>
+    <div class="scroll"><table><thead><tr>
+      <th>Început</th><th>IP sursă</th><th>Calculator țintă</th><th>Cine (ID / nume)</th><th>Tip</th><th>Autentificare</th><th>Durată</th><th>Stare</th><th></th>
+    </tr></thead><tbody id="t-conns"></tbody></table></div>
+  </div></section>
+
+  <section id="brute"><div class="card">
+    <h2>Statistici brute-force pe IP (ultimele 30 de zile)</h2>
+    <p class="hint">Risc ridicat: ≥10 conexiuni eșuate sau o alarmă de la calculatoare. Mediu: ≥3 eșuate.</p>
+    <div class="scroll"><table><thead><tr>
+      <th>IP</th><th>Risc</th><th class="num">Încercări</th><th class="num">Reușite</th><th class="num">Eșuate</th><th class="num">Alarme</th><th class="num">Calculatoare vizate</th><th>Ultima dată</th><th></th>
+    </tr></thead><tbody id="t-brute"></tbody></table></div>
+  </div></section>
+
+  <section id="blocked">
+    <div class="card">
+      <h2>Blocate pe server (de tine)</h2>
+      <p class="hint">Serverul refuză să transmită (relay) conexiuni de la aceste IP-uri. Conexiunile directe (P2P) nu trec prin server; pentru acelea contează blocarea de pe calculatoare și firewall-ul lor.</p>
+      <form class="add" id="add-block">
+        <input type="text" id="block-ip" placeholder="IP de blocat" required>
+        <input type="text" id="block-note" placeholder="Notă (opțional)">
+        <button class="primary" type="submit">Blochează</button>
+      </form>
+      <div class="scroll"><table><thead><tr><th>IP</th><th>Adăugat</th><th>Notă</th><th></th></tr></thead><tbody id="t-blocklist"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Blocate automat de calculatoare (anti brute-force)</h2>
+      <p class="hint">Raportate de calculatoarele controlate: după 6 parole greșite într-un minut IP-ul e blocat 1 minut; după 30 e blocat până la repornirea aplicației.</p>
+      <div class="scroll"><table><thead><tr><th>IP</th><th>Motiv</th><th>Stare</th><th class="num">De câte ori</th><th>Calculatoare</th><th>Ultima dată</th><th></th></tr></thead><tbody id="t-clientblocks"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="alarms"><div class="card">
+    <h2>Alarme de securitate (ultimele 200)</h2>
+    <div class="scroll"><table><thead><tr><th>Când</th><th>Alarmă</th><th>IP</th><th>Calculator</th><th>Detalii</th></tr></thead><tbody id="t-alarms"></tbody></table></div>
+  </div></section>
+
+  <section id="devices"><div class="card">
+    <h2>Dispozitive</h2>
+    <p class="hint">Calculatoarele cu aplicația ta raportează la fiecare ~15 secunde. Poți închide de aici o sesiune activă.</p>
+    <div class="scroll"><table><thead><tr><th>Stare</th><th>ID</th><th>Nume calculator</th><th>Utilizator</th><th>Sistem</th><th>IP public</th><th>Versiune</th><th>Văzut ultima dată</th><th>Sesiuni active</th></tr></thead><tbody id="t-devices"></tbody></table></div>
+  </div></section>
+</main>
+<div id="toast"></div>
+<script>
+(function () {
+  "use strict";
+  var base = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/";
+  var data = null, timer = null;
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function when(ts) { return ts ? new Date(ts * 1000).toLocaleString("ro-RO") : "—"; }
+  function ago(ts) {
+    if (!ts) return "—";
+    var s = Math.max(0, Math.round(data.now - ts));
+    if (s < 60) return "acum " + s + "s";
+    if (s < 3600) return "acum " + Math.round(s / 60) + " min";
+    if (s < 86400) return "acum " + Math.round(s / 3600) + " h";
+    return when(ts);
+  }
+  function dur(a, b) {
+    if (!a) return "—";
+    var s = Math.round((b || data.now) - a);
+    var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60;
+    return (h ? h + "h " : "") + (h || m ? m + "m " : "") + r + "s";
+  }
+  function pill(text, cls) { return '<span class="pill ' + cls + '">' + esc(text) + "</span>"; }
+  function ip(v) { return v ? '<a class="ip mono" data-ip="' + esc(v) + '">' + esc(v) + "</a>" : "—"; }
+  function blockBtn(v, blocked) {
+    if (!v) return "";
+    return blocked
+      ? '<button class="small" data-unblock="' + esc(v) + '">Deblochează</button>'
+      : '<button class="small danger" data-block="' + esc(v) + '">Blochează</button>';
+  }
+  function rows(id, list, fn, cols) {
+    document.getElementById(id).innerHTML = list.length
+      ? list.map(fn).join("")
+      : '<tr><td class="empty" colspan="' + cols + '">Nimic de afișat</td></tr>';
+  }
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  function render() {
+    var s = data.stats;
+    document.getElementById("status").innerHTML =
+      "Actualizat " + esc(new Date().toLocaleTimeString("ro-RO")) + " · relay (hbbr): " +
+      (data.hbbr_ok ? pill("conectat", "ok") : pill("indisponibil", "bad"));
+    var tiles = [
+      [s.devices_online + " / " + s.devices_total, "Dispozitive online", "ok"],
+      [s.active_sessions, "Sesiuni active", ""],
+      [s.conns_24h, "Conexiuni reușite (24h)", ""],
+      [s.failed_24h, "Conexiuni eșuate (24h)", s.failed_24h ? "warn" : ""],
+      [s.alarms_24h, "Alarme (24h)", s.alarms_24h ? "bad" : ""],
+      [s.blocked, "IP-uri blocate pe server", ""]
+    ];
+    document.getElementById("tiles").innerHTML = tiles.map(function (t) {
+      return '<div class="tile ' + t[2] + '"><div class="v">' + esc(t[0]) + '</div><div class="l">' + esc(t[1]) + "</div></div>";
+    }).join("");
+
+    var online = {};
+    data.devices.forEach(function (d) { if (d.online) online[d.uuid] = d; });
+
+    rows("t-conns", data.sessions, function (r) {
+      var st;
+      if (r.authed && !r.ended) st = pill("Activă", "ok");
+      else if (r.authed) st = pill("Reușită", "mute");
+      else if (r.ended) st = pill("Eșuată", "bad");
+      else st = pill("În curs", "warn");
+      var who = r.peer_id ? '<span class="mono">' + esc(r.peer_id) + "</span> " + esc(r.peer_name || "") : "—";
+      var target = '<span class="mono">' + esc(r.device_id || "") + "</span>" + (r.hostname ? " · " + esc(r.hostname) : "");
+      var dis = r.authed && !r.ended && online[r.uuid]
+        ? '<button class="small danger" data-disc="' + esc(r.uuid) + '" data-conn="' + esc(r.conn_id) + '">Deconectează</button>' : "";
+      return "<tr><td>" + esc(when(r.started)) + "</td><td>" + ip(r.remote_ip) + (r.blocked ? " " + pill("blocat", "bad") : "") +
+        "</td><td>" + target + "</td><td>" + who + "</td><td>" + esc(r.type_label || "—") +
+        "</td><td>" + esc(r.auth_label || "—") + "</td><td>" + esc(r.authed ? dur(r.authed, r.ended) : "—") +
+        "</td><td>" + st + "</td><td>" + dis + "</td></tr>";
+    }, 9);
+
+    rows("t-brute", data.ip_stats, function (r) {
+      var cls = r.risk === "ridicat" ? "bad" : r.risk === "mediu" ? "warn" : "ok";
+      return "<tr><td>" + ip(r.ip) + (r.blocked ? " " + pill("blocat", "bad") : "") + "</td><td>" + pill(r.risk, cls) +
+        '</td><td class="num">' + r.attempts + '</td><td class="num">' + r.ok + '</td><td class="num">' + r.failed +
+        '</td><td class="num">' + r.alarms + '</td><td class="num">' + r.devices + "</td><td>" + esc(ago(r.last)) +
+        "</td><td>" + blockBtn(r.ip, r.blocked) + "</td></tr>";
+    }, 9);
+
+    var blockedSet = {};
+    data.blocklist.forEach(function (b) { blockedSet[b.ip] = true; });
+    rows("t-blocklist", data.blocklist, function (r) {
+      return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(when(r.added)) + "</td><td>" + esc(r.note) +
+        "</td><td>" + blockBtn(r.ip, true) + "</td></tr>";
+    }, 4);
+    rows("t-clientblocks", data.client_blocks, function (r) {
+      return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(r.label) + "</td><td>" +
+        (r.active ? pill("probabil activ", "bad") : pill("expirat", "mute")) + '</td><td class="num">' + r.n +
+        '</td><td class="mono">' + esc(r.devices) + "</td><td>" + esc(ago(r.last)) + "</td><td>" +
+        blockBtn(r.ip, !!blockedSet[r.ip]) + "</td></tr>";
+    }, 7);
+
+    rows("t-alarms", data.alarms, function (r) {
+      var cls = [1, 2, 6].indexOf(r.typ) >= 0 ? "bad" : "warn";
+      var info = "";
+      try { var o = JSON.parse(r.info || "{}"); info = Object.keys(o).filter(function (k) { return k !== "ip"; })
+        .map(function (k) { return k + ": " + o[k]; }).join(", "); } catch (e) { info = r.info; }
+      return "<tr><td>" + esc(when(r.ts)) + "</td><td>" + pill(r.label, cls) + "</td><td>" + ip(r.ip) +
+        '</td><td><span class="mono">' + esc(r.device_id) + "</span>" + (r.hostname ? " · " + esc(r.hostname) : "") +
+        "</td><td>" + esc(info) + "</td></tr>";
+    }, 5);
+
+    rows("t-devices", data.devices, function (d) {
+      return "<tr><td>" + (d.online ? pill("online", "ok") : pill("offline", "mute")) + '</td><td class="mono">' + esc(d.device_id) +
+        "</td><td>" + esc(d.hostname || "—") + "</td><td>" + esc(d.username || "—") + "</td><td>" + esc(d.os || "—") +
+        "</td><td>" + ip(d.src_ip) + "</td><td>" + esc(d.ver || "—") + "</td><td>" + esc(ago(d.last_seen)) +
+        '</td><td class="num">' + (d.conns ? d.conns.length : 0) + "</td></tr>";
+    }, 9);
+  }
+
+  function load() {
+    var q = document.getElementById("q").value.trim();
+    return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) { data = d; render(); })
+      .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });
+  }
+  function post(action, body) {
+    return fetch(base + "api/" + action, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Panel": "1" }, body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); });
+  }
+
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var t = e.target.closest("button[data-tab]"); if (!t) return;
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", b === t); });
+    document.querySelectorAll("main section").forEach(function (s) { s.classList.toggle("on", s.id === t.dataset.tab); });
+    try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
+  });
+  document.body.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
+    if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
+    if (el.dataset.block) {
+      if (!confirm("Blochezi IP-ul " + el.dataset.block + " pe server?")) return;
+      post("block", { ip: el.dataset.block, note: "" }).then(function (r) {
+        toast(r.hbbr ? "IP blocat" : "IP salvat; relay-ul nu a răspuns, se aplică la repornirea lui"); load();
+      }).catch(function (err) { toast("Eroare: " + err.message); });
+    } else if (el.dataset.unblock) {
+      post("unblock", { ip: el.dataset.unblock }).then(function () { toast("IP deblocat"); load(); })
+        .catch(function (err) { toast("Eroare: " + err.message); });
+    } else if (el.dataset.disc) {
+      if (!confirm("Închizi această sesiune?")) return;
+      post("disconnect", { uuid: el.dataset.disc, conn_id: Number(el.dataset.conn) })
+        .then(function () { toast("Cerere trimisă; sesiunea se închide în câteva secunde"); setTimeout(load, 5000); })
+        .catch(function (err) { toast("Eroare: " + err.message); });
+    }
+  });
+  document.getElementById("add-block").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var ipv = document.getElementById("block-ip").value.trim();
+    post("block", { ip: ipv, note: document.getElementById("block-note").value.trim() }).then(function (r) {
+      toast(r.hbbr ? "IP blocat" : "IP salvat; relay-ul nu a răspuns, se aplică la repornirea lui");
+      document.getElementById("block-ip").value = ""; document.getElementById("block-note").value = ""; load();
+    }).catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  var debounce;
+  document.getElementById("q").addEventListener("input", function () { clearTimeout(debounce); debounce = setTimeout(load, 300); });
+  document.getElementById("refresh").addEventListener("click", load);
+
+  try {
+    var saved = localStorage.getItem("panel-tab");
+    if (saved) { var b = document.querySelector('#tabs button[data-tab="' + saved + '"]'); if (b) b.click(); }
+  } catch (err) {}
+  load();
+  timer = setInterval(load, 10000);
+})();
+</script>
+</body>
+</html>

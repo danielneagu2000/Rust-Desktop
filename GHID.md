@@ -19,8 +19,9 @@ Ordinea pașilor contează: **serverul primul**, pentru că el generează cheia 
 
 ## Pasul 1 — Pornește serverul
 
-Ai nevoie de un server Linux cu IP public (un VPS de 1 vCPU / 1 GB RAM e suficient pentru
-zeci de calculatoare; Ubuntu 22.04 sau 24.04). Ideal, un domeniu (ex. `remote.firma-mea.ro`)
+Ai nevoie de un calculator Linux pornit permanent: un VPS (1 vCPU / 1 GB RAM e suficient
+pentru zeci de calculatoare), serverul tău cu Virtualmin sau un mini PC. Merge pe AlmaLinux,
+Rocky, RHEL, Ubuntu și Debian. Ideal, un domeniu (ex. `remote.firma-mea.ro`)
 care arată spre IP-ul lui — dacă schimbi vreodată IP-ul, schimbi doar DNS-ul, nu și clienții.
 
 ```bash
@@ -29,8 +30,8 @@ cd Rust-Desktop/server
 sudo ./install.sh remote.firma-mea.ro
 ```
 
-Scriptul instalează Docker (dacă lipsește), deschide porturile în `ufw`, pornește `hbbs` și
-`hbbr` și la final afișează ceva de genul:
+Scriptul instalează Docker (dacă lipsește), deschide porturile în firewall (`firewalld` sau
+`ufw`), pornește `hbbs`, `hbbr` și panoul de securitate și la final afișează ceva de genul:
 
 ```
 RENDEZVOUS_SERVER=remote.firma-mea.ro
@@ -40,7 +41,7 @@ RS_PUB_KEY=h5gYcaUJdmf0TSyIb296phdKvtJBhgY7a6SmrcQ280A=
 Notează-le — îți trebuie la pasul 2.
 
 **Porturi** (dacă ai și firewall la provider: AWS, Azure, Hetzner etc., deschide-le și acolo):
-`21115-21117/tcp`, `21116/udp`, iar `21118-21119/tcp` doar dacă vrei clientul web.
+`21114-21117/tcp`, `21116/udp`, iar `21118-21119/tcp` doar dacă vrei clientul web.
 
 **Backup obligatoriu:** `server/data/id_ed25519`. Este cheia privată a serverului. Dacă o
 pierzi, trebuie să recompilezi și să reinstalezi toți clienții.
@@ -52,8 +53,73 @@ dezactivate în `server/docker-compose.yml` (`TOTAL_BANDWIDTH`, `SINGLE_BANDWIDT
 calculatoare se pot conecta direct (P2P), traficul nici nu trece prin server. În aplicație,
 la *Calitate imagine* poți alege „Cea mai bună” și FPS personalizat (până la 120).
 
-Serverul acceptă doar clienți care au cheia lui (`-k _`), deci un RustDesk obișnuit sau
-altcineva nu-ți poate folosi serverul.
+Serverul acceptă doar clienți care au cheia lui publică (`-k _`). Cheia publică nu e secretă
+(e în aplicație și în repo), deci asta oprește folosirea întâmplătoare, nu un atacator hotărât;
+secretul real e cheia privată `id_ed25519`.
+
+### Pe un mini PC (acasă sau la birou)
+
+Funcționează la fel, cu AlmaLinux sau altă distribuție de mai sus:
+
+1. Dă-i mini PC-ului un **IP fix în rețeaua locală** (rezervare DHCP din router).
+2. Pe router, fă **port forwarding** către mini PC pentru `21114-21117/tcp` și `21116/udp`
+   (plus `21118-21119/tcp` doar pentru clientul web). **Nu** redirecționa `21120` (panoul).
+3. Dacă nu ai IP public fix, folosește un **DDNS** (No-IP, DuckDNS sau DDNS-ul din router) și
+   pune numele DDNS în `RENDEZVOUS_SERVER`. Dacă IP-ul de la operator e în spatele CG-NAT
+   (nu ai IP public deloc), cere unul public de la operator sau folosește un VPS.
+4. Instalează cu panoul accesibil din rețeaua locală:
+
+   ```bash
+   sudo dnf -y install git        # pe AlmaLinux
+   git clone https://github.com/danielneagu2000/Rust-Desktop.git
+   cd Rust-Desktop/server
+   sudo PANEL_BIND=0.0.0.0 ./install.sh remote.domeniul-tau.ro
+   ```
+
+   Scriptul deschide portul panoului (21120) doar pentru rețelele locale (192.168.x.x, 10.x.x.x,
+   172.16-31.x.x). SELinux poate rămâne activ: volumele sunt etichetate corect.
+5. Setează mini PC-ul să nu intre în sleep și, din BIOS, să pornească singur după o pană de
+   curent (*Restore on AC power loss → Power On*).
+
+## Panoul de securitate
+
+Rulează pe același server și primește automat jurnalele de la toate calculatoarele care
+folosesc aplicația ta. Nu trebuie configurat nimic pe calculatoare: clienții trimit singuri
+datele la `http://SERVER:21114`.
+
+Ce arată:
+
+- **Istoric conexiuni:** fiecare conexiune cu IP-ul sursă, calculatorul vizat, cine s-a
+  conectat (ID și nume), tipul (control, transfer fișiere, terminal…), metoda de autentificare
+  (parolă unică/permanentă, acceptare manuală, 2FA), durata și starea (activă, reușită, eșuată).
+- **Brute-force pe IP:** pentru fiecare IP, din ultimele 30 de zile: încercări, reușite, eșuate,
+  alarme și câte calculatoare a încercat; risc scăzut, mediu sau ridicat.
+- **IP-uri blocate:** cele blocate automat de calculatoare (după 6 parole greșite într-un minut,
+  după 30 în total) și lista ta de IP-uri blocate pe server, cu buton Blochează/Deblochează.
+- **Alarme:** toate alarmele de securitate trimise de calculatoare.
+- **Dispozitive:** ce calculatoare sunt online, nume, utilizator, sistem, IP public, și butonul
+  **Deconectează** pentru a închide imediat o sesiune activă.
+
+Acces: implicit panoul ascultă doar local pe server (port 21120). Utilizatorul și parola sunt
+afișate de `install.sh` și salvate în `server/.env`.
+
+- De pe calculatorul tău, prin tunel SSH: `ssh -L 21120:127.0.0.1:21120 root@SERVER`, apoi
+  deschide `http://localhost:21120/`.
+- Cu Virtualmin, prin HTTPS pe domeniul tău: în Virtualmin, la domeniul dorit,
+  **Server Configuration → Edit Proxy Paths**, adaugă calea `/rustdesk-panel/` către
+  `http://127.0.0.1:21120/`. Panoul e apoi la `https://domeniul-tau.ro/rustdesk-panel/`.
+- Pe un mini PC în rețeaua locală: instalează cu `PANEL_BIND=0.0.0.0` (vezi mai sus).
+
+Ce trebuie știut:
+
+- „Blocat pe server” refuză conexiunile **prin relay** de la acel IP. Conexiunile directe P2P
+  nu trec prin server; pe acelea le opresc protecțiile de pe calculatoare (blocare automată, 2FA,
+  whitelist de IP).
+- Calculatoarele raportează o tentativă eșuată per conexiune, nu fiecare parolă greșită;
+  rafalele de parole greșite apar ca alarme.
+- Jurnalele vin de la aplicații; cine are cheia publică ar putea trimite date false în panou,
+  dar nu poate citi panoul și nu poate controla nimic. Datele se păstrează 180 de zile
+  (`RETENTION_DAYS` în `server/.env`).
 
 ## Pasul 2 — Configurează branding-ul
 

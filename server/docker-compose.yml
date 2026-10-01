@@ -6,6 +6,10 @@
 #   21116/tcp  + 21116/udp  ID/rendezvous (hbbs)
 #   21117/tcp  relay (hbbr)
 #   21118/tcp, 21119/tcp  doar pentru clientul web (opțional)
+#   21114/tcp  API pentru panoul de securitate (clienții trimit aici jurnalele)
+#
+# Panoul de securitate ascultă pe 21120, implicit doar local (127.0.0.1); vezi GHID.md.
+# ":z" pe volume = etichetă SELinux partajată (necesar pe AlmaLinux/Rocky; ignorat în rest).
 
 services:
   hbbs:
@@ -15,7 +19,7 @@ services:
     # -k _: acceptă doar clienții care au cheia publică a acestui server.
     command: hbbs -r ${SERVER_HOST:?setează SERVER_HOST în server/.env}:21117 -k _
     volumes:
-      - ./data:/root
+      - ./data:/root:z
     # host network: hbbs vede IP-urile reale ale clienților (necesar pentru conexiuni directe/NAT).
     network_mode: host
     restart: unless-stopped
@@ -32,9 +36,27 @@ services:
       - SINGLE_BANDWIDTH=100000
       - LIMIT_SPEED=100000
     volumes:
-      - ./data:/root
+      - ./data:/root:z
     network_mode: host
     # hbbs generează perechea de chei la primul start; hbbr o folosește pe aceeași.
     depends_on:
       - hbbs
+    restart: unless-stopped
+
+  panel:
+    container_name: rustdesk-panel
+    image: python:3.12-alpine
+    command: python /app/panel.py
+    environment:
+      - PANEL_USER=${PANEL_USER:-admin}
+      - PANEL_PASSWORD=${PANEL_PASSWORD:?setează PANEL_PASSWORD în server/.env}
+      - PANEL_BIND=${PANEL_BIND:-127.0.0.1}
+      - RETENTION_DAYS=${RETENTION_DAYS:-180}
+      - DATA_DIR=/data
+    volumes:
+      - ./panel:/app:ro,z
+      - ./data:/data:z
+    network_mode: host
+    depends_on:
+      - hbbr
     restart: unless-stopped
