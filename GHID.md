@@ -45,6 +45,13 @@ Notează-le — îți trebuie la pasul 2.
 **Backup obligatoriu:** `server/data/id_ed25519`. Este cheia privată a serverului. Dacă o
 pierzi, trebuie să recompilezi și să reinstalezi toți clienții.
 
+**Fără limite:** serverul open-source nu limitează numărul de calculatoare, durata sesiunilor
+sau numărul de conexiuni simultane. Limitele implicite de viteză ale relay-ului sunt
+dezactivate în `server/docker-compose.yml` (`TOTAL_BANDWIDTH`, `SINGLE_BANDWIDTH`,
+`LIMIT_SPEED`), deci viteza depinde doar de rețeaua și procesorul serverului. Când cele două
+calculatoare se pot conecta direct (P2P), traficul nici nu trece prin server. În aplicație,
+la *Calitate imagine* poți alege „Cea mai bună” și FPS personalizat (până la 120).
+
 Serverul acceptă doar clienți care au cheia lui (`-k _`), deci un RustDesk obișnuit sau
 altcineva nu-ți poate folosi serverul.
 
