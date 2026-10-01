@@ -11,6 +11,7 @@ on:
     paths:
       - "branding/brand.env"
       - "branding/logo.png"
+      - "branding/logo-small.png"
       - "branding/apply.py"
 
 permissions:

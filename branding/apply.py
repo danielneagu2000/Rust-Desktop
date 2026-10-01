@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 BRAND_DIR = ROOT / "branding"
 ENV_FILE = BRAND_DIR / "brand.env"
 LOGO_FILE = BRAND_DIR / "logo.png"
+# Optional simplified mark for icons of SMALL_MAX px and below (tray, taskbar, notifications).
+LOGO_SMALL_FILE = BRAND_DIR / "logo-small.png"
+SMALL_MAX = 48
 STAMP_FILE = BRAND_DIR / ".applied"
 PLACEHOLDER = "CHANGE_ME"
 
@@ -246,24 +249,35 @@ def apply_icons(check):
         return []
     from PIL import Image
 
-    logo = Image.open(LOGO_FILE).convert("RGBA")
-    if logo.width != logo.height:
-        side = max(logo.size)
-        sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-        sq.alpha_composite(logo, ((side - logo.width) // 2, (side - logo.height) // 2))
-        logo = sq
-    if logo.width < 512:
-        print(f"warning: {LOGO_FILE.name} is {logo.width}px; 1024px recommended", file=sys.stderr)
+    def load(path):
+        img = Image.open(path).convert("RGBA")
+        if img.width != img.height:
+            side = max(img.size)
+            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+            sq.alpha_composite(img, ((side - img.width) // 2, (side - img.height) // 2))
+            img = sq
+        if img.width < 512:
+            print(f"warning: {path.name} is {img.width}px; 1024px recommended", file=sys.stderr)
+        return img
+
+    logo = load(LOGO_FILE)
+    small = load(LOGO_SMALL_FILE) if LOGO_SMALL_FILE.exists() else logo
+
+    def pick(kind, size):
+        return small if size <= SMALL_MAX or kind.startswith("silhouette") else logo
 
     written = []
     for rel, kind, size in icon_jobs():
         path = ROOT / rel
         if kind == "ico":
-            render(logo, "plain", 256).save(path, format="ICO", sizes=[(s, s) for s in size])
+            frames = [render(pick("plain", s), "plain", s) for s in size]
+            render(logo, "plain", 256).save(
+                path, format="ICO", sizes=[(s, s) for s in size], append_images=frames
+            )
         elif kind == "icns":
             render(logo, "plain", size).save(path, format="ICNS")
         else:
-            render(logo, kind, size).save(path, format="PNG", optimize=True)
+            render(pick(kind, size), kind, size).save(path, format="PNG", optimize=True)
         written.append(rel)
 
     # Vector logos: wrap the PNG so every consumer (Flutter UI, Linux desktop) shows the brand.
@@ -283,6 +297,8 @@ def fingerprint():
     h = hashlib.sha256()
     h.update(ENV_FILE.read_bytes())
     h.update(LOGO_FILE.read_bytes())
+    if LOGO_SMALL_FILE.exists():
+        h.update(LOGO_SMALL_FILE.read_bytes())
     h.update(Path(__file__).read_bytes())
     return h.hexdigest()
 

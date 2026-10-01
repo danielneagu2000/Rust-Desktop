@@ -61,3 +61,5 @@ flutter/web/
 
 # Branding logo (overrides the *png rule above)
 !branding/logo.png
+!branding/logo-small.png
+!branding/logo-original.png
