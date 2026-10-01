@@ -82,6 +82,11 @@ def load_config():
         fail("ANDROID_ICON_BACKGROUND must look like #RRGGBB")
     cfg["ANDROID_ICON_BACKGROUND"] = color.lower()
 
+    display = cfg.get("DISPLAY_NAME") or name
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .\-]{0,39}", display) or "  " in display:
+        fail("DISPLAY_NAME may use letters, digits, single spaces, '.' and '-' (max 40)")
+    cfg["DISPLAY_NAME"] = display.strip()
+
     if not LOGO_FILE.exists():
         fail(f"missing {LOGO_FILE.relative_to(ROOT)} (square PNG, ideally 1024x1024, transparent background)")
     return cfg
@@ -95,6 +100,8 @@ def xml_escape(s):
 # once, both in pristine upstream sources and in already-branded sources.
 def text_patches(cfg):
     name = cfg["APP_NAME"]
+    # Shown by the OS (launcher, shortcuts, file properties); may contain spaces.
+    display = cfg["DISPLAY_NAME"]
     return [
         ("libs/hbb_common/src/config.rs",
          r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &\["[^"]*"\];',
@@ -113,28 +120,28 @@ def text_patches(cfg):
         # so the upstream build and packaging scripts keep working.
         ("flutter/android/app/src/main/AndroidManifest.xml",
          r'(<application\b[^>]*?android:label=")[^"]*(")',
-         rf'\g<1>{xml_escape(name)}\g<2>'),
+         rf'\g<1>{xml_escape(display)}\g<2>'),
         ("flutter/android/app/src/main/AndroidManifest.xml",
          r'android:label="[^"]* Input"',
-         f'android:label="{xml_escape(name)} Input"'),
+         f'android:label="{xml_escape(display)} Input"'),
         ("flutter/android/app/src/main/res/values/ic_launcher_background.xml",
          r'(<color name="ic_launcher_background">)[^<]*(</color>)',
          rf'\g<1>{cfg["ANDROID_ICON_BACKGROUND"]}\g<2>'),
         ("flutter/ios/Runner/Info.plist",
          r'(<key>CFBundleDisplayName</key>\s*<string>)[^<]*(</string>)',
-         rf'\g<1>{xml_escape(name)}\g<2>'),
+         rf'\g<1>{xml_escape(display)}\g<2>'),
         ("flutter/ios/Runner/Info.plist",
          r'(<key>CFBundleName</key>\s*<string>)[^<]*(</string>)',
-         rf'\g<1>{xml_escape(name)}\g<2>'),
+         rf'\g<1>{xml_escape(display)}\g<2>'),
         ("flutter/windows/runner/Runner.rc",
          r'VALUE "FileDescription", "[^"]*"',
-         f'VALUE "FileDescription", "{name} Remote Desktop"'),
+         f'VALUE "FileDescription", "{display}"'),
         ("flutter/windows/runner/Runner.rc",
          r'VALUE "ProductName", "[^"]*"',
-         f'VALUE "ProductName", "{name}"'),
+         f'VALUE "ProductName", "{display}"'),
         # Only the first Name= (the [Desktop Entry] one), not the actions' names.
-        ("res/rustdesk.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={name}'),
-        ("res/rustdesk-link.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={name}'),
+        ("res/rustdesk.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
+        ("res/rustdesk-link.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
     ]
 
 

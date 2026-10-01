@@ -210,9 +210,16 @@ cheia încorporate, iconițele și logo-ul, adresa API implicită (nu mai trimit
 rustdesk.com). Pentru că numele nu mai e „RustDesk”, verificarea automată de update-uri de
 la RustDesk este dezactivată — update-urile le distribui tu.
 
-Rămân ca în original, intenționat, ca scripturile oficiale de build să funcționeze:
-numele fișierului executabil (`rustdesk.exe`, `rustdesk`), numele pachetului macOS
-(`RustDesk.app`) și identificatorul pachetului Android.
+Există două nume: `APP_NAME` (tehnic, fără spații, ex. `RDNRemote`), folosit în aplicație,
+în foldere și în numele serviciilor, și `DISPLAY_NAME` (ex. `RDN Remote`), afișat de sistem
+pe scurtături, pe ecranul telefonului și în proprietățile fișierului.
+
+**De rezolvat înainte de prima compilare de producție:** codul RustDesk caută executabilul și
+serviciul după `APP_NAME` (de ex. `rdnremote.exe`, serviciul Linux `rdnremote`,
+`/Applications/RDNRemote.app` pe macOS), dar scripturile de build produc încă fișiere numite
+`rustdesk`. Pe Windows, instalatorul redenumește singur executabilul, deci acolo nu e o
+problemă. Pe Linux și macOS, pachetele trebuie redenumite ca serviciul de fundal (acces
+nesupravegheat) să pornească corect.
 
 ## Actualizare la o versiune nouă RustDesk
 
