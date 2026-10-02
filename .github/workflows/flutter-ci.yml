@@ -3,6 +3,9 @@ name: Full Flutter CI
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run-ci:
     uses: ./.github/workflows/flutter-build.yml
