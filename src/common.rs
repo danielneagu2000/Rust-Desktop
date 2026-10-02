@@ -1061,7 +1061,7 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let response_url = resp.url;
     let latest_release_version = response_url.rsplit('/').next().unwrap_or_default();
 
-    if get_version_number(&latest_release_version) > get_version_number(crate::VERSION) {
+    if get_version_number(&latest_release_version) > get_version_number(release_version()) {
         #[cfg(feature = "flutter")]
         {
             let mut m = HashMap::new();
@@ -1079,6 +1079,22 @@ pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
 }
 
 #[inline]
+/// The version update checks compare against: the release tag this build was made
+/// for when it extends VERSION with a revision ("1.5.0-3"), otherwise VERSION.
+pub fn release_version() -> &'static str {
+    match option_env!("TAG_NAME") {
+        Some(tag)
+            if tag.len() > crate::VERSION.len() + 1
+                && tag.starts_with(crate::VERSION)
+                && tag.as_bytes()[crate::VERSION.len()] == b'-'
+                && tag[crate::VERSION.len() + 1..].bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            tag
+        }
+        _ => crate::VERSION,
+    }
+}
+
 pub fn get_app_name() -> String {
     hbb_common::config::APP_NAME.read().unwrap().clone()
 }

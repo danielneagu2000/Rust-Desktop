@@ -20,6 +20,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import socket
 import sqlite3
 import sys
@@ -275,6 +276,19 @@ def ingest_file(v, src_ip):
         x("UPDATE sessions SET files=files+1 WHERE id=?", (s["id"],))
 
 
+def latest_release():
+    """Release that clients should run, written by web/update_downloads.py."""
+    try:
+        data = json.loads((DATA_DIR / "latest.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    tag, repo = str(data.get("tag") or ""), str(data.get("repo") or "")
+    if not re.fullmatch(r"[0-9A-Za-z._-]{1,40}", tag) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
+        return {}
+    # RustDesk turns ".../releases/tag/X" into ".../releases/download/X/<file>".
+    return {"url": f"https://github.com/{repo}/releases/tag/{tag}"}
+
+
 def heartbeat(v, src_ip):
     uuid = as_text(v.get("uuid"), 100)
     if not uuid:
@@ -334,6 +348,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if urlparse(self.path).path == "/version/latest":
+            return self.reply(200, latest_release() or {"url": ""})
         self.reply(404, {"error": "not found"})
 
     def do_POST(self):
@@ -352,6 +368,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not isinstance(v, dict):
             return self.reply(400, {"error": "bad json"})
         try:
+            if path == "/version/latest":
+                return self.reply(200, latest_release() or {"url": ""})
             if path == "/api/audit/conn":
                 ingest_conn(v, src_ip)
                 return self.reply(200)

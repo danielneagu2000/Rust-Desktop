@@ -1,0 +1,67 @@
+name: Publish client update
+
+# Runs after every build of a release succeeded. It adds copies of the installers
+# under the names RustDesk's updater requests (rustdesk-<tag>-<arch>.<ext>), uploads
+# update-manifest.json and marks the release final. Servers only offer releases that
+# carry update-manifest.json (server/web/update_downloads.py), so a failed or
+# unfinished build never reaches the download page or the clients.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Add update copies and mark the release final
+        run: |
+          set -euo pipefail
+          BASE="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          if [[ ! "$TAG" =~ ^${BASE//./\\.}-[1-9]$ ]]; then
+            echo "::error::Tag $TAG must be $BASE-1 … $BASE-9: clients compare versions as $BASE-N."
+            exit 1
+          fi
+          mkdir -p assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets \
+            --pattern "rustdesk-$BASE-*.exe" --pattern "rustdesk-$BASE-*.msi" --pattern "rustdesk-$BASE-*.dmg"
+          python3 - "$BASE" "$TAG" <<'EOF'
+          import hashlib, json, os, re, sys
+          base, tag = sys.argv[1], sys.argv[2]
+          b = re.escape(base)
+          files = {}
+          for name in sorted(os.listdir("assets")):
+              path = os.path.join("assets", name)
+              if name.startswith(f"rustdesk-{tag}-"):
+                  os.remove(path)
+                  continue
+              m = (re.fullmatch(rf"rustdesk-{b}-(x86_64|aarch64)(?:-\1)?\.dmg", name)
+                   or re.fullmatch(rf"rustdesk-{b}-(x86_64|aarch64|x86-sciter)\.(exe|msi)", name))
+              if not m:
+                  os.remove(path)
+                  continue
+              ext = "dmg" if name.endswith(".dmg") else m.group(2)
+              new = f"rustdesk-{tag}-{m.group(1)}.{ext}"
+              os.rename(path, os.path.join("assets", new))
+              with open(os.path.join("assets", new), "rb") as f:
+                  files[new] = hashlib.sha256(f.read()).hexdigest()
+          if not any(n.endswith("-x86_64.exe") for n in files):
+              sys.exit("Windows x86_64 installer missing from the release")
+          with open("assets/update-manifest.json", "w") as f:
+              json.dump({"tag": tag, "base": base, "files": files}, f, indent=1)
+          print("\n".join(sorted(files)))
+          EOF
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber assets/*
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
+          echo "::notice::$TAG published: servers pick it up within a day (or: sudo systemctl start rdn-update)."

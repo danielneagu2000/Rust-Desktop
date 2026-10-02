@@ -114,6 +114,22 @@ def load_config():
     if email and not re.fullmatch(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", email):
         fail("SUPPORT_EMAIL is not a valid e-mail address")
     cfg["SUPPORT_EMAIL"] = email
+    m = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)/?", cfg["SOURCE_URL"])
+    if not m:
+        fail("SOURCE_URL must be the GitHub repository (https://github.com/OWNER/REPO): "
+             "client updates are downloaded from its releases")
+    if "tag" in m.group(1) + m.group(2):
+        fail("the GitHub owner/repo must not contain 'tag' (RustDesk derives download URLs by replacing it)")
+    cfg["GITHUB_OWNER"], cfg["GITHUB_REPO"] = m.group(1), m.group(2)
+
+    app_id = cfg.get("ANDROID_APP_ID") or "com.carriez.flutter_hbb"
+    if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", app_id):
+        fail("ANDROID_APP_ID must look like ro.firma.aplicatie (lowercase)")
+    cfg["ANDROID_APP_ID"] = app_id
+    cfg["AUTO_UPDATE"] = (cfg.get("AUTO_UPDATE") or "Y").upper()
+    if cfg["AUTO_UPDATE"] not in ("Y", "N"):
+        fail("AUTO_UPDATE must be Y or N")
+
     phone = cfg.get("SUPPORT_PHONE", "")
     if phone and not re.fullmatch(r"\+?[0-9 ()./-]{6,20}", phone):
         fail("SUPPORT_PHONE may contain digits, spaces and + ( ) . / -")
@@ -174,7 +190,68 @@ def text_patches(cfg):
         # Only the first Name= (the [Desktop Entry] one), not the actions' names.
         ("res/rustdesk.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
         ("res/rustdesk-link.desktop", r'\A(\[Desktop Entry\]\n)Name=[^\n]*', rf'\g<1>Name={display}'),
-    ] + publisher_patches(cfg)
+    ] + publisher_patches(cfg) + package_patches(cfg) + update_patches(cfg)
+
+
+def package_patches(cfg):
+    """macOS: build <APP_NAME>.app, the bundle name the service scripts derive from the
+    app name. Android: own application id, so the app installs next to RustDesk.
+    Linux keeps the "rustdesk" package names (src/platform/linux.rs PACKAGE_NAME)."""
+    name = cfg["APP_NAME"]
+    app = r"\b(?:RustDesk|" + re.escape(name) + r")\.app\b"
+    to_app = (lambda m: f"{name}.app")
+    return [
+        ("flutter/macos/Runner/Configs/AppInfo.xcconfig", r"(?m)^PRODUCT_NAME = .*$", lambda m: f"PRODUCT_NAME = {name}"),
+        (".github/workflows/flutter-build.yml", app, to_app, 7),
+        ("build.py", r"(Build/Products/Release/)(?:RustDesk|" + re.escape(name) + r")(\.app)",
+         lambda m: f"{m.group(1)}{name}{m.group(2)}", 2),
+        ("flutter/macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme", app, to_app, 4),
+        ("flutter/macos/Runner.xcodeproj/project.pbxproj", app, to_app, 4),
+        ("flutter/android/app/build.gradle", r'(applicationId ")[^"]*(")',
+         lambda m: f'{m.group(1)}{cfg["ANDROID_APP_ID"]}{m.group(2)}'),
+    ]
+
+
+def update_patches(cfg):
+    """Client updates: ask this server which release is current and download it only
+    from this repository's GitHub releases (the updater's URL allowlist)."""
+    owner, repo = cfg["GITHUB_OWNER"], cfg["GITHUB_REPO"]
+    web = cfg["WEBSITE_URL"]
+    defaults = (
+        'RwLock::new(HashMap::from([("allow-auto-update".to_owned(), "Y".to_owned())]))'
+        if cfg["AUTO_UPDATE"] == "Y" else "Default::default()"
+    )
+    return [
+        ("libs/hbb_common/src/lib.rs", r'(const URL: &str = ")[^"]*(";\n\n    use sysinfo::System;)',
+         lambda m: f'{m.group(1)}{cfg["API_SERVER"]}/version/latest{m.group(2)}'),
+        ("src/updater.rs", r'(if owner != ")[^"]*("\n\s*\|\| repo != ")[^"]*(")',
+         lambda m: f"{m.group(1)}{owner}{m.group(2)}{repo}{m.group(3)}"),
+        # Upstream skips update checks for renamed (custom) clients; this one has its own feed.
+        ("src/common.rs", r"(pub fn check_software_update\(\) \{\n)(?:    if is_custom_client\(\) \{\n        return;\n    \}\n)?",
+         lambda m: m.group(1)),
+        ("src/updater.rs",
+         r'(Auto update is disabled, skipping\."\);\n        return Ok\(false\);\n    \}\n)'
+         r'(?:    if crate::is_custom_client\(\) \{\n[^\n]*\n        return Ok\(false\);\n    \}\n)?',
+         lambda m: m.group(1)),
+        ("src/updater.rs", r"(let update_msi = crate::platform::is_msi_installed\(\)\?)(?: && !crate::is_custom_client\(\))?;",
+         lambda m: f"{m.group(1)};"),
+        ("libs/hbb_common/src/config.rs",
+         r"(pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
+         lambda m: f"{m.group(1)}{defaults};"),
+        # Desktop "new version" card: shown for this client too, links to its own site/releases.
+        ("flutter/lib/desktop/pages/desktop_home_page.dart",
+         r"if \((?:!bind\.isCustomClient\(\) &&\n\s*)?updateUrl\.isNotEmpty &&\n(\s*)!isCardClosed"
+         r"(?: &&\n\s*bind\.mainUriPrefixSync\(\)\.contains\('rustdesk'\))?\) \{",
+         lambda m: f"if (updateUrl.isNotEmpty &&\n{m.group(1)}!isCardClosed) {{"),
+        ("flutter/lib/desktop/pages/desktop_home_page.dart",
+         r"(final Uri url = Uri\.parse\(')[^']*('\);\n\s*await launchUrl\(url\);)",
+         lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
+        ("flutter/lib/desktop/pages/desktop_home_page.dart",
+         r"'https://github\.com/[^/']+/[^/']+/releases/tag/\$\{bind\.mainGetNewVersion\(\)\}'",
+         lambda m: f"'https://github.com/{owner}/{repo}/releases/tag/${{bind.mainGetNewVersion()}}'"),
+        ("flutter/lib/mobile/pages/connection_page.dart", r"(final url = ')[^']*(';\n\s*// https://pub\.dev)",
+         lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
+    ]
 
 
 def publisher_patches(cfg):

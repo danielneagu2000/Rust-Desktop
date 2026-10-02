@@ -1651,6 +1651,7 @@ jobs:
             ls -l "${PWD}"
             ls -l /opt/artifacts/vcpkg/installed
           dockerRunArgs: |
+            --env TAG_NAME=${{ env.TAG_NAME }}
             --volume "${PWD}:/workspace"
             --volume "/opt/artifacts:/opt/artifacts"
           shell: /bin/bash
@@ -1972,6 +1973,7 @@ jobs:
             ls -l "${PWD}"
             ls -l /opt/artifacts/vcpkg/installed
           dockerRunArgs: |
+            --env TAG_NAME=${{ env.TAG_NAME }}
             --volume "${PWD}:/workspace"
             --volume "/opt/artifacts:/opt/artifacts"
           shell: /bin/bash
@@ -2253,6 +2255,7 @@ jobs:
           setup: |
             ls -l "${PWD}"
           dockerRunArgs: |
+            --env TAG_NAME=${{ env.TAG_NAME }}
             --volume "${PWD}:/workspace"
           shell: /bin/bash
           install: |
@@ -2525,6 +2528,7 @@ jobs:
           setup: |
             ls -l "${PWD}"
           dockerRunArgs: |
+            --env TAG_NAME=${{ env.TAG_NAME }}
             --volume "${PWD}:/workspace"
           shell: /bin/bash
           install: |

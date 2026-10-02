@@ -121,34 +121,40 @@ fi
 # Asigură-te că relay-ul folosește aceeași cheie ca hbbs.
 docker compose restart hbbr >/dev/null
 
-# Aduce ultimele kituri de instalare de pe GitHub Releases în web/files, acum și zilnic.
+# Actualizare automată zilnică (auto_update.sh): kiturile de pe pagina de descărcare,
+# versiunea anunțată clienților și serverul însuși, urmărind doar release-urile finalizate.
 SERVER_DIR="$(pwd)"
-cat > /etc/systemd/system/rdn-downloads.service <<EOF
+for old in rdn-downloads.timer rdn-downloads.service; do
+  systemctl disable --now "$old" >/dev/null 2>&1 || true
+  rm -f "/etc/systemd/system/$old"
+done
+cat > /etc/systemd/system/rdn-update.service <<EOF
 [Unit]
-Description=RDN Remote: actualizează kiturile de pe pagina de descărcare
+Description=RDN Remote: actualizare automată (kituri, versiune clienți, server)
 After=docker.service network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/docker run --rm -e SERVER_HOST=$HOST -v $SERVER_DIR/web:/w:z -v $SERVER_DIR/data:/data:z python:3.12-alpine python /w/update_downloads.py
+ExecStart=$SERVER_DIR/auto_update.sh
 EOF
-cat > /etc/systemd/system/rdn-downloads.timer <<EOF
+cat > /etc/systemd/system/rdn-update.timer <<EOF
 [Unit]
-Description=RDN Remote: verificare zilnică a versiunilor noi
+Description=RDN Remote: verificare zilnică a release-urilor noi
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=1d
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=30min
 Persistent=true
 
 [Install]
 WantedBy=timers.target
 EOF
 systemctl daemon-reload
-systemctl enable --now rdn-downloads.timer >/dev/null
-echo "==> Actualizez pagina de descărcare"
-systemctl start rdn-downloads.service || echo "Atenție: actualizarea kiturilor a eșuat; vezi: journalctl -u rdn-downloads" >&2
+systemctl enable --now rdn-update.timer >/dev/null
+echo "==> Verific release-urile publicate"
+systemctl start rdn-update.service || echo "Atenție: actualizarea automată a eșuat; vezi: journalctl -u rdn-update" >&2
 
 if [[ "$WEB" == 1 ]]; then
   if [[ "$WEB_ADDRESS" == ":80" ]]; then WEB_URL="http://$HOST/"; else WEB_URL="https://$HOST/"; fi

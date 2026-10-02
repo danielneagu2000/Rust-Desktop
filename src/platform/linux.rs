@@ -992,7 +992,7 @@ fn set_x11_env(desktop: &Desktop) {
 fn stop_rustdesk_servers() {
     let _ = run_cmds(&format!(
         r##"ps -ef | grep -E '{} +--server' | awk '{{print $2}}' | xargs -r kill -9"##,
-        crate::get_app_name().to_lowercase(),
+        PACKAGE_NAME,
     ));
 }
 
@@ -2066,7 +2066,7 @@ mod desktop {
         }
 
         fn get_display_xauth_xwayland(&mut self) {
-            let tray = format!("{} +--tray", crate::get_app_name().to_lowercase());
+            let tray = format!("{} +--tray", PACKAGE_NAME);
             for _ in 1..=10 {
                 let display_proc = vec![
                     XDG_DESKTOP_PORTAL,
@@ -2273,7 +2273,7 @@ mod desktop {
 
         fn get_xauth_x11(&mut self) {
             // try by direct access to window manager process by name
-            let tray = format!("{} +--tray", crate::get_app_name().to_lowercase());
+            let tray = format!("{} +--tray", PACKAGE_NAME);
             for _ in 1..=10 {
                 let display_proc = vec![
                     XWAYLAND,
@@ -2697,7 +2697,7 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     }
     log::info!("Uninstalling service...");
     let cp = switch_service(true);
-    let app_name = crate::get_app_name().to_lowercase();
+    let app_name = PACKAGE_NAME.to_owned();
     // systemctl kill rustdesk --tray, execute cp first
     if !run_cmds_privileged(&format!(
         "{cp} systemctl disable {app_name}; systemctl stop {app_name};"
@@ -2719,7 +2719,7 @@ pub fn install_service() -> bool {
     }
     log::info!("Installing service...");
     let cp = switch_service(false);
-    let app_name = crate::get_app_name().to_lowercase();
+    let app_name = PACKAGE_NAME.to_owned();
     if !run_cmds_privileged(&format!(
         "{cp} systemctl enable {app_name}; systemctl start {app_name};"
     )) {
@@ -2730,7 +2730,7 @@ pub fn install_service() -> bool {
 
 fn check_if_stop_service() {
     if Config::get_option("stop-service".into()) == "Y" {
-        let app_name = crate::get_app_name().to_lowercase();
+        let app_name = PACKAGE_NAME.to_owned();
         allow_err!(run_cmds(&format!(
             "systemctl disable {app_name}; systemctl stop {app_name}"
         )));
@@ -2747,7 +2747,7 @@ pub fn check_autostart_config() -> ResultType<()> {
             return Ok(());
         }
     };
-    let app_name = crate::get_app_name().to_lowercase();
+    let app_name = PACKAGE_NAME.to_owned();
     let path = format!("{home}/.config/autostart");
     let file = format!("{path}/{app_name}.desktop");
     // https://github.com/rustdesk/rustdesk/issues/4863
@@ -2859,9 +2859,13 @@ fn get_shortcuts_inhibitor_app_id() -> String {
             }
         }
     } else {
-        format!("{}.desktop", crate::get_app_name().to_lowercase())
+        format!("{}.desktop", PACKAGE_NAME)
     }
 }
+
+// The executable, systemd unit and .desktop file are always installed as "rustdesk"
+// (see build.py), even when the app name is customized.
+const PACKAGE_NAME: &str = "rustdesk";
 
 const PERMISSION_STORE_DEST: &str = "org.freedesktop.impl.portal.PermissionStore";
 const PERMISSION_STORE_PATH: &str = "/org/freedesktop/impl/portal/PermissionStore";

@@ -1,0 +1,63 @@
+name: Publish new version
+
+# Actions → "Publish new version" → Run workflow. Picks the next tag (<version>-N),
+# builds every platform from the current master and, if everything built,
+# publishes the release for the download page, the clients and the servers.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check-branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Verify the sources carry the branding from branding/brand.env
+        run: python3 branding/apply.py --check
+
+  next-tag:
+    needs: check-branding
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Create the next tag
+        id: tag
+        run: |
+          set -euo pipefail
+          BASE="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          LAST="$(git tag --list "$BASE-*" | sed -n "s/^${BASE//./\\.}-\([0-9]\+\)$/\1/p" | sort -n | tail -n 1)"
+          N=$(( ${LAST:-0} + 1 ))
+          if (( N > 9 )); then
+            echo "::error::$BASE-9 was the last revision clients can tell apart; update to a newer RustDesk version first."
+            exit 1
+          fi
+          TAG="$BASE-$N"
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "::notice::Building $TAG"
+
+  build:
+    needs: next-tag
+    uses: ./.github/workflows/flutter-build.yml
+    secrets: inherit
+    with:
+      upload-artifact: true
+      upload-tag: ${{ needs.next-tag.outputs.tag }}
+
+  publish:
+    needs: [next-tag, build]
+    uses: ./.github/workflows/publish-update.yml
+    with:
+      tag: ${{ needs.next-tag.outputs.tag }}

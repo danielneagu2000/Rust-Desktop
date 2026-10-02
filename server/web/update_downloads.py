@@ -30,6 +30,9 @@ FILES = WEB / "files"
 DATA = WEB.parent / "data"
 REPO = os.environ.get("GITHUB_REPO", "danielneagu2000/Rust-Desktop")
 SLUG = "rdn-remote"
+# Uploaded by .github/workflows/publish-update.yml once every build of a release succeeded;
+# releases without it (still building, or failed) are never offered.
+MARKER = "update-manifest.json"
 
 # (key, regex on the asset name, platform, label, published file suffix)
 ASSETS = [
@@ -74,13 +77,13 @@ def pick_release(tag):
     if tag:
         with http(f"https://api.github.com/repos/{REPO}/releases/tags/{tag}") as r:
             return json.load(r)
-    # /releases/latest skips pre-releases, and the build workflow publishes as pre-release.
-    with http(f"https://api.github.com/repos/{REPO}/releases?per_page=20") as r:
+    # Newest finished release; /releases/latest would skip pre-releases.
+    with http(f"https://api.github.com/repos/{REPO}/releases?per_page=30") as r:
         releases = json.load(r)
     for rel in releases:
         if rel.get("draft"):
             continue
-        if any(match(a["name"]) for a in rel.get("assets", [])):
+        if any(a["name"] == MARKER for a in rel.get("assets", [])):
             return rel
     return None
 
@@ -160,6 +163,12 @@ def main():
         if old.is_dir() and old != target and not old.name.startswith("."):
             shutil.rmtree(old)
     write_manifest(version, items, published)
+    if not args.from_dir:
+        # The panel's /version/latest answers clients from this file.
+        DATA.mkdir(parents=True, exist_ok=True)
+        tmp_latest = DATA / "latest.json.tmp"
+        tmp_latest.write_text(json.dumps({"tag": version, "repo": REPO}))
+        tmp_latest.replace(DATA / "latest.json")
     log(f"Published {len(items)} installer(s) for version {version}")
 
 

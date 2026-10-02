@@ -3,6 +3,9 @@ name: Flutter Nightly Build
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check-branding:
     runs-on: ubuntu-latest

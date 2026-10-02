@@ -87,6 +87,8 @@ fn install_android_deps() {
 
 fn main() {
     hbb_common::gen_version();
+    // common::release_version() embeds the release tag the CI build is made for.
+    println!("cargo:rerun-if-env-changed=TAG_NAME");
     install_android_deps();
     #[cfg(all(windows, feature = "inline"))]
     build_manifest();

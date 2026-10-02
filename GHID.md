@@ -10,7 +10,7 @@ se conectează doar la serverul tău și nu au nevoie de nicio configurare la in
 | Logo-ul | [`branding/logo.png`](branding/logo.png) |
 | Scriptul care aplică branding-ul | [`branding/apply.py`](branding/apply.py) |
 | Serverul (Docker) | [`server/`](server/) |
-| Build pentru toate platformele | GitHub Actions → **Flutter Tag Build** |
+| Versiune nouă pentru toate platformele | GitHub Actions → **Publish new version** |
 
 Ordinea pașilor contează: **serverul primul**, pentru că el generează cheia pe care o
 încorporezi în clienți.
@@ -92,7 +92,7 @@ Funcționează la fel, cu AlmaLinux sau altă distribuție de mai sus:
 
 **Fișierele se actualizează singure:** zilnic (și la pornire) serverul verifică release-urile
 din GitHub și descarcă ultima versiune compilată în `server/web/files/`. Manual:
-`sudo systemctl start rdn-downloads`. Până la primul release, pagina afișează „În curând”.
+`sudo systemctl start rdn-update`. Până la primul release, pagina afișează „În curând”.
 
 **Ce trebuie să faci:**
 
@@ -172,19 +172,18 @@ python3 branding/apply.py          # aplică
 python3 branding/apply.py --check  # verifică
 ```
 
-## Pasul 3 — Compilează pentru toate platformele
+## Pasul 3 — Publică o versiune
 
-În GitHub: **Releases → Draft a new release → Choose a tag**, scrie un tag nou de forma
-`1.5.0-1` (apoi `1.5.0-2` la următoarea versiune etc.) și publică. Alternativ, din terminal:
+În GitHub: **Actions → Publish new version → Run workflow**. Atât. Workflow-ul:
 
-```bash
-git tag 1.5.0-1 && git push origin 1.5.0-1
-```
+1. verifică întâi că branding-ul e aplicat (refuză să compileze un client nebranduit);
+2. alege singur eticheta următoare: `1.5.0-1`, apoi `1.5.0-2` … `1.5.0-9`;
+3. compilează pentru toate platformele (**1–2 ore**; minutele GitHub Actions sunt gratuite
+   pentru repo-uri publice);
+4. **numai dacă toate compilările au reușit**, publică release-ul ca „final” (adaugă
+   `update-manifest.json`).
 
-Workflow-ul **Flutter Tag Build** verifică întâi că branding-ul e aplicat (refuză să
-compileze un client nebranduit), apoi construiește tot și urcă fișierele în release-ul
-cu același nume. Prima compilare durează **1–2 ore**. Repo-ul fiind public, minutele
-GitHub Actions sunt gratuite.
+Un release nefinalizat (în lucru sau eșuat) nu ajunge niciodată la clienți sau pe server.
 
 Ce primești în release:
 
@@ -230,23 +229,53 @@ Fără semnare, aplicațiile funcționează, dar apar avertismente:
   distribuție enterprise). De reținut: **un iPhone/iPad poate doar controla alte
   dispozitive, nu poate fi controlat** — este o limitare a iOS, valabilă și pentru AnyDesk.
 
+## Actualizări automate
+
+După ce un release e final, totul merge singur, fără intervenția ta:
+
+| Ce | Cum | Când |
+| --- | --- | --- |
+| Pagina de descărcare | serverul aduce noile kituri de pe GitHub | zilnic, ~04:00 |
+| Serverul (panou, site, configurație) | serverul trece la codul release-ului (`auto_update.sh`) | zilnic, ~04:00 |
+| Aplicația pe **Windows** | se descarcă și se instalează singură, când nu e nicio sesiune activă | la verificarea periodică a aplicației |
+| Aplicația pe **macOS** | se actualizează prin serviciul de fundal (dacă aplicația e instalată) | la fel |
+| Aplicația pe **Linux** și **Android** | apare mesajul „versiune nouă”, cu link spre pagina de descărcare | la fel |
+
+Forțezi verificarea pe server cu `sudo systemctl start rdn-update` (jurnal:
+`journalctl -u rdn-update`).
+
+Siguranță: aplicația întreabă serverul tău care e ultima versiune, dar **descarcă doar din
+release-urile acestui repo de pe GitHub** (lista permisă e compilată în aplicație), deci
+nici un server compromis nu o poate face să instaleze altceva.
+
+Reguli:
+
+- Nu modifica fișiere din repo direct pe server (de ex. `server/web/site.json`): modifică-le
+  în GitHub. Dacă găsește modificări locale, actualizarea serverului se oprește ca să nu le piardă.
+- Actualizarea automată pe Windows/macOS e pornită implicit (`AUTO_UPDATE=Y` în
+  `branding/brand.env`); utilizatorul o poate opri din setările aplicației.
+- Încap 9 versiuni (`1.5.0-1` … `1.5.0-9`) peste aceeași versiune RustDesk; după aceea
+  treci la o versiune RustDesk nouă (vezi mai jos).
+
 ## Ce schimbă branding-ul și ce nu
 
-Se schimbă: numele afișat (ferestre, meniuri, Android, iOS, Windows, Linux), serverul și
-cheia încorporate, iconițele și logo-ul, adresa API implicită (nu mai trimite cereri la
-rustdesk.com). Pentru că numele nu mai e „RustDesk”, verificarea automată de update-uri de
-la RustDesk este dezactivată — update-urile le distribui tu.
+Se schimbă: numele afișat, serverul și cheia încorporate, iconițele și logo-ul, firma
+care publică (metadate), textul de licență al instalatorului MSI, adresa de unde se verifică
+actualizările.
 
 Există două nume: `APP_NAME` (tehnic, fără spații, ex. `RDNRemote`), folosit în aplicație,
 în foldere și în numele serviciilor, și `DISPLAY_NAME` (ex. `RDN Remote`), afișat de sistem
 pe scurtături, pe ecranul telefonului și în proprietățile fișierului.
 
-**De rezolvat înainte de prima compilare de producție:** codul RustDesk caută executabilul și
-serviciul după `APP_NAME` (de ex. `rdnremote.exe`, serviciul Linux `rdnremote`,
-`/Applications/RDNRemote.app` pe macOS), dar scripturile de build produc încă fișiere numite
-`rustdesk`. Pe Windows, instalatorul redenumește singur executabilul, deci acolo nu e o
-problemă. Pe Linux și macOS, pachetele trebuie redenumite ca serviciul de fundal (acces
-nesupravegheat) să pornească corect.
+Pe sisteme:
+
+- **Windows:** instalatorul redenumește executabilul în `RDNRemote.exe`.
+- **macOS:** aplicația se numește `RDNRemote.app`.
+- **Android:** identificator propriu (`ANDROID_APP_ID`, implicit `ro.rdndata.remote`), deci
+  se instalează lângă un RustDesk existent. Nu-l schimba după prima distribuire.
+- **Linux:** pachetul, executabilul și serviciul rămân `rustdesk` (procesul de build
+  oficial); codul le caută sub acest nume. Pe un calculator cu RustDesk oficial instalat,
+  pachetul RDN Remote îl înlocuiește.
 
 ## Actualizare la o versiune nouă RustDesk
 
