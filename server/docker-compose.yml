@@ -46,8 +46,9 @@ services:
 
   panel:
     container_name: rustdesk-panel
-    image: python:3.12-alpine
-    command: python /app/panel.py
+    image: rdn-panel:local
+    build: ./panel
+    pull_policy: build
     environment:
       - PANEL_USER=${PANEL_USER:-admin}
       - PANEL_PASSWORD=${PANEL_PASSWORD:?setează PANEL_PASSWORD în server/.env}

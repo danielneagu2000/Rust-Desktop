@@ -51,6 +51,7 @@ ENV_FILE = Path(os.environ.get("ENV_FILE", "/config/server.env"))
 BACKUP_DIR = DATA_DIR / "backups"
 AUTO_BACKUP_KEEP = int(os.environ.get("AUTO_BACKUP_KEEP", "14"))
 MAX_RESTORE = 300 * 1024 * 1024
+MAX_ROWS = int(os.environ.get("MAX_ROWS", "500000"))
 
 DB_FILE = DATA_DIR / "panel.sqlite3"
 BLOCKLIST_FILE = DATA_DIR / "blocklist.txt"  # read by hbbr at start (its cwd is the data dir)
@@ -74,6 +75,15 @@ ALARMS = {
 BLOCKING_ALARMS = (1, 2, 6)
 
 DB_LOCK = threading.Lock()
+
+
+def body_length(headers, limit):
+    """Content-Length as a non-negative int no larger than limit, else None."""
+    try:
+        n = int(headers.get("Content-Length") or 0)
+    except ValueError:
+        return None
+    return n if 0 <= n <= limit else None
 
 
 def log(msg):
@@ -318,6 +328,17 @@ def latest_release():
 # license stops working at the next heartbeat (or after TOKEN_TTL when offline).
 
 TOKEN_TTL = 7 * 86400
+# Must match TOKEN_PREFIX in src/license.rs. The same key signs hbbs' protobuf messages;
+# a leading zero byte can never start a valid protobuf message, so a token can't be
+# mistaken for one (and vice versa).
+TOKEN_PREFIX = b"\x00RDN-LICENSE-1\x00"
+try:  # libsodium (constant time) when the image provides it; see panel/Dockerfile
+    import nacl.signing
+
+    def _sign(seed, msg):
+        return nacl.signing.SigningKey(seed).sign(msg).signature
+except ImportError:
+    _sign = ed25519.sign
 PERIODS = (0, 1, 3, 6, 12)
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _SIGNING_SEED = None
@@ -402,7 +423,8 @@ def issue_token(uuid, lic):
         {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or ""},
         separators=(",", ":"), ensure_ascii=False,
     ).encode()
-    token = base64.b64encode(ed25519.sign(seed, payload) + payload).decode()
+    payload = TOKEN_PREFIX + payload
+    token = base64.b64encode(_sign(seed, payload) + payload).decode()
     if len(_TOKEN_CACHE) > 5000:
         _TOKEN_CACHE.clear()
     _TOKEN_CACHE[key] = (token, now)
@@ -433,7 +455,9 @@ def activate(v, src_ip):
                 ACT_FAILS.clear()
         return {"error": msg}
 
-    uuid = as_text(v.get("uuid"), 100)
+    uuid = str(v.get("uuid") or "")
+    if not re.fullmatch(r"[A-Za-z0-9+/=]{8,100}", uuid):
+        return fail("Date lipsă de la aplicație")
     code = normalize_code(v.get("code"))
     if not uuid:
         return fail("Date lipsă de la aplicație")
@@ -521,6 +545,7 @@ def sysinfo(v, src_ip):
 
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = "panel"
+    timeout = 20  # per-socket; slow or stalled clients are dropped
 
     def log_message(self, fmt, *args):
         pass
@@ -545,9 +570,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         src_ip = self.client_address[0]
         if not rate_ok(src_ip):
             return self.reply(429, {"error": "rate limited"})
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY:
-            return self.reply(413, {"error": "too large"})
+        length = body_length(self.headers, MAX_BODY)
+        if length is None:
+            return self.reply(413, {"error": "bad or too large body"})
         raw = self.rfile.read(length) if length else b""
         path = urlparse(self.path).path
         try:
@@ -707,6 +732,7 @@ def state(search):
 
 class PanelHandler(BaseHTTPRequestHandler):
     server_version = "panel"
+    timeout = 120
 
     def log_message(self, fmt, *args):
         pass
@@ -794,11 +820,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "missing header"})
         action = urlparse(self.path).path.rsplit("/api/", 1)[-1]
         if action == "backup/restore":
-            length = int(self.headers.get("Content-Length") or 0)
-            if not 0 < length <= MAX_RESTORE:
+            length = body_length(self.headers, MAX_RESTORE)
+            if not length:
                 return self.reply(413, {"error": "fișier prea mare sau gol"})
             return self.reply(*restore_live(self.rfile.read(length)))
-        length = min(int(self.headers.get("Content-Length") or 0), MAX_BODY)
+        length = body_length(self.headers, MAX_BODY)
+        if length is None:
+            return self.reply(413, {"error": "bad or too large body"})
         try:
             v = json.loads(self.rfile.read(length) or b"{}")
         except ValueError:
@@ -957,6 +985,10 @@ def housekeeping():
             x("DELETE FROM devices WHERE last_seen < ?", (cutoff,))
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
+            # The audit API is public: cap what unauthenticated posts can grow to.
+            for table, order in (("sessions", "started"), ("alarms", "ts"), ("devices", "last_seen")):
+                x(f"DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} "
+                  f"ORDER BY {order} DESC LIMIT -1 OFFSET ?)", (MAX_ROWS,))
             auto_backup()
             # Sessions whose close never arrived (client crashed, network lost).
             x(

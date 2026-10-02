@@ -12,6 +12,9 @@ use serde::Deserialize;
 /// Set by branding/apply.py (LICENSE_REQUIRED in branding/brand.env).
 pub const REQUIRED: bool = false;
 pub const OPTION_TOKEN: &str = "license-token";
+/// Leading bytes of every signed token (server/panel/panel.py TOKEN_PREFIX). The server key
+/// also signs hbbs' protobuf messages; a zero first byte can never start one of those.
+const TOKEN_PREFIX: &[u8] = b"\x00RDN-LICENSE-1\x00";
 pub const BLOCKED_MSG: &str =
     "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație.";
 
@@ -40,7 +43,7 @@ fn verify(token: &str) -> Option<Claims> {
     let signed = crate::decode64(token).ok()?;
     let pk = crate::common::get_rs_pk(hbb_common::config::RS_PUB_KEY)?;
     let payload = hbb_common::sodiumoxide::crypto::sign::verify(&signed, &pk).ok()?;
-    let claims: Claims = serde_json::from_slice(&payload).ok()?;
+    let claims: Claims = serde_json::from_slice(payload.strip_prefix(TOKEN_PREFIX)?).ok()?;
     if claims.u != crate::encode64(hbb_common::get_uuid()) || claims.e <= now() {
         return None;
     }

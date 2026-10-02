@@ -107,8 +107,8 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
 fi
 
 echo "==> Pornesc serverul"
-docker compose pull
-docker compose up -d
+docker compose pull --ignore-buildable
+docker compose up -d --build
 
 for _ in $(seq 1 30); do
   [[ -s data/id_ed25519.pub ]] && break
@@ -120,6 +120,9 @@ if [[ ! -s data/id_ed25519.pub ]]; then
 fi
 # Asigură-te că relay-ul folosește aceeași cheie ca hbbs.
 docker compose restart hbbr >/dev/null
+# Cheia privată și backup-urile: doar root.
+chmod 700 data
+chmod 600 data/id_ed25519
 
 # Actualizare automată zilnică (auto_update.sh): kiturile de pe pagina de descărcare,
 # versiunea anunțată clienților și serverul însuși, urmărind doar release-urile finalizate.
