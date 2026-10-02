@@ -148,6 +148,40 @@ Ce trebuie știut:
   dar nu poate citi panoul și nu poate controla nimic. Datele se păstrează 180 de zile
   (`RETENTION_DAYS` în `server/.env`).
 
+## Licențe
+
+Cu `LICENSE_REQUIRED=Y` în `branding/brand.env`, aplicația **nu funcționează fără un cod de
+licență valid**: nu se poate conecta la alte calculatoare și nu poate fi accesată. La prima
+pornire afișează „Licență necesară” cu butonul **Activează licența**.
+
+În panoul de securitate, tab-ul **Licențe**:
+
+- **Licență nouă:** numele clientului, câte calculatoare acoperă, perioada (1, 3, 6, 12 luni sau
+  nelimitată). Primești un cod de forma `RDN-XXXX-XXXX-XXXX`, pe care îl trimiți clientului.
+  Perioada începe la prima activare.
+- **Prelungește** cu +1, +3, +6 sau +12 luni (de la data expirării, sau de azi dacă a expirat).
+- **Revocă** sau **Reactivează** o licență; **Eliberează locul** unui calculator (tab-ul
+  Dispozitive), de exemplu când clientul își schimbă calculatorul.
+- Tab-ul **Dispozitive** arată pentru fiecare calculator licența și data expirării, plus cine e
+  online fără licență validă.
+
+Licența e necesară pe **toate** dispozitivele: și pe calculatoarele clienților, și pe ale
+tehnicienilor. Pentru calculatoarele tale creează o licență „nelimitată” (de ex. „Intern RDN”).
+
+Cum funcționează: serverul semnează licența cu cheia lui (`server/data/id_ed25519`), iar aplicația
+o verifică cu cheia publică pe care o are compilată, deci nu poate fi falsificată. Serverul o
+reîmprospătează la fiecare ~15 secunde; o licență revocată sau expirată blochează aplicația în
+câteva secunde dacă e online, iar sesiunile deschise sunt închise. Un calculator care nu poate
+contacta serverul rămâne funcțional cel mult 7 zile.
+
+Limită: codul sursă e public (AGPL-3.0), deci cineva priceput poate compila o versiune fără
+verificare; o astfel de versiune nu are însă cheia serverului tău și nu se poate folosi cu
+el decât dacă o pornește cu cheia publică, care nu e secretă. Licența protejează împotriva
+utilizării obișnuite, nu împotriva unui programator hotărât.
+
+Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
+aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
+
 ## Pasul 2 — Configurează branding-ul
 
 Direct pe GitHub (nu ai nevoie de nimic instalat):

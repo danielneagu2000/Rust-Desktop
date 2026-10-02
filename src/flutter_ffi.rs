@@ -2677,6 +2677,12 @@ pub fn main_get_printer_names() -> SyncReturn<String> {
 }
 
 pub fn main_get_common(key: String) -> String {
+    if key == "license-status" {
+        return crate::license::ui_status();
+    }
+    if let Some(code) = key.strip_prefix("license-activate:") {
+        return crate::license::activate(code);
+    }
     if key == "is-printer-installed" {
         #[cfg(target_os = "windows")]
         {

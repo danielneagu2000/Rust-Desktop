@@ -253,6 +253,9 @@ async fn start_hbbs_sync_async() {
                             config::Status::set("sysinfo_hash", "".to_owned());
                             log::info!("sysinfo required to forcely update");
                         }
+                        if let Some(token) = rsp.remove("license") {
+                            crate::license::store_from_server(token.as_str().unwrap_or_default());
+                        }
                         if let Some(conns)  = rsp.remove("disconnect") {
                                 if let Ok(conns) = serde_json::from_value::<Vec<i32>>(conns) {
                                     SENDER.lock().unwrap().send(conns).ok();

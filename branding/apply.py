@@ -126,6 +126,9 @@ def load_config():
     if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", app_id):
         fail("ANDROID_APP_ID must look like ro.firma.aplicatie (lowercase)")
     cfg["ANDROID_APP_ID"] = app_id
+    cfg["LICENSE_REQUIRED"] = (cfg.get("LICENSE_REQUIRED") or "N").upper()
+    if cfg["LICENSE_REQUIRED"] not in ("Y", "N"):
+        fail("LICENSE_REQUIRED must be Y or N")
     cfg["AUTO_UPDATE"] = (cfg.get("AUTO_UPDATE") or "Y").upper()
     if cfg["AUTO_UPDATE"] not in ("Y", "N"):
         fail("AUTO_UPDATE must be Y or N")
@@ -251,6 +254,12 @@ def update_patches(cfg):
          lambda m: f"'https://github.com/{owner}/{repo}/releases/tag/${{bind.mainGetNewVersion()}}'"),
         ("flutter/lib/mobile/pages/connection_page.dart", r"(final url = ')[^']*(';\n\s*// https://pub\.dev)",
          lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
+        ("flutter/lib/mobile/pages/connection_page.dart",
+         r"if \((?:!bind\.isCustomClient\(\) && )?!isIOS\)(\n\s*Obx\(\(\) => _buildUpdateUI)",
+         lambda m: f"if (!isIOS){m.group(1)}"),
+        # Licenses issued by the panel (src/license.rs).
+        ("src/license.rs", r"pub const REQUIRED: bool = (?:true|false);",
+         lambda m: f"pub const REQUIRED: bool = {'true' if cfg['LICENSE_REQUIRED'] == 'Y' else 'false'};"),
     ]
 
 
