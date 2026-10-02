@@ -159,7 +159,7 @@ Future<void> showLicenseDialog(BuildContext context) async {
                 autofocus: true,
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
-                  hintText: 'RDN-XXXX-XXXX-XXXX',
+                  hintText: 'RDN-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX',
                   border: OutlineInputBorder(),
                 ),
                 onSubmitted: (_) => submit(),

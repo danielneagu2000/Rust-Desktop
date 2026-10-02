@@ -348,9 +348,25 @@ def add_months(ts, months):
     return d.replace(year=year, month=month, day=day).timestamp()
 
 
+CODE_GROUPS, CODE_GROUP_LEN = 5, 5  # 25 random characters from 32 symbols: 125 bits
+
+
 def new_code():
-    groups = ["".join(secrets.choice(CODE_ALPHABET) for _ in range(4)) for _ in range(3)]
+    groups = ["".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_GROUP_LEN)) for _ in range(CODE_GROUPS)]
     return "RDN-" + "-".join(groups)
+
+
+def normalize_code(raw):
+    """Accept codes typed in lowercase, without dashes or with spaces."""
+    code = re.sub(r"[^A-Z0-9]", "", str(raw or "").upper())
+    if not code.startswith("RDN"):
+        return code
+    body = code[3:]
+    # Current codes: 5 groups of 5; codes created before: 3 groups of 4.
+    size = CODE_GROUP_LEN if len(body) == CODE_GROUPS * CODE_GROUP_LEN else 4 if len(body) == 12 else 0
+    if not size:
+        return code
+    return "RDN-" + "-".join(body[i:i + size] for i in range(0, len(body), size))
 
 
 def license_ok(lic, now=None):
@@ -418,9 +434,7 @@ def activate(v, src_ip):
         return {"error": msg}
 
     uuid = as_text(v.get("uuid"), 100)
-    code = re.sub(r"[^A-Z0-9]", "", str(v.get("code") or "").upper())
-    if len(code) == 15 and code.startswith("RDN"):
-        code = f"RDN-{code[3:7]}-{code[7:11]}-{code[11:15]}"
+    code = normalize_code(v.get("code"))
     if not uuid:
         return fail("Date lipsă de la aplicație")
     if not signing_seed():
