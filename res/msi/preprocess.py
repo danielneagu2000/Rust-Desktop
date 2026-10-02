@@ -93,7 +93,7 @@ def make_parser():
         "-m",
         "--manufacturer",
         type=str,
-        default="Purslane Tech Pte. Ltd.",
+        default="RDN Network Data",
         help="The app manufacturer.",
     )
     return parser
