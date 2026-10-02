@@ -340,15 +340,30 @@ Pe sisteme:
 
 ## Actualizare la o versiune nouă RustDesk
 
-```bash
-git remote add upstream https://github.com/rustdesk/rustdesk.git
-git fetch upstream --tags
-# Copiază peste repo sursele noii versiuni (inclusiv libs/hbb_common), apoi:
-python3 branding/apply.py
-```
+Îmbunătățirile din RustDesk se preiau automat, dar intră în aplicație doar cu acordul tău:
 
-`apply.py` refuză să lucreze (fără să modifice nimic) dacă noua versiune a schimbat
-fișierele pe care le modifică; atunci trebuie actualizat scriptul.
+1. În fiecare luni dimineața, workflow-ul **Sync RustDesk releases** verifică dacă RustDesk
+   a publicat o versiune nouă (doar versiuni stabile, ex. `1.5.1`, niciodată `nightly`).
+2. Dacă da, o importă și deschide un **pull request „Actualizare RustDesk X.Y.Z”** către
+   `master`. Descrierea spune ce s-a schimbat, dacă se îmbină fără conflicte cu
+   modificările RDN (branding, licențe, server) și dacă branding-ul se aplică în continuare.
+3. Tu (sau eu, la cerere) apeși **Merge**. Branding-ul se reaplică singur după merge.
+4. Rulezi **Publish new version**; clienții și serverul se actualizează ca de obicei.
+
+Verificarea se poate porni și manual: Actions → **Sync RustDesk releases** → Run workflow
+(opțional cu o versiune anume).
+
+De știut:
+
+- Dacă GitHub nu permite workflow-urilor să deschidă pull request-uri (setarea
+  Settings → Actions → General → „Allow GitHub Actions to create and approve pull
+  requests”), workflow-ul deschide în loc un **issue** cu link-ul spre pull request.
+- Dacă descrierea anunță **conflicte** sau că **branding-ul nu se mai aplică**, nu face
+  merge; cere-mi să le rezolv.
+- Fișierele de compilare din `.github/` nu se preiau (sunt adaptate pentru RDN Remote);
+  descrierea le listează pe cele pe care RustDesk le-a schimbat, ca să le portăm manual.
+- Ramura `upstream-rustdesk` conține sursele RustDesk neschimbate, câte un commit pe
+  versiune; nu lucra pe ea.
 
 ## Licență
 

@@ -1,0 +1,95 @@
+name: Sync RustDesk releases
+
+# Checks every Monday for a new RustDesk release. When there is one, it is imported on
+# the upstream-rustdesk branch and proposed as a pull request into master (or, if the
+# repository does not let Actions open pull requests, as an issue with the link).
+# Nothing reaches the clients until the PR is merged and "Publish new version" is run.
+# See .github/scripts/sync-rustdesk.sh.
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "RustDesk tag (e.g. 1.5.1); empty = latest release"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: rustdesk-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the RustDesk release
+        id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$INPUT_TAG"
+          if [[ -z "$TAG" ]]; then
+            TAG="$(git ls-remote --tags --refs https://github.com/rustdesk/rustdesk \
+              | sed -n 's#.*refs/tags/\([0-9]\+\.[0-9]\+\.[0-9]\+\)$#\1#p' | sort -V | tail -n 1)"
+          fi
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid RustDesk tag: '$TAG'" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch RustDesk ${{ steps.release.outputs.tag }}
+        id: upstream
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --branch "${{ steps.release.outputs.tag }}" \
+            --recurse-submodules --shallow-submodules \
+            https://github.com/rustdesk/rustdesk "$RUNNER_TEMP/rustdesk"
+          echo "sha=$(git -C "$RUNNER_TEMP/rustdesk" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Pillow
+        run: python3 -m pip install --user pillow
+
+      - name: Import and test-merge
+        id: sync
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash .github/scripts/sync-rustdesk.sh "${{ steps.release.outputs.tag }}" \
+            "${{ steps.upstream.outputs.sha }}" "$RUNNER_TEMP/rustdesk" "$RUNNER_TEMP/report.md"
+
+      - name: Push branches
+        if: steps.sync.outputs.proposed == 'true'
+        run: git push origin upstream-rustdesk "rustdesk-sync/${{ steps.release.outputs.tag }}"
+
+      - name: Open pull request
+        if: steps.sync.outputs.proposed == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TITLE="Actualizare RustDesk $TAG"
+          if gh pr create --base master --head "rustdesk-sync/$TAG" --title "$TITLE" \
+               --body-file "$RUNNER_TEMP/report.md"; then
+            exit 0
+          fi
+          echo "::warning::Actions may not open pull requests here (Settings → Actions → General); opening an issue instead."
+          {
+            echo "Deschide pull request-ul de aici: ${{ github.server_url }}/${{ github.repository }}/compare/master...rustdesk-sync/$TAG?expand=1"
+            echo
+            cat "$RUNNER_TEMP/report.md"
+          } > "$RUNNER_TEMP/issue.md"
+          gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/issue.md"
