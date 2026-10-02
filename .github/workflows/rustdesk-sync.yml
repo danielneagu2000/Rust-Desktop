@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "RustDesk tag (e.g. 1.5.1); empty = latest release"
+        description: "RustDesk tag (e.g. 1.5.1); empty = latest stable release"
         required: false
 
 permissions:
@@ -42,8 +42,8 @@ jobs:
           set -euo pipefail
           TAG="$INPUT_TAG"
           if [[ -z "$TAG" ]]; then
-            TAG="$(git ls-remote --tags --refs https://github.com/rustdesk/rustdesk \
-              | sed -n 's#.*refs/tags/\([0-9]\+\.[0-9]\+\.[0-9]\+\)$#\1#p' | sort -V | tail -n 1)"
+            # "Latest" on GitHub: never a pre-release, draft or nightly build.
+            TAG="$(gh api repos/rustdesk/rustdesk/releases/latest --jq .tag_name)"
           fi
           if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid RustDesk tag: '$TAG'" >&2

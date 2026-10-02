@@ -343,7 +343,8 @@ Pe sisteme:
 Îmbunătățirile din RustDesk se preiau automat, dar intră în aplicație doar cu acordul tău:
 
 1. În fiecare luni dimineața, workflow-ul **Sync RustDesk releases** verifică dacă RustDesk
-   a publicat o versiune nouă (doar versiuni stabile, ex. `1.5.1`, niciodată `nightly`).
+   a publicat o versiune nouă. Se ia doar versiunea marcată de RustDesk ca stabilă
+   („Latest” pe GitHub, ex. `1.5.1`), niciodată `nightly` sau „Pre-release”.
 2. Dacă da, o importă și deschide un **pull request „Actualizare RustDesk X.Y.Z”** către
    `master`. Descrierea spune ce s-a schimbat, dacă se îmbină fără conflicte cu
    modificările RDN (branding, licențe, server) și dacă branding-ul se aplică în continuare.
