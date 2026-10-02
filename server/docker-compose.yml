@@ -58,6 +58,8 @@ services:
     volumes:
       - ./panel:/app:ro,z
       - ./data:/data:z
+      # Inclus în backup-uri (server/panel/backup.py); doar citire.
+      - ./.env:/config/server.env:ro,z
     network_mode: host
     depends_on:
       - hbbr

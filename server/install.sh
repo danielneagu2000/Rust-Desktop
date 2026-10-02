@@ -190,7 +190,8 @@ Panoul de securitate:
   utilizator: $PANEL_USER
   parolă:     $PANEL_PASSWORD      (salvată în server/.env)
 
-IMPORTANT: fă backup la server/data/id_ed25519 (cheia privată). Dacă o pierzi,
+IMPORTANT: descarcă periodic un backup din panou (tab-ul Backup) pe alt dispozitiv;
+conține cheia privată server/data/id_ed25519. Dacă o pierzi,
 toți clienții trebuie recompilați cu cheia nouă.
 Dacă serverul e în spatele unui router sau al unui firewall de la provider, deschide/redirecționează
 porturile 21114-21119/tcp și 21116/udp (plus 80 și 443/tcp pentru pagina de descărcare)

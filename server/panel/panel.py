@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import backup
 import ed25519
 
 PANEL_USER = os.environ.get("PANEL_USER", "admin")
@@ -46,6 +47,10 @@ RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "180"))
 HBBR_ADMIN = os.environ.get("HBBR_ADMIN", "127.0.0.1:21117")
 # Y: devices without a valid license get an empty token and their sessions closed.
 LICENSE_REQUIRED = os.environ.get("LICENSE_REQUIRED", "Y").upper() == "Y"
+ENV_FILE = Path(os.environ.get("ENV_FILE", "/config/server.env"))
+BACKUP_DIR = DATA_DIR / "backups"
+AUTO_BACKUP_KEEP = int(os.environ.get("AUTO_BACKUP_KEEP", "14"))
+MAX_RESTORE = 300 * 1024 * 1024
 
 DB_FILE = DATA_DIR / "panel.sqlite3"
 BLOCKLIST_FILE = DATA_DIR / "blocklist.txt"  # read by hbbr at start (its cwd is the data dir)
@@ -756,6 +761,15 @@ class PanelHandler(BaseHTTPRequestHandler):
         if url.path.endswith("/api/state"):
             search = (parse_qs(url.query).get("q") or [""])[0].strip()[:100]
             return self.reply(200, state(search))
+        if url.path.endswith("/api/backups"):
+            return self.reply(200, {"backups": list_backups(), "dir": str(BACKUP_DIR)})
+        if url.path.endswith("/api/backup/download"):
+            name = (parse_qs(url.query).get("name") or [""])[0]
+            path = BACKUP_DIR / name
+            if not re.fullmatch(rf"{backup.PREFIX}-[0-9]{{8}}-[0-9]{{6}}-[a-z-]+\.tar\.gz", name) or not path.is_file():
+                return self.reply(404, "backup inexistent")
+            return self.reply(200, path.read_bytes(), "application/gzip",
+                              headers=[("Content-Disposition", f'attachment; filename="{name}"')])
         self.reply(200, INDEX_HTML, "text/html; charset=utf-8")
 
     def do_POST(self):
@@ -764,12 +778,17 @@ class PanelHandler(BaseHTTPRequestHandler):
         # Browsers cannot add this header cross-site without CORS, which we never grant.
         if self.headers.get("X-Panel") != "1":
             return self.reply(403, {"error": "missing header"})
+        action = urlparse(self.path).path.rsplit("/api/", 1)[-1]
+        if action == "backup/restore":
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= MAX_RESTORE:
+                return self.reply(413, {"error": "fișier prea mare sau gol"})
+            return self.reply(*restore_live(self.rfile.read(length)))
         length = min(int(self.headers.get("Content-Length") or 0), MAX_BODY)
         try:
             v = json.loads(self.rfile.read(length) or b"{}")
         except ValueError:
             return self.reply(400, {"error": "bad json"})
-        action = urlparse(self.path).path.rsplit("/api/", 1)[-1]
         if action == "block":
             ip = valid_ip(v.get("ip"))
             if not ip:
@@ -797,6 +816,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(200, {"ok": True})
         if action.startswith("license/"):
             return self.reply(*license_action(action[len("license/"):], v))
+        if action == "backup/create":
+            try:
+                path = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "manual")
+            except (OSError, RuntimeError, sqlite3.Error) as e:
+                return self.reply(500, {"error": f"backup eșuat: {e}"})
+            log(f"backup: {path.name}")
+            return self.reply(200, {"ok": True, "name": path.name})
         self.reply(404, {"error": "unknown action"})
 
 
@@ -854,6 +880,60 @@ def license_action(action, v):
     return 404, {"error": "unknown action"}
 
 
+# ---------------------------------------------------------------- backups
+
+def list_backups():
+    out = []
+    for f in sorted(BACKUP_DIR.glob(f"{backup.PREFIX}-*.tar.gz"), reverse=True):
+        st = f.stat()
+        label = f.name[len(backup.PREFIX) + 1:-len(".tar.gz")].split("-", 2)[-1]
+        out.append({"name": f.name, "size": st.st_size, "created": st.st_mtime, "label": label})
+    return out
+
+
+def auto_backup():
+    newest = max((f.stat().st_mtime for f in BACKUP_DIR.glob(f"{backup.PREFIX}-*-auto.tar.gz")), default=0)
+    if time.time() - newest < 23 * 3600 or not (DATA_DIR / "id_ed25519").exists():
+        return
+    path = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "auto")
+    backup.prune(BACKUP_DIR, "auto", AUTO_BACKUP_KEEP)
+    log(f"backup: {path.name}")
+
+
+def restore_live(blob):
+    """Restore licenses, history and the IP blocklist while the server runs. A backup
+    from a different server key needs the full restore (server/restore.sh)."""
+    global DB
+    try:
+        manifest, contents = backup.read(blob)
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    current = (DATA_DIR / "id_ed25519").read_bytes().strip() if (DATA_DIR / "id_ed25519").exists() else b""
+    if contents["id_ed25519"].strip() != current:
+        return 409, {"error": "Backup-ul este de pe un server cu altă cheie. Pentru restaurare completă "
+                              "(cheie, ID-uri, licențe) rulează pe server: sudo ./server/restore.sh <fișier>"}
+    safety = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "inainte-de-restaurare")
+    blocked_before = [r_["ip"] for r_ in q("SELECT ip FROM blocklist")]
+    restored = []
+    with DB_LOCK:
+        if "panel.sqlite3" in contents:
+            DB.close()
+            for suffix in ("-wal", "-shm"):
+                (DATA_DIR / ("panel.sqlite3" + suffix)).unlink(missing_ok=True)
+            backup._atomic_write(DB_FILE, contents["panel.sqlite3"])
+            DB = db()
+            restored.append("licențe, istoric, dispozitive")
+    if "panel.sqlite3" in contents:
+        # The blocklist lives in the panel database; make hbbr match the restored one.
+        if blocked_before:
+            hbbr_cmd("Br " + "|".join(blocked_before))
+        sync_hbbr_blocklist()
+        restored.append("IP-uri blocate")
+    _TOKEN_CACHE.clear()
+    log(f"backup: restored {manifest.get('created')} (safety copy {safety.name})")
+    return 200, {"ok": True, "restored": restored, "created": manifest.get("created"), "safety": safety.name}
+
+
 def housekeeping():
     while True:
         try:
@@ -863,6 +943,7 @@ def housekeeping():
             x("DELETE FROM devices WHERE last_seen < ?", (cutoff,))
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
+            auto_backup()
             # Sessions whose close never arrived (client crashed, network lost).
             x(
                 "UPDATE sessions SET ended=started WHERE ended IS NULL AND authed IS NULL AND started < ?",
