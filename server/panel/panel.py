@@ -16,6 +16,9 @@ PANEL_PORT, API_BIND, API_PORT, DATA_DIR, RETENTION_DAYS, HBBR_ADMIN.
 """
 
 import base64
+import calendar
+import datetime
+import secrets
 import hmac
 import ipaddress
 import json
@@ -30,6 +33,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import ed25519
+
 PANEL_USER = os.environ.get("PANEL_USER", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "")
 PANEL_BIND = os.environ.get("PANEL_BIND", "127.0.0.1")
@@ -39,6 +44,8 @@ API_PORT = int(os.environ.get("API_PORT", "21114"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "180"))
 HBBR_ADMIN = os.environ.get("HBBR_ADMIN", "127.0.0.1:21117")
+# Y: devices without a valid license get an empty token and their sessions closed.
+LICENSE_REQUIRED = os.environ.get("LICENSE_REQUIRED", "Y").upper() == "Y"
 
 DB_FILE = DATA_DIR / "panel.sqlite3"
 BLOCKLIST_FILE = DATA_DIR / "blocklist.txt"  # read by hbbr at start (its cwd is the data dir)
@@ -106,6 +113,14 @@ def init_db():
         CREATE TABLE IF NOT EXISTS blocklist (ip TEXT PRIMARY KEY, added REAL, note TEXT);
         CREATE TABLE IF NOT EXISTS pending_disconnect (uuid TEXT, conn_id INTEGER, ts REAL);
         CREATE TABLE IF NOT EXISTS nonces (nonce TEXT PRIMARY KEY, ts REAL);
+        CREATE TABLE IF NOT EXISTS licenses (
+            code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
+            created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT
+        );
+        CREATE TABLE IF NOT EXISTS activations (
+            uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
+            activated REAL, last_seen REAL
+        );
         """
     )
 
@@ -289,6 +304,150 @@ def latest_release():
     return {"url": f"https://github.com/{repo}/releases/tag/{tag}"}
 
 
+# ---------------------------------------------------------------- licenses
+#
+# A license (code) covers `seats` computers for `months` (0 = unlimited), counted from
+# its first activation. Clients get a token signed with the rendezvous server key
+# (data/id_ed25519), which they verify offline with the key they are built with.
+# Tokens live TOKEN_TTL and are refreshed in every heartbeat, so a revoked or expired
+# license stops working at the next heartbeat (or after TOKEN_TTL when offline).
+
+TOKEN_TTL = 7 * 86400
+PERIODS = (0, 1, 3, 6, 12)
+CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_SIGNING_SEED = None
+_TOKEN_CACHE = {}
+ACT_FAILS = {}
+ACT_LOCK = threading.Lock()
+
+
+def signing_seed():
+    global _SIGNING_SEED
+    if _SIGNING_SEED is None:
+        try:
+            raw = base64.b64decode((DATA_DIR / "id_ed25519").read_text().strip())
+        except (OSError, ValueError):
+            return None
+        if len(raw) != 64 or ed25519.public_key(raw[:32]) != raw[32:]:
+            log("licenses: data/id_ed25519 is not a valid Ed25519 key; licensing disabled")
+            return None
+        _SIGNING_SEED = raw[:32]
+    return _SIGNING_SEED
+
+
+def add_months(ts, months):
+    d = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
+    m = d.month - 1 + months
+    year, month = d.year + m // 12, m % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return d.replace(year=year, month=month, day=day).timestamp()
+
+
+def new_code():
+    groups = ["".join(secrets.choice(CODE_ALPHABET) for _ in range(4)) for _ in range(3)]
+    return "RDN-" + "-".join(groups)
+
+
+def license_ok(lic, now=None):
+    now = now or time.time()
+    if not lic or lic["revoked"]:
+        return False
+    return lic["expires"] is None or lic["expires"] > now
+
+
+def license_status(lic, now=None):
+    now = now or time.time()
+    if lic["revoked"]:
+        return "revocată"
+    if lic["starts"] is None:
+        return "neactivată"
+    if lic["expires"] is not None and lic["expires"] <= now:
+        return "expirată"
+    return "activă"
+
+
+def issue_token(uuid, lic):
+    seed = signing_seed()
+    if not seed:
+        return None
+    expires = lic["expires"]
+    key = (uuid, lic["code"], expires)
+    cached = _TOKEN_CACHE.get(key)
+    now = time.time()
+    if cached and now - cached[1] < 3600:
+        return cached[0]
+    token_exp = now + TOKEN_TTL if expires is None else min(expires, now + TOKEN_TTL)
+    payload = json.dumps(
+        {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or ""},
+        separators=(",", ":"), ensure_ascii=False,
+    ).encode()
+    token = base64.b64encode(ed25519.sign(seed, payload) + payload).decode()
+    if len(_TOKEN_CACHE) > 5000:
+        _TOKEN_CACHE.clear()
+    _TOKEN_CACHE[key] = (token, now)
+    return token
+
+
+def device_license(uuid):
+    rows = q(
+        "SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code WHERE a.uuid = ?",
+        (uuid,),
+    )
+    return rows[0] if rows else None
+
+
+def activate(v, src_ip):
+    now = time.time()
+    with ACT_LOCK:
+        window, fails = ACT_FAILS.get(src_ip, (now, 0))
+        if now - window > 3600:
+            window, fails = now, 0
+        if fails >= 20:
+            return {"error": "Prea multe încercări. Reîncearcă peste o oră."}
+
+    def fail(msg):
+        with ACT_LOCK:
+            ACT_FAILS[src_ip] = (window, fails + 1)
+            if len(ACT_FAILS) > 10000:
+                ACT_FAILS.clear()
+        return {"error": msg}
+
+    uuid = as_text(v.get("uuid"), 100)
+    code = re.sub(r"[^A-Z0-9]", "", str(v.get("code") or "").upper())
+    if len(code) == 15 and code.startswith("RDN"):
+        code = f"RDN-{code[3:7]}-{code[7:11]}-{code[11:15]}"
+    if not uuid:
+        return fail("Date lipsă de la aplicație")
+    if not signing_seed():
+        return {"error": "Serverul de licențe nu este configurat"}
+    rows = q("SELECT * FROM licenses WHERE code = ?", (code,))
+    if not rows:
+        return fail("Cod de licență invalid")
+    lic = rows[0]
+    if lic["revoked"]:
+        return fail("Licența a fost revocată. Contactează RDN Network Data.")
+    if lic["expires"] is not None and lic["expires"] <= now:
+        return fail("Licența a expirat. Contactează RDN Network Data pentru prelungire.")
+    with DB_LOCK:
+        already = DB.execute("SELECT 1 FROM activations WHERE uuid=? AND code=?", (uuid, code)).fetchone()
+        used = DB.execute("SELECT COUNT(*) FROM activations WHERE code=?", (code,)).fetchone()[0]
+        if not already and used >= lic["seats"]:
+            return fail(f"Toate cele {lic['seats']} locuri ale licenței sunt ocupate.")
+        if lic["starts"] is None:
+            expires = add_months(now, lic["months"]) if lic["months"] else None
+            DB.execute("UPDATE licenses SET starts=?, expires=? WHERE code=?", (now, expires, code))
+        DB.execute(
+            """INSERT INTO activations(uuid, code, device_id, hostname, activated, last_seen)
+               VALUES(?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET code=excluded.code,
+               device_id=excluded.device_id, hostname=excluded.hostname,
+               activated=excluded.activated, last_seen=excluded.last_seen""",
+            (uuid, code, as_text(v.get("id"), 40), as_text(v.get("hostname"), 100), now, now),
+        )
+    lic = q("SELECT * FROM licenses WHERE code = ?", (code,))[0]
+    log(f"licenses: {code} activated on {as_text(v.get('id'), 40)} ({src_ip})")
+    return {"license": issue_token(uuid, lic), "expires": int(lic["expires"] or 0), "client": lic["client"]}
+
+
 def heartbeat(v, src_ip):
     uuid = as_text(v.get("uuid"), 100)
     if not uuid:
@@ -306,6 +465,17 @@ def heartbeat(v, src_ip):
     if pending:
         out["disconnect"] = [p["conn_id"] for p in pending]
         x("DELETE FROM pending_disconnect WHERE uuid=?", (uuid,))
+    lic = device_license(uuid)
+    if license_ok(lic):
+        token = issue_token(uuid, lic)
+        if token:
+            out["license"] = token
+            x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
+    elif LICENSE_REQUIRED and signing_seed():
+        # Licensed builds drop their token and block themselves; close what is open.
+        out["license"] = ""
+        if conns:
+            out["disconnect"] = sorted(set(out.get("disconnect", []) + conns))
     if "modified_at" in v:
         out["modified_at"] = v["modified_at"]
     return out
@@ -370,6 +540,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         try:
             if path == "/version/latest":
                 return self.reply(200, latest_release() or {"url": ""})
+            if path == "/api/license/activate":
+                return self.reply(200, activate(v, src_ip))
             if path == "/api/audit/conn":
                 ingest_conn(v, src_ip)
                 return self.reply(200)
@@ -455,10 +627,30 @@ def state(search):
         # typ 2 lifts after a minute; typ 1/6 last until the client app restarts.
         b["active"] = b["typ"] != 2 or now - b["last"] < 60
 
-    devices = q("SELECT * FROM devices ORDER BY last_seen DESC")
+    devices = q(
+        """SELECT d.*, a.code AS lic_code, l.client AS lic_client, l.expires AS lic_expires,
+                  l.revoked AS lic_revoked, l.starts AS lic_starts
+           FROM devices d LEFT JOIN activations a ON a.uuid = d.uuid
+           LEFT JOIN licenses l ON l.code = a.code ORDER BY d.last_seen DESC"""
+    )
     for d in devices:
         d["online"] = now - (d["last_seen"] or 0) < ONLINE_SECONDS
         d["conns"] = json.loads(d["conns"] or "[]") if d["online"] else []
+        if d["lic_code"]:
+            d["lic_status"] = license_status(
+                {"revoked": d["lic_revoked"], "starts": d["lic_starts"], "expires": d["lic_expires"]}, now)
+        else:
+            d["lic_status"] = "fără licență"
+
+    licenses = q("SELECT * FROM licenses ORDER BY created DESC")
+    acts = {}
+    for a_ in q("""SELECT a.*, d.last_seen AS dev_seen FROM activations a
+                   LEFT JOIN devices d ON d.uuid = a.uuid ORDER BY a.activated"""):
+        a_["online"] = now - (a_["dev_seen"] or 0) < ONLINE_SECONDS
+        acts.setdefault(a_["code"], []).append(a_)
+    for l_ in licenses:
+        l_["status"] = license_status(l_, now)
+        l_["devices"] = acts.get(l_["code"], [])
 
     def one(sql, args=()):
         return q(sql, args)[0]["n"] or 0
@@ -488,6 +680,8 @@ def state(search):
         "client_blocks": client_blocks,
         "blocklist": sorted(blocked.values(), key=lambda r: -r["added"]),
         "devices": devices,
+        "licenses": licenses,
+        "licensing_ready": signing_seed() is not None,
         "hbbr_ok": hbbr_cmd("h") is not None,
     }
 
@@ -601,7 +795,63 @@ class PanelHandler(BaseHTTPRequestHandler):
             x("INSERT INTO pending_disconnect(uuid, conn_id, ts) VALUES(?,?,?)", (uuid, conn_id, time.time()))
             log(f"panel: disconnect requested for {uuid}/{conn_id}")
             return self.reply(200, {"ok": True})
+        if action.startswith("license/"):
+            return self.reply(*license_action(action[len("license/"):], v))
         self.reply(404, {"error": "unknown action"})
+
+
+def license_action(action, v):
+    code = as_text(v.get("code"), 40) or ""
+    if action == "create":
+        seats, months = as_int(v.get("seats")), as_int(v.get("months"))
+        client = (as_text(v.get("client"), 100) or "").strip()
+        if not client:
+            return 400, {"error": "Completează numele clientului"}
+        if not seats or not 1 <= seats <= 10000:
+            return 400, {"error": "Număr de calculatoare invalid"}
+        if months not in PERIODS:
+            return 400, {"error": "Perioadă invalidă"}
+        for _ in range(5):
+            code = new_code()
+            try:
+                x("INSERT INTO licenses(code, client, seats, months, created, note) VALUES(?,?,?,?,?,?)",
+                  (code, client, seats, months, time.time(), as_text(v.get("note"), 300) or ""))
+                break
+            except sqlite3.IntegrityError:
+                continue
+        log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
+        return 200, {"ok": True, "code": code}
+    rows = q("SELECT * FROM licenses WHERE code=?", (code,))
+    if action in ("extend", "revoke", "restore", "seats") and not rows:
+        return 404, {"error": "Licență inexistentă"}
+    if action == "extend":
+        lic, months = rows[0], as_int(v.get("months"))
+        if months not in (1, 3, 6, 12):
+            return 400, {"error": "Perioadă invalidă"}
+        if lic["starts"] is None:
+            if lic["months"]:
+                x("UPDATE licenses SET months=? WHERE code=?", (lic["months"] + months, code))
+        elif lic["expires"] is not None:
+            base = max(lic["expires"], time.time())
+            x("UPDATE licenses SET expires=? WHERE code=?", (add_months(base, months), code))
+        log(f"licenses: {code} extended by {months} months")
+        return 200, {"ok": True}
+    if action in ("revoke", "restore"):
+        x("UPDATE licenses SET revoked=? WHERE code=?", (1 if action == "revoke" else 0, code))
+        log(f"licenses: {code} {action}d")
+        return 200, {"ok": True}
+    if action == "seats":
+        seats = as_int(v.get("seats"))
+        if not seats or not 1 <= seats <= 10000:
+            return 400, {"error": "Număr de calculatoare invalid"}
+        x("UPDATE licenses SET seats=? WHERE code=?", (seats, code))
+        return 200, {"ok": True}
+    if action == "release":
+        uuid = as_text(v.get("uuid"), 100)
+        x("DELETE FROM activations WHERE uuid=?", (uuid,))
+        log(f"licenses: seat released for {uuid}")
+        return 200, {"ok": True}
+    return 404, {"error": "unknown action"}
 
 
 def housekeeping():

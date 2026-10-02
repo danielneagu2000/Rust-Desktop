@@ -1499,6 +1499,10 @@ impl Connection {
         if !self.check_whitelist(&addr).await {
             return false;
         }
+        if !crate::license::is_allowed() {
+            self.send_login_error(crate::license::BLOCKED_MSG).await;
+            return false;
+        }
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if crate::is_server() && Config::get_option("allow-only-conn-window-open") == "Y" {
             if !crate::check_process("", !crate::platform::is_root()) {

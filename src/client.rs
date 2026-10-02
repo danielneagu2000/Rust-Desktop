@@ -376,6 +376,7 @@ impl Client {
         (i32, String),
     )> {
         debug_assert!(peer == interface.get_id());
+        crate::license::check_outgoing()?;
         interface.update_direct(None);
         interface.update_received(false);
         match Self::_start(peer, key, token, conn_type, interface.clone()).await {

@@ -53,6 +53,7 @@ services:
       - PANEL_PASSWORD=${PANEL_PASSWORD:?setează PANEL_PASSWORD în server/.env}
       - PANEL_BIND=${PANEL_BIND:-127.0.0.1}
       - RETENTION_DAYS=${RETENTION_DAYS:-180}
+      - LICENSE_REQUIRED=${LICENSE_REQUIRED:-Y}
       - DATA_DIR=/data
     volumes:
       - ./panel:/app:ro,z

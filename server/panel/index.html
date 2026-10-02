@@ -91,6 +91,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="blocked">IP-uri blocate</button>
     <button data-tab="alarms">Alarme</button>
     <button data-tab="devices">Dispozitive</button>
+    <button data-tab="licenses">Licențe</button>
   </nav>
 
   <section id="conns" class="on"><div class="card">
@@ -135,8 +136,30 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
   <section id="devices"><div class="card">
     <h2>Dispozitive</h2>
     <p class="hint">Calculatoarele cu aplicația ta raportează la fiecare ~15 secunde. Poți închide de aici o sesiune activă.</p>
-    <div class="scroll"><table><thead><tr><th>Stare</th><th>ID</th><th>Nume calculator</th><th>Utilizator</th><th>Sistem</th><th>IP public</th><th>Versiune</th><th>Văzut ultima dată</th><th>Sesiuni active</th></tr></thead><tbody id="t-devices"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Stare</th><th>ID</th><th>Nume calculator</th><th>Utilizator</th><th>Sistem</th><th>IP public</th><th>Versiune</th><th>Văzut ultima dată</th><th>Sesiuni active</th><th>Licență</th><th></th></tr></thead><tbody id="t-devices"></tbody></table></div>
   </div></section>
+
+  <section id="licenses">
+    <div class="card">
+      <h2>Licență nouă</h2>
+      <p class="hint" id="lic-hint">Perioada începe la prima activare. Clientul introduce codul în aplicație; codul funcționează pe atâtea calculatoare câte setezi.</p>
+      <form class="add" id="add-license">
+        <input type="text" id="lic-client" placeholder="Client (ex. Firma X SRL)" required>
+        <input type="number" id="lic-seats" min="1" max="10000" value="1" style="width:110px" title="Număr de calculatoare">
+        <select id="lic-months" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+          <option value="1">1 lună</option><option value="3">3 luni</option><option value="6">6 luni</option>
+          <option value="12" selected>12 luni</option><option value="0">Nelimitată</option>
+        </select>
+        <input type="text" id="lic-note" placeholder="Notă (opțional)">
+        <button class="primary" type="submit">Creează licența</button>
+      </form>
+      <p id="lic-new" class="hint" style="display:none"></p>
+    </div>
+    <div class="card">
+      <h2>Licențe</h2>
+      <div class="scroll"><table><thead><tr><th>Cod</th><th>Client</th><th>Stare</th><th class="num">Calculatoare</th><th>Perioadă</th><th>Activată</th><th>Expiră</th><th>Prelungește</th><th></th></tr></thead><tbody id="t-licenses"></tbody></table></div>
+    </div>
+  </section>
 </main>
 <div id="toast"></div>
 <script>
@@ -173,6 +196,16 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       ? '<button class="small" data-unblock="' + esc(v) + '">Deblochează</button>'
       : '<button class="small danger" data-block="' + esc(v) + '">Blochează</button>';
   }
+  function day(ts) { return new Date(ts * 1000).toLocaleDateString("ro-RO"); }
+  function statusPill(st) {
+    var cls = { "activă": "ok", "neactivată": "mute", "expirată": "bad", "revocată": "bad", "fără licență": "warn" }[st] || "mute";
+    return pill(st, cls);
+  }
+  function licCell(d) {
+    if (!d.lic_code) return statusPill("fără licență");
+    var exp = d.lic_expires ? " · până la " + new Date(d.lic_expires * 1000).toLocaleDateString("ro-RO") : "";
+    return statusPill(d.lic_status) + ' <span style="font-size:12px">' + esc(d.lic_client || d.lic_code) + esc(exp) + "</span>";
+  }
   function rows(id, list, fn, cols) {
     document.getElementById(id).innerHTML = list.length
       ? list.map(fn).join("")
@@ -195,7 +228,9 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       [s.conns_24h, "Conexiuni reușite (24h)", ""],
       [s.failed_24h, "Conexiuni eșuate (24h)", s.failed_24h ? "warn" : ""],
       [s.alarms_24h, "Alarme (24h)", s.alarms_24h ? "bad" : ""],
-      [s.blocked, "IP-uri blocate pe server", ""]
+      [s.blocked, "IP-uri blocate pe server", ""],
+      [(data.licenses || []).filter(function (l) { return l.status === "activă"; }).length, "Licențe active", ""],
+      [data.devices.filter(function (d) { return d.online && d.lic_status !== "activă"; }).length, "Online fără licență validă", ""]
     ];
     document.getElementById("tiles").innerHTML = tiles.map(function (t) {
       return '<div class="tile ' + t[2] + '"><div class="v">' + esc(t[0]) + '</div><div class="l">' + esc(t[1]) + "</div></div>";
@@ -255,7 +290,31 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       return "<tr><td>" + (d.online ? pill("online", "ok") : pill("offline", "mute")) + '</td><td class="mono">' + esc(d.device_id) +
         "</td><td>" + esc(d.hostname || "—") + "</td><td>" + esc(d.username || "—") + "</td><td>" + esc(d.os || "—") +
         "</td><td>" + ip(d.src_ip) + "</td><td>" + esc(d.ver || "—") + "</td><td>" + esc(ago(d.last_seen)) +
-        '</td><td class="num">' + (d.conns ? d.conns.length : 0) + "</td></tr>";
+        '</td><td class="num">' + (d.conns ? d.conns.length : 0) + "</td><td>" + licCell(d) + "</td><td>" +
+        (d.lic_code ? '<button class="small" data-release="' + esc(d.uuid) + '">Eliberează locul</button>' : "") + "</td></tr>";
+    }, 11);
+
+    var L = data.licenses || [];
+    document.getElementById("lic-hint").innerHTML = data.licensing_ready
+      ? "Perioada începe la prima activare. Clientul introduce codul în aplicație; codul funcționează pe atâtea calculatoare câte setezi."
+      : '<span class="pill bad">Atenție</span> Panoul nu găsește cheia serverului (data/id_ed25519), deci nu poate emite licențe.';
+    rows("t-licenses", L, function (l) {
+      var used = l.devices.length;
+      var devs = l.devices.map(function (a) {
+        return (a.online ? "● " : "○ ") + esc(a.device_id || "?") + (a.hostname ? " · " + esc(a.hostname) : "");
+      }).join("<br>");
+      var ext = [1, 3, 6, 12].map(function (m) {
+        return '<button class="small" data-extend="' + esc(l.code) + '" data-months="' + m + '">+' + m + "</button>";
+      }).join(" ");
+      return '<tr><td><span class="mono">' + esc(l.code) + '</span><br><button class="small" data-copy="' + esc(l.code) + '" style="margin-top:4px">Copiază</button></td><td style="white-space:normal">' +
+        esc(l.client) + (l.note ? '<div class="lbl" style="color:var(--muted);font-size:12px">' + esc(l.note) + "</div>" : "") +
+        "</td><td>" + statusPill(l.status) + '</td><td class="num" title="' + devs.replace(/<br>/g, "\n").replace(/"/g, "") + '">' + used + " / " + l.seats +
+        (devs ? '<div style="text-align:left;font-size:12px;color:var(--muted);margin-top:4px">' + devs + "</div>" : "") +
+        "</td><td>" + (l.months ? l.months + (l.months === 1 ? " lună" : " luni") : "nelimitată") +
+        "</td><td>" + esc(l.starts ? day(l.starts) : "—") + "</td><td>" + esc(l.expires ? day(l.expires) : (l.months ? "—" : "niciodată")) +
+        '</td><td style="white-space:normal;min-width:110px">' + (l.months ? ext : "") + "</td><td>" +
+        (l.revoked ? '<button class="small" data-restore="' + esc(l.code) + '">Reactivează</button>'
+                   : '<button class="small danger" data-revoke="' + esc(l.code) + '">Revocă</button>') + "</td></tr>";
     }, 9);
   }
 
@@ -280,6 +339,8 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
   });
   document.body.addEventListener("click", function (e) {
+    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release]");
+    if (lic) { licenseClick(lic); return; }
     var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
     if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
     if (el.dataset.block) {
@@ -296,6 +357,40 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
         .then(function () { toast("Cerere trimisă; sesiunea se închide în câteva secunde"); setTimeout(load, 5000); })
         .catch(function (err) { toast("Eroare: " + err.message); });
     }
+  });
+  function licenseClick(el) {
+    var d = el.dataset, fail = function (err) { toast("Eroare: " + err.message); };
+    if (d.copy) {
+      (navigator.clipboard ? navigator.clipboard.writeText(d.copy) : Promise.reject(new Error("clipboard indisponibil")))
+        .then(function () { toast("Cod copiat: " + d.copy); }).catch(function () { prompt("Copiază codul:", d.copy); });
+    } else if (d.extend) {
+      if (!confirm("Prelungești licența " + d.extend + " cu " + d.months + (d.months === "1" ? " lună?" : " luni?"))) return;
+      post("license/extend", { code: d.extend, months: Number(d.months) }).then(function () { toast("Licență prelungită"); load(); }).catch(fail);
+    } else if (d.revoke) {
+      if (!confirm("Revoci licența " + d.revoke + "? Calculatoarele ei se blochează la următoarea verificare (câteva secunde dacă sunt online).")) return;
+      post("license/revoke", { code: d.revoke }).then(function () { toast("Licență revocată"); load(); }).catch(fail);
+    } else if (d.restore) {
+      post("license/restore", { code: d.restore }).then(function () { toast("Licență reactivată"); load(); }).catch(fail);
+    } else if (d.release) {
+      if (!confirm("Eliberezi locul de licență al acestui calculator? Calculatorul se blochează până primește un cod.")) return;
+      post("license/release", { uuid: d.release }).then(function () { toast("Loc eliberat"); load(); }).catch(fail);
+    }
+  }
+  document.getElementById("add-license").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("license/create", {
+      client: document.getElementById("lic-client").value.trim(),
+      seats: Number(document.getElementById("lic-seats").value),
+      months: Number(document.getElementById("lic-months").value),
+      note: document.getElementById("lic-note").value.trim()
+    }).then(function (r) {
+      var box = document.getElementById("lic-new");
+      box.style.display = "block";
+      box.innerHTML = 'Licență creată. Cod: <span class="mono" style="font-size:16px;font-weight:700;color:var(--text)">' + esc(r.code) +
+        '</span> <button class="small" data-copy="' + esc(r.code) + '">Copiază</button>';
+      document.getElementById("lic-client").value = ""; document.getElementById("lic-note").value = "";
+      load();
+    }).catch(function (err) { toast("Eroare: " + err.message); });
   });
   document.getElementById("add-block").addEventListener("submit", function (e) {
     e.preventDefault();
