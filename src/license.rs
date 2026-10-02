@@ -96,6 +96,14 @@ pub fn activate(code: &str) -> String {
     }
 }
 
+/// The ID shown in the app; ui_interface::get_id only exists in Flutter builds.
+fn device_id() -> String {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    return Config::get_id();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return crate::ipc::get_id();
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn activate_(code: &str) -> ResultType<()> {
     let api = crate::common::get_api_server(
@@ -108,7 +116,7 @@ async fn activate_(code: &str) -> ResultType<()> {
     let body = serde_json::json!({
         "code": code,
         "uuid": crate::encode64(hbb_common::get_uuid()),
-        "id": crate::ui_interface::get_id(),
+        "id": device_id(),
         "hostname": crate::common::hostname(),
     });
     let resp = crate::post_request(format!("{api}/api/license/activate"), body.to_string(), "")
