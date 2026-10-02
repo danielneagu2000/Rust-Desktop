@@ -2,6 +2,9 @@ name: Full Flutter CI
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ci-test-branding
 
 jobs:
   run-ci:
