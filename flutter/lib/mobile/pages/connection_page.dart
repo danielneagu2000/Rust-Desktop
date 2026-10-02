@@ -86,7 +86,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
         SliverList(
             delegate: SliverChildListDelegate([
           const LicenseBanner(),
-          if (!bind.isCustomClient() && !isIOS)
+          if (!isIOS)
             Obx(() => _buildUpdateUI(stateGlobal.updateUrl.value)),
           _buildRemoteIDTextField(),
         ])),

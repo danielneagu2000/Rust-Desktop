@@ -10,7 +10,7 @@ use hbb_common::{config::Config, log, tokio, ResultType};
 use serde::Deserialize;
 
 /// Set by branding/apply.py (LICENSE_REQUIRED in branding/brand.env).
-pub const REQUIRED: bool = false;
+pub const REQUIRED: bool = true;
 pub const OPTION_TOKEN: &str = "license-token";
 pub const BLOCKED_MSG: &str =
     "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație.";
