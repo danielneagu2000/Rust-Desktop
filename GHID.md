@@ -359,8 +359,12 @@ De știut:
 - Dacă GitHub nu permite workflow-urilor să deschidă pull request-uri (setarea
   Settings → Actions → General → „Allow GitHub Actions to create and approve pull
   requests”), workflow-ul deschide în loc un **issue** cu link-ul spre pull request.
-- Dacă descrierea anunță **conflicte** sau că **branding-ul nu se mai aplică**, nu face
-  merge; cere-mi să le rezolv.
+- Designul și datele RDN rămân ale tale: numele, logo-ul, iconițele și link-urile se
+  reaplică după fiecare merge; panoul, site-ul, licențele și scripturile serverului sunt
+  verificate la fiecare preluare să rămână neschimbate; datele (licențe, istoric, backup-uri,
+  parole, cheia serverului) stau doar pe server, nu în repo, deci nu sunt atinse niciodată.
+- Dacă descrierea anunță **conflicte**, **ATENȚIE: fișiere RDN** sau că **branding-ul nu
+  se mai aplică**, nu face merge; cere-mi să le rezolv.
 - Fișierele de compilare din `.github/` nu se preiau (sunt adaptate pentru RDN Remote);
   descrierea le listează pe cele pe care RustDesk le-a schimbat, ca să le portăm manual.
 - Ramura `upstream-rustdesk` conține sursele RustDesk neschimbate, câte un commit pe

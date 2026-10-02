@@ -68,6 +68,17 @@ else
   CONFLICTS="$(git -C "$WT" diff --name-only --diff-filter=U)"
   git -C "$WT" merge --abort
 fi
+# Files RDN added (design, logo, panel, site, licenses) must come out of the merge unchanged.
+RDN_LIST="$(mktemp)"
+git diff --name-only --diff-filter=A "$BASE" origin/master -- . ':!.github' > "$RDN_LIST"
+RDN_COUNT="$(wc -l < "$RDN_LIST")"
+RDN_TOUCHED=""
+if [[ -z "$CONFLICTS" && "$RDN_COUNT" -gt 0 ]]; then
+  RDN_TOUCHED="$(git -C "$WT" diff --name-only origin/master HEAD | grep -Fxf "$RDN_LIST" || true)"
+fi
+# Files RDN changed that this release changes too; the merge keeps the RDN edits.
+BOTH="$(comm -12 <(git diff --name-only --diff-filter=M "$BASE" origin/master | sort) \
+                 <(git diff --name-only "$BASE" "$NEW" | sort))"
 if [[ -n "$CONFLICTS" ]]; then
   BRANDING="Branding-ul se verifică după rezolvarea conflictelor (se reaplică automat după merge)."
 elif grep -q '=CHANGE_ME' "$WT/branding/brand.env"; then
@@ -94,6 +105,20 @@ WORKFLOWS="$(gh api "repos/rustdesk/rustdesk/compare/$LAST...$TAG" --jq '.files[
     echo "**Conflicte** între modificările RustDesk și cele RDN, de rezolvat înainte de merge:"
     echo
     sed 's/^/- `/; s/$/`/' <<< "$CONFLICTS"
+  fi
+  echo
+  if [[ -n "$RDN_TOUCHED" ]]; then
+    echo "**ATENȚIE: versiunea nouă ar modifica fișiere RDN. Nu face merge**; cere adaptarea manuală:"
+    echo
+    sed 's/^/- `/; s/$/`/' <<< "$RDN_TOUCHED"
+  elif [[ -z "$CONFLICTS" ]]; then
+    echo "Fișierele RDN (design, logo, panou, site, licențe: $RDN_COUNT fișiere) rămân neschimbate."
+  fi
+  if [[ -n "$BOTH" ]]; then
+    echo
+    echo "Fișiere modificate și de RDN, și de RustDesk (modificările RDN se păstrează la îmbinare):"
+    echo
+    sed 's/^/- `/; s/$/`/' <<< "$BOTH"
   fi
   echo
   echo "$BRANDING"
