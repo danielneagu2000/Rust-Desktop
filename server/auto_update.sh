@@ -48,8 +48,8 @@ fi
 
 echo "Actualizez serverul de la ${CURRENT:0:12} la $TAG"
 git_ checkout --quiet --detach "$TARGET"
-docker compose pull --quiet
-docker compose up -d --remove-orphans
+docker compose pull --quiet --ignore-buildable
+docker compose up -d --build --remove-orphans
 # panel.py, pagina web și Caddyfile sunt montate din repo; le reîncarc explicit.
 docker compose restart panel >/dev/null
 if docker ps --format '{{.Names}}' | grep -qx rustdesk-web; then

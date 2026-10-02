@@ -92,6 +92,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="alarms">Alarme</button>
     <button data-tab="devices">Dispozitive</button>
     <button data-tab="licenses">Licențe</button>
+    <button data-tab="backup">Backup</button>
   </nav>
 
   <section id="conns" class="on"><div class="card">
@@ -158,6 +159,28 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <div class="card">
       <h2>Licențe</h2>
       <div class="scroll"><table><thead><tr><th>Cod</th><th>Client</th><th>Stare</th><th class="num">Calculatoare</th><th>Perioadă</th><th>Activată</th><th>Expiră</th><th>Prelungește</th><th></th></tr></thead><tbody id="t-licenses"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="backup">
+    <div class="card">
+      <h2>Backup</h2>
+      <p class="hint">Un backup conține cheia serverului, ID-urile înregistrate, licențele, istoricul, IP-urile blocate și setările (server/.env).
+        Se face automat zilnic (se păstrează ultimele 14). <strong>Descarcă periodic un backup pe alt dispozitiv</strong>: cele de aici se pierd dacă se strică discul serverului.
+        Fișierul conține cheia privată a serverului și parola panoului; păstrează-l în siguranță.</p>
+      <form class="add" id="backup-now"><button class="primary" type="submit">Creează backup acum</button></form>
+      <div class="scroll"><table><thead><tr><th>Fișier</th><th>Tip</th><th>Creat</th><th class="num">Mărime</th><th></th></tr></thead><tbody id="t-backups"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Restaurare</h2>
+      <p class="hint">Din panou se restaurează licențele, istoricul, dispozitivele și IP-urile blocate, pe același server (aceeași cheie).
+        Înainte, panoul face automat un backup al stării curente.</p>
+      <form class="add" id="restore-form">
+        <input type="file" id="restore-file" accept=".gz,application/gzip" required>
+        <button class="danger" type="submit">Restaurează</button>
+      </form>
+      <p class="hint">Restaurare completă (server nou, disc defect, cheie pierdută): copiază backup-ul pe server și rulează
+        <span class="mono">sudo ./server/restore.sh /cale/backup.tar.gz</span>. Pe un calculator nou rulează întâi <span class="mono">install.sh</span>.</p>
     </div>
   </section>
 </main>
@@ -318,7 +341,21 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     }, 9);
   }
 
+  function size(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+  function loadBackups() {
+    return fetch(base + "api/backups", { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var kinds = { auto: "automat", manual: "manual", "inainte-de-restaurare": "înainte de restaurare" };
+        rows("t-backups", d.backups || [], function (b) {
+          return '<tr><td class="mono">' + esc(b.name) + "</td><td>" + esc(kinds[b.label] || b.label) + "</td><td>" + esc(when(b.created)) +
+            '</td><td class="num">' + esc(size(b.size)) + '</td><td><a class="small" style="text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:8px" href="' +
+            base + "api/backup/download?name=" + encodeURIComponent(b.name) + '">Descarcă</a></td></tr>';
+        }, 5);
+      }).catch(function () {});
+  }
   function load() {
+    if (document.getElementById("backup").classList.contains("on")) loadBackups();
     var q = document.getElementById("q").value.trim();
     return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin" })
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -376,6 +413,28 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       post("license/release", { uuid: d.release }).then(function () { toast("Loc eliberat"); load(); }).catch(fail);
     }
   }
+  document.getElementById("backup-now").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("backup/create", {}).then(function (r) { toast("Backup creat: " + r.name); loadBackups(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.getElementById("restore-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var f = document.getElementById("restore-file").files[0];
+    if (!f) return;
+    if (!confirm("Restaurezi datele panoului din " + f.name + "? Licențele și istoricul actuale vor fi înlocuite (se face întâi un backup de siguranță).")) return;
+    fetch(base + "api/backup/restore", {
+      method: "POST", credentials: "same-origin", headers: { "X-Panel": "1", "Content-Type": "application/octet-stream" }, body: f
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); })
+      .then(function (j) {
+        toast("Restaurat: " + j.restored.join(", ") + " (backup din " + new Date(j.created * 1000).toLocaleString("ro-RO") + ")");
+        document.getElementById("restore-file").value = ""; load(); loadBackups();
+      }).catch(function (err) { alert("Restaurare eșuată: " + err.message); });
+  });
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var t = e.target.closest("button[data-tab]");
+    if (t && t.dataset.tab === "backup") loadBackups();
+  });
   document.getElementById("add-license").addEventListener("submit", function (e) {
     e.preventDefault();
     post("license/create", {

@@ -46,8 +46,9 @@ services:
 
   panel:
     container_name: rustdesk-panel
-    image: python:3.12-alpine
-    command: python /app/panel.py
+    image: rdn-panel:local
+    build: ./panel
+    pull_policy: build
     environment:
       - PANEL_USER=${PANEL_USER:-admin}
       - PANEL_PASSWORD=${PANEL_PASSWORD:?setează PANEL_PASSWORD în server/.env}
@@ -58,6 +59,8 @@ services:
     volumes:
       - ./panel:/app:ro,z
       - ./data:/data:z
+      # Inclus în backup-uri (server/panel/backup.py); doar citire.
+      - ./.env:/config/server.env:ro,z
     network_mode: host
     depends_on:
       - hbbr

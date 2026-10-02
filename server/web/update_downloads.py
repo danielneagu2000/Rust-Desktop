@@ -124,7 +124,9 @@ def main():
         version = rel["tag_name"]
         published = calendar.timegm(time.strptime(rel["published_at"], "%Y-%m-%dT%H:%M:%SZ"))
 
-    target = FILES / re.sub(r"[^A-Za-z0-9._-]", "_", version)
+    # Release tags come from GitHub; never let one shape a path ("../", "/").
+    version = re.sub(r"[^A-Za-z0-9._-]", "_", version).strip(".") or "release"
+    target = FILES / version
     tmp = FILES / f".incoming-{os.getpid()}"
     tmp.mkdir(parents=True, exist_ok=True)
     items = []

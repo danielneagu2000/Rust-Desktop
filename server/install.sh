@@ -107,8 +107,8 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
 fi
 
 echo "==> Pornesc serverul"
-docker compose pull
-docker compose up -d
+docker compose pull --ignore-buildable
+docker compose up -d --build
 
 for _ in $(seq 1 30); do
   [[ -s data/id_ed25519.pub ]] && break
@@ -120,6 +120,9 @@ if [[ ! -s data/id_ed25519.pub ]]; then
 fi
 # Asigură-te că relay-ul folosește aceeași cheie ca hbbs.
 docker compose restart hbbr >/dev/null
+# Cheia privată și backup-urile: doar root.
+chmod 700 data
+chmod 600 data/id_ed25519
 
 # Actualizare automată zilnică (auto_update.sh): kiturile de pe pagina de descărcare,
 # versiunea anunțată clienților și serverul însuși, urmărind doar release-urile finalizate.
@@ -190,7 +193,8 @@ Panoul de securitate:
   utilizator: $PANEL_USER
   parolă:     $PANEL_PASSWORD      (salvată în server/.env)
 
-IMPORTANT: fă backup la server/data/id_ed25519 (cheia privată). Dacă o pierzi,
+IMPORTANT: descarcă periodic un backup din panou (tab-ul Backup) pe alt dispozitiv;
+conține cheia privată server/data/id_ed25519. Dacă o pierzi,
 toți clienții trebuie recompilați cu cheia nouă.
 Dacă serverul e în spatele unui router sau al unui firewall de la provider, deschide/redirecționează
 porturile 21114-21119/tcp și 21116/udp (plus 80 și 443/tcp pentru pagina de descărcare)

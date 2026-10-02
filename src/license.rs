@@ -12,6 +12,9 @@ use serde::Deserialize;
 /// Set by branding/apply.py (LICENSE_REQUIRED in branding/brand.env).
 pub const REQUIRED: bool = true;
 pub const OPTION_TOKEN: &str = "license-token";
+/// Leading bytes of every signed token (server/panel/panel.py TOKEN_PREFIX). The server key
+/// also signs hbbs' protobuf messages; a zero first byte can never start one of those.
+const TOKEN_PREFIX: &[u8] = b"\x00RDN-LICENSE-1\x00";
 pub const BLOCKED_MSG: &str =
     "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație.";
 
@@ -40,7 +43,7 @@ fn verify(token: &str) -> Option<Claims> {
     let signed = crate::decode64(token).ok()?;
     let pk = crate::common::get_rs_pk(hbb_common::config::RS_PUB_KEY)?;
     let payload = hbb_common::sodiumoxide::crypto::sign::verify(&signed, &pk).ok()?;
-    let claims: Claims = serde_json::from_slice(&payload).ok()?;
+    let claims: Claims = serde_json::from_slice(payload.strip_prefix(TOKEN_PREFIX)?).ok()?;
     if claims.u != crate::encode64(hbb_common::get_uuid()) || claims.e <= now() {
         return None;
     }
@@ -93,6 +96,14 @@ pub fn activate(code: &str) -> String {
     }
 }
 
+/// The ID shown in the app; ui_interface::get_id only exists in Flutter builds.
+fn device_id() -> String {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    return Config::get_id();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return crate::ipc::get_id();
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn activate_(code: &str) -> ResultType<()> {
     let api = crate::common::get_api_server(
@@ -105,7 +116,7 @@ async fn activate_(code: &str) -> ResultType<()> {
     let body = serde_json::json!({
         "code": code,
         "uuid": crate::encode64(hbb_common::get_uuid()),
-        "id": crate::ui_interface::get_id(),
+        "id": device_id(),
         "hostname": crate::common::hostname(),
     });
     let resp = crate::post_request(format!("{api}/api/license/activate"), body.to_string(), "")

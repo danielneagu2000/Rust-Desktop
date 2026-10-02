@@ -157,7 +157,7 @@ pornire afișează „Licență necesară” cu butonul **Activează licența**.
 În panoul de securitate, tab-ul **Licențe**:
 
 - **Licență nouă:** numele clientului, câte calculatoare acoperă, perioada (1, 3, 6, 12 luni sau
-  nelimitată). Primești un cod de forma `RDN-XXXX-XXXX-XXXX`, pe care îl trimiți clientului.
+  nelimitată). Primești un cod de forma `RDN-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX` (25 de caractere aleatorii), pe care îl trimiți clientului.
   Perioada începe la prima activare.
 - **Prelungește** cu +1, +3, +6 sau +12 luni (de la data expirării, sau de azi dacă a expirat).
 - **Revocă** sau **Reactivează** o licență; **Eliberează locul** unui calculator (tab-ul
@@ -180,6 +180,34 @@ secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât
 
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
+
+## Backup și restaurare
+
+Un backup conține tot ce nu poate fi refăcut: **cheia serverului** (`id_ed25519`, de care depind
+toate aplicațiile instalate), ID-urile înregistrate, **licențele**, istoricul conexiunilor,
+IP-urile blocate și setările (`server/.env`).
+
+- **Automat:** panoul face un backup pe zi în `server/data/backups/` și păstrează ultimele 14.
+- **Manual:** panoul → tab-ul **Backup** → **Creează backup acum**, apoi **Descarcă**.
+- **Important:** descarcă periodic (de ex. săptămânal) un backup pe alt dispozitiv (laptop,
+  stick, cloud). Backup-urile de pe mini PC se pierd odată cu discul lui.
+- Fișierul conține cheia privată a serverului și parola panoului: păstrează-l în siguranță.
+
+**Restaurare din panou** (același server): tab-ul **Backup** → alegi fișierul → **Restaurează**.
+Se restaurează licențele, istoricul, dispozitivele și IP-urile blocate; înainte se face automat
+un backup al stării curente. Un backup de pe alt server (altă cheie) e refuzat aici.
+
+**Restaurare completă** (mini PC nou, disc defect, cheie pierdută):
+
+```bash
+git clone https://github.com/danielneagu2000/Rust-Desktop.git
+cd Rust-Desktop/server
+sudo PANEL_BIND=0.0.0.0 ./install.sh remote.rdndata.ro     # instalează Docker și pornește
+sudo ./restore.sh /cale/rdn-backup-....tar.gz            # pune la loc cheia, licențele, setările
+```
+
+După restaurare, cheia publică afișată trebuie să fie aceeași cu `RS_PUB_KEY` din
+`branding/brand.env`: așa aplicațiile deja instalate se reconectează singure, fără reinstalare.
 
 ## Pasul 2 — Configurează branding-ul
 
