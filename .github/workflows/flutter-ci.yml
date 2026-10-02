@@ -6,6 +6,9 @@ on:
     branches:
       - ci-test-branding
 
+permissions:
+  contents: write
+
 jobs:
   run-ci:
     uses: ./.github/workflows/flutter-build.yml
