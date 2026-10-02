@@ -174,10 +174,9 @@ reîmprospătează la fiecare ~15 secunde; o licență revocată sau expirată b
 câteva secunde dacă e online, iar sesiunile deschise sunt închise. Un calculator care nu poate
 contacta serverul rămâne funcțional cel mult 7 zile.
 
-Limită: codul sursă e public (AGPL-3.0), deci cineva priceput poate compila o versiune fără
-verificare; o astfel de versiune nu are însă cheia serverului tău și nu se poate folosi cu
-el decât dacă o pornește cu cheia publică, care nu e secretă. Licența protejează împotriva
-utilizării obișnuite, nu împotriva unui programator hotărât.
+Limită: codul sursă e public (AGPL-3.0), deci un programator poate compila o versiune fără
+verificarea licenței și o poate conecta la serverul tău (cheia publică a serverului nu e
+secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât.
 
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
