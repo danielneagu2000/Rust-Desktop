@@ -48,6 +48,8 @@
 
     var legal = (f.legal || []).map(link);
     legal.push('<a href="confidentialitate.html">Confidențialitate RDN Remote</a>');
+    legal.push('<span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0)</span>');
+    legal.push('<a href="' + href(s.source_url || "https://github.com/danielneagu2000/Rust-Desktop") + '" rel="noopener">Cod sursă</a>');
 
     el.innerHTML =
       '<div class="ft-top"><div class="ft-wrap">' +
@@ -62,8 +64,6 @@
           "<span>Powered by <b>" + esc(company) + "</b></span>" +
           (legal.length ? '<span class="sep"></span>' + legal.join('<span class="sep">·</span>') : "") +
         '</div><a class="ft-logo" href="' + href(f.home_url || "/") + '" aria-label="' + esc(company) + '"><img src="assets/logo.png" alt=""></a></div>' +
-        '<div class="ft-attr">' + esc(s.product || "RDN Remote") + ' este bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0) · ' +
-          '<a href="' + href(s.source_url || "https://github.com/danielneagu2000/Rust-Desktop") + '" rel="noopener">Cod sursă</a></div>' +
       "</div></div>";
 
     var now = document.getElementById("ft-now");
