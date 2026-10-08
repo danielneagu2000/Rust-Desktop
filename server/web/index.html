@@ -544,6 +544,22 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
     btn.setAttribute("aria-expanded", open ? "true" : "false");
   });
   nav.addEventListener("click", function (e) { if (e.target.closest("a")) { nav.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); } });
+  // In-page links scroll without leaving "#sectiune" in the address bar.
+  function clean() { if (location.hash) history.replaceState(null, "", location.pathname + location.search); }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest('a[href^="#"]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    var target = document.getElementById(a.getAttribute("href").slice(1));
+    if (!target) return;
+    e.preventDefault();
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    clean();
+  });
+  if (location.hash && document.getElementById(location.hash.slice(1))) {
+    window.addEventListener("load", function () { document.getElementById(location.hash.slice(1)).scrollIntoView(); clean(); });
+  } else {
+    clean();
+  }
   if (!("IntersectionObserver" in window)) return;
   var links = {};
   nav.querySelectorAll('a[href^="#"]').forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
