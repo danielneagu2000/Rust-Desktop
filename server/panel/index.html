@@ -92,6 +92,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="alarms">Alarme</button>
     <button data-tab="devices">Dispozitive</button>
     <button data-tab="licenses">Licențe</button>
+    <button data-tab="reports">Rapoarte</button>
     <button data-tab="backup">Backup</button>
   </nav>
 
@@ -161,6 +162,19 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <div class="card">
       <h2>Licențe</h2>
       <div class="scroll"><table><thead><tr><th>Cod</th><th>Client</th><th>Stare</th><th class="num">Calculatoare</th><th>Perioadă</th><th>Activată</th><th>Expiră</th><th>Prelungește</th><th class="num">Conexiuni</th><th>Bandă</th><th></th></tr></thead><tbody id="t-licenses"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="reports">
+    <div class="card">
+      <h2>Raport pe client</h2>
+      <p class="hint">Activitatea fiecărei licențe în luna aleasă. <strong>Pornite</strong> = sesiuni deschise de pe dispozitivele licenței (de tehnicienii clientului); <strong>primite</strong> = sesiuni în care un dispozitiv al licenței a fost controlat. Istoricul se păstrează <span id="rep-ret">180</span> de zile.</p>
+      <form class="add" id="rep-form">
+        <input type="month" id="rep-month" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+        <button class="primary" type="submit">Arată</button>
+        <a class="small" id="rep-csv" style="text-decoration:none;border:1px solid var(--line);padding:7px 12px;border-radius:8px">Export CSV (Excel)</a>
+      </form>
+      <div class="scroll"><table><thead><tr><th>Client</th><th>Licență</th><th>Stare</th><th class="num">Dispozitive</th><th class="num">Sesiuni pornite</th><th class="num">Ore pornite</th><th class="num">Calculatoare accesate</th><th class="num">Sesiuni primite</th><th class="num">Ore primite</th><th class="num">Fișiere</th><th class="num">Închise la limită</th><th>Ultima activitate</th><th></th></tr></thead><tbody id="t-report"></tbody></table></div>
     </div>
   </section>
 
@@ -450,7 +464,32 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
   document.getElementById("tabs").addEventListener("click", function (e) {
     var t = e.target.closest("button[data-tab]");
     if (t && t.dataset.tab === "backup") loadBackups();
+    if (t && t.dataset.tab === "reports") loadReport();
   });
+  (function () {
+    var d = new Date(), m = document.getElementById("rep-month");
+    m.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  })();
+  function hours(h) { return h ? String(h).replace(".", ",") : "0"; }
+  function loadReport() {
+    var month = document.getElementById("rep-month").value;
+    if (!month) return;
+    document.getElementById("rep-csv").href = base + "api/report.csv?month=" + encodeURIComponent(month);
+    fetch(base + "api/report?month=" + encodeURIComponent(month), { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.retention_days) document.getElementById("rep-ret").textContent = d.retention_days;
+        rows("t-report", d.rows || [], function (r) {
+          return "<tr><td>" + esc(r.client) + '</td><td class="mono">' + esc(r.code) + "</td><td>" + statusPill(r.status) +
+            '</td><td class="num">' + r.devices + " / " + r.seats + '</td><td class="num">' + r.out_sessions + '</td><td class="num">' + hours(r.out_hours) +
+            '</td><td class="num">' + r.out_targets + '</td><td class="num">' + r.in_sessions + '</td><td class="num">' + hours(r.in_hours) +
+            '</td><td class="num">' + r.files + '</td><td class="num">' + (r.limit_hits ? pill(String(r.limit_hits), "warn") : "0") +
+            "</td><td>" + esc(r.last_seen ? when(r.last_seen) : "—") + '</td><td><a class="small" style="text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:8px" href="' +
+            base + "api/report.csv?month=" + encodeURIComponent(month) + "&code=" + encodeURIComponent(r.code) + '">CSV detaliat</a></td></tr>';
+        }, 13);
+      }).catch(function () {});
+  }
+  document.getElementById("rep-form").addEventListener("submit", function (e) { e.preventDefault(); loadReport(); });
   document.getElementById("add-license").addEventListener("submit", function (e) {
     e.preventDefault();
     post("license/create", {

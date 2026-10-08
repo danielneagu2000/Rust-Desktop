@@ -200,6 +200,19 @@ secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
 
+## Raport pe client
+
+Tab-ul **Rapoarte** din panou arată, pentru luna aleasă, fiecare licență: sesiuni pornite de pe
+dispozitivele ei și orele de lucru, câte calculatoare au fost accesate, sesiuni primite, fișiere
+transferate, de câte ori s-a atins limita de conexiuni și ultima activitate.
+
+- **Export CSV (Excel)**: tot raportul lunii, gata de deschis în Excel (separator `;`).
+- **CSV detaliat** (pe rândul unei licențe): fiecare sesiune, cu început, sfârșit, minute, cine s-a
+  conectat, la ce calculator, tipul sesiunii și IP-ul.
+
+Istoricul se păstrează 180 de zile (`RETENTION_DAYS` în `server/.env`), deci rapoartele acoperă
+ultimele ~6 luni. Pentru evidență pe termen lung, descarcă lunar CSV-ul.
+
 ## Backup și restaurare
 
 Un backup conține tot ce nu poate fi refăcut: **cheia serverului** (`id_ed25519`, de care depind

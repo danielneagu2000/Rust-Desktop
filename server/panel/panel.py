@@ -17,6 +17,8 @@ PANEL_PORT, API_BIND, API_PORT, DATA_DIR, RETENTION_DAYS, HBBR_ADMIN.
 
 import base64
 import calendar
+import csv
+import io
 import datetime
 import secrets
 import hmac
@@ -867,6 +869,16 @@ class PanelHandler(BaseHTTPRequestHandler):
         if url.path.endswith("/api/state"):
             search = (parse_qs(url.query).get("q") or [""])[0].strip()[:100]
             return self.reply(200, state(search))
+        if url.path.endswith("/api/report"):
+            data = report((parse_qs(url.query).get("month") or [""])[0])
+            return self.reply(200, data) if data else self.reply(400, {"error": "lună invalidă"})
+        if url.path.endswith("/api/report.csv"):
+            qs = parse_qs(url.query)
+            body, name = report_csv((qs.get("month") or [""])[0], as_text((qs.get("code") or [""])[0], 40) or None)
+            if not body:
+                return self.reply(404, "raport inexistent")
+            return self.reply(200, body, "text/csv; charset=utf-8",
+                              headers=[("Content-Disposition", f'attachment; filename="{name}"')])
         if url.path.endswith("/api/backups"):
             return self.reply(200, {"backups": list_backups(), "dir": str(BACKUP_DIR)})
         if url.path.endswith("/api/backup/download"):
@@ -1018,6 +1030,103 @@ def license_action(action, v):
         log(f"licenses: seat released for {uuid}")
         return 200, {"ok": True}
     return 404, {"error": "unknown action"}
+
+
+# ---------------------------------------------------------------- reports
+
+def month_range(month):
+    """'2026-10' -> (start, end) unix seconds in local time; None if invalid."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})", str(month or ""))
+    if not m or not 1 <= int(m.group(2)) <= 12:
+        return None
+    y, mo = int(m.group(1)), int(m.group(2))
+    start = datetime.datetime(y, mo, 1).timestamp()
+    end = datetime.datetime(y + mo // 12, mo % 12 + 1, 1).timestamp()
+    return start, end
+
+
+def license_sessions(code, start, end, direction):
+    """Sessions of a license in [start, end): started from its devices ("out") or received by them ("in")."""
+    join = "a.device_id = s.peer_id" if direction == "out" else "a.uuid = s.uuid"
+    rows = q(
+        f"""SELECT s.*, d.last_seen AS dev_seen, d.device_id AS target_id, d.hostname AS target_name
+            FROM sessions s JOIN activations a ON {join} AND a.code = ?
+            LEFT JOIN devices d ON d.uuid = s.uuid
+            WHERE s.authed IS NOT NULL AND s.authed < ? AND COALESCE(s.ended, ?) >= ?
+            ORDER BY s.authed""",
+        (code, end, time.time(), start),
+    )
+    for r in rows:
+        # A session whose close never arrived (crash, power loss) ends when its device was last seen.
+        stop = r["ended"] or max(r["authed"], r["dev_seen"] or r["authed"])
+        r["seconds"] = max(0, min(stop, end) - max(r["authed"], start))
+    return rows
+
+
+def report(month):
+    rng = month_range(month)
+    if not rng:
+        return None
+    start, end = rng
+    out = []
+    for lic in q("SELECT * FROM licenses ORDER BY client, created"):
+        sent = license_sessions(lic["code"], start, end, "out")
+        recv = license_sessions(lic["code"], start, end, "in")
+        acts = q("SELECT COUNT(*) AS n, MAX(last_seen) AS seen FROM activations WHERE code = ?", (lic["code"],))[0]
+        limit_hits = q(
+            "SELECT COUNT(*) AS n FROM alarms WHERE typ = ? AND ts >= ? AND ts < ? AND info LIKE ?",
+            (ALARM_SESSION_LIMIT, start, end, f'%"{lic["code"]}"%'),
+        )[0]["n"]
+        out.append({
+            "code": lic["code"], "client": lic["client"], "status": license_status(lic),
+            "devices": acts["n"], "seats": lic["seats"], "last_seen": acts["seen"],
+            "sessions_limit": lic.get("sessions") or 0, "bandwidth": lic.get("bandwidth") or 0,
+            "out_sessions": len(sent), "out_hours": round(sum(r["seconds"] for r in sent) / 3600, 2),
+            "out_targets": len({r["uuid"] for r in sent}),
+            "in_sessions": len(recv), "in_hours": round(sum(r["seconds"] for r in recv) / 3600, 2),
+            "files": sum(r["files"] or 0 for r in sent + recv),
+            "limit_hits": limit_hits,
+        })
+    return {"month": month, "rows": out, "retention_days": RETENTION_DAYS}
+
+
+def csv_bytes(header, rows):
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")  # Excel în română folosește ";" ca separator
+    w.writerow(header)
+    w.writerows(rows)
+    return ("\ufeff" + buf.getvalue()).encode()
+
+
+def report_csv(month, code=None):
+    rng = month_range(month)
+    if not rng:
+        return None, None
+    fmt = lambda t: datetime.datetime.fromtimestamp(t).strftime("%d.%m.%Y %H:%M") if t else ""
+    num = lambda v: str(v).replace(".", ",")
+    if not code:
+        data = report(month)
+        rows = [[r["client"], r["code"], r["status"], f'{r["devices"]}/{r["seats"]}', r["sessions_limit"] or "nelimitat",
+                 num(r["bandwidth"] / 1000) if r["bandwidth"] else "nelimitată", r["out_sessions"], num(r["out_hours"]),
+                 r["out_targets"], r["in_sessions"], num(r["in_hours"]), r["files"], r["limit_hits"], fmt(r["last_seen"])]
+                for r in data["rows"]]
+        header = ["Client", "Licență", "Stare", "Dispozitive", "Conexiuni simultane", "Bandă (Mbit/s)", "Sesiuni pornite",
+                  "Ore pornite", "Calculatoare accesate", "Sesiuni primite", "Ore primite", "Fișiere transferate",
+                  "Închise la limită", "Ultima activitate"]
+        return csv_bytes(header, rows), f"raport-rdn-remote-{month}.csv"
+    if not q("SELECT 1 FROM licenses WHERE code = ?", (code,)):
+        return None, None
+    start, end = rng
+    rows = []
+    for direction, label in (("out", "pornită"), ("in", "primită")):
+        for r in license_sessions(code, start, end, direction):
+            rows.append([fmt(r["authed"]), fmt(r["ended"]), num(round(r["seconds"] / 60, 1)), label,
+                         r["peer_id"] or "", r["peer_name"] or "", r["target_id"] or r["device_id"] or "", r["target_name"] or "",
+                         CONN_TYPES.get(r["conn_type"], r["conn_type"] or ""), r["remote_ip"] or "", r["files"] or 0])
+    rows.sort(key=lambda x: datetime.datetime.strptime(x[0], "%d.%m.%Y %H:%M") if x[0] else datetime.datetime.min)
+    header = ["Început", "Sfârșit", "Minute", "Sesiune", "De la (ID)", "De la (nume)", "Către (ID)", "Către (calculator)",
+              "Tip", "IP", "Fișiere"]
+    return csv_bytes(header, rows), f"raport-{code}-{month}.csv"
 
 
 # ---------------------------------------------------------------- backups
