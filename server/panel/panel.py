@@ -104,6 +104,7 @@ def db():
     conn = sqlite3.connect(DB_FILE, check_same_thread=False, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
     # Databases (and backups) from before per-license bandwidth limits.
     cols = {r[1] for r in conn.execute("PRAGMA table_info(licenses)")}
     if cols and "bandwidth" not in cols:
@@ -556,11 +557,12 @@ def device_license(uuid):
 def activate(v, src_ip):
     now = time.time()
     with ACT_LOCK:
+        max_fails, lock_seconds = lockout("activation")
         window, fails = ACT_FAILS.get(src_ip, (now, 0))
-        if now - window > 3600:
+        if now - window > lock_seconds:
             window, fails = now, 0
-        if fails >= 20:
-            return {"error": "Prea multe încercări. Reîncearcă peste o oră."}
+        if fails >= max_fails:
+            return {"error": f"Prea multe încercări. Reîncearcă peste {minutes_text(window + lock_seconds - now)}."}
 
     def fail(msg):
         with ACT_LOCK:
@@ -726,8 +728,82 @@ class ApiHandler(BaseHTTPRequestHandler):
 
 AUTH_FAILS = {}
 AUTH_LOCK = threading.Lock()
-AUTH_MAX_FAILS = 10
-AUTH_LOCK_SECONDS = 900
+# Lockouts after wrong attempts, per address: (attempts, minutes). Changed from the panel
+# ("IP-uri blocate" tab) and kept in the settings table.
+LOCKOUT_DEFAULTS = {"panel": (10, 15), "portal": (10, 15), "activation": (20, 60)}
+LOCKOUT_MAX_MINUTES = 7 * 24 * 60
+
+
+def lockout(kind):
+    """(max attempts, lock seconds) for the panel, the portal or license activation."""
+    fails, minutes = LOCKOUT_DEFAULTS[kind]
+    for r in q("SELECT key, value FROM settings WHERE key IN (?, ?)", (f"lock_{kind}_fails", f"lock_{kind}_minutes")):
+        value = as_int(r["value"])
+        if value is None:
+            continue
+        if r["key"].endswith("_fails") and 1 <= value <= 1000:
+            fails = value
+        elif r["key"].endswith("_minutes") and 1 <= value <= LOCKOUT_MAX_MINUTES:
+            minutes = value
+    return fails, minutes * 60
+
+
+def minutes_text(seconds):
+    m = max(1, int(-(-seconds // 60)))
+    if m < 120:
+        return "1 minut" if m == 1 else f"{m} minute"
+    h = round(m / 60)
+    return f"{h} ore" if h < 48 else f"{round(h / 24)} zile"
+
+
+def lockout_state():
+    now = time.time()
+    with AUTH_LOCK:
+        auth = list(AUTH_FAILS.items())
+    with ACT_LOCK:
+        act = list(ACT_FAILS.items())
+    blocked = []
+    for key, (fails, until) in auth:
+        if until > now:
+            kind = "portal" if key.startswith("portal:") else "panel"
+            blocked.append({"kind": kind, "ip": key.split(":", 1)[1] if kind == "portal" else key, "fails": fails, "until": until})
+    max_fails, lock_seconds = lockout("activation")
+    for ip, (window, fails) in act:
+        if fails >= max_fails and window + lock_seconds > now:
+            blocked.append({"kind": "activation", "ip": ip, "fails": fails, "until": window + lock_seconds})
+    settings = {}
+    for kind in LOCKOUT_DEFAULTS:
+        f, sec = lockout(kind)
+        settings[kind] = {"fails": f, "minutes": sec // 60}
+    return {"settings": settings, "blocked": sorted(blocked, key=lambda b: -b["until"])}
+
+
+def lockout_action(action, v):
+    if action == "save":
+        rows = []
+        for kind in LOCKOUT_DEFAULTS:
+            cfg = v.get(kind) if isinstance(v.get(kind), dict) else {}
+            fails, minutes = as_int(cfg.get("fails")), as_int(cfg.get("minutes"))
+            if fails is None or not 1 <= fails <= 1000:
+                return 400, {"error": "Numărul de încercări trebuie să fie între 1 și 1000"}
+            if minutes is None or not 1 <= minutes <= LOCKOUT_MAX_MINUTES:
+                return 400, {"error": f"Durata blocării trebuie să fie între 1 și {LOCKOUT_MAX_MINUTES} minute (7 zile)"}
+            rows += [(f"lock_{kind}_fails", str(fails)), (f"lock_{kind}_minutes", str(minutes))]
+        for row in rows:
+            x("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", row)
+        log("panel: lockout settings changed " + ", ".join(f"{k}={val}" for k, val in rows))
+        return 200, {"ok": True}
+    if action == "clear":
+        ip = as_text(v.get("ip"), 100)
+        with AUTH_LOCK:
+            for key in [k for k in AUTH_FAILS if not ip or k in (ip, "portal:" + ip)]:
+                del AUTH_FAILS[key]
+        with ACT_LOCK:
+            for key in [k for k in ACT_FAILS if not ip or k == ip]:
+                del ACT_FAILS[key]
+        log(f"panel: lockouts cleared for {ip or 'all addresses'}")
+        return 200, {"ok": True}
+    return 404, {"error": "unknown action"}
 SESSION_COOKIE = "rdn_panel"
 SESSION_TTL = 12 * 3600
 PANEL_SESSIONS = {}  # token -> expiry
@@ -895,6 +971,7 @@ def state(search):
         "alarms": alarms,
         "client_blocks": client_blocks,
         "blocklist": sorted(blocked.values(), key=lambda r: -r["added"]),
+        "lockouts": lockout_state(),
         "devices": devices,
         "licenses": licenses,
         "licensing_ready": signing_seed() is not None,
@@ -963,10 +1040,12 @@ class PanelHandler(BaseHTTPRequestHandler):
     def login(self):
         ip = self.client_ip()
         now = time.time()
+        max_fails, lock_seconds = lockout("panel")
         with AUTH_LOCK:
             fails, until = AUTH_FAILS.get(ip, (0, 0))
         if until > now:
-            return self.reply(429, login_page("Prea multe încercări greșite. Reîncearcă peste 15 minute."), "text/html; charset=utf-8")
+            return self.reply(429, login_page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}."),
+                              "text/html; charset=utf-8")
         length = body_length(self.headers, 4096)
         if length is None:
             return self.reply(413, "body prea mare")
@@ -979,7 +1058,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         if not ok:
             with AUTH_LOCK:
                 fails += 1
-                AUTH_FAILS[ip] = (fails, now + AUTH_LOCK_SECONDS if fails >= AUTH_MAX_FAILS else 0)
+                AUTH_FAILS[ip] = (fails, now + lock_seconds if fails >= max_fails else 0)
             log(f"panel: failed login from {ip}")
             return self.reply(200, login_page("Date de autentificare greșite."), "text/html; charset=utf-8")
         token = secrets.token_urlsafe(32)
@@ -1043,10 +1122,11 @@ class PanelHandler(BaseHTTPRequestHandler):
         ip, now = self.client_ip(), time.time()
         key = "portal:" + ip
         page = lambda err: self.reply(200, portal_login_page(err), "text/html; charset=utf-8")
+        max_fails, lock_seconds = lockout("portal")
         with AUTH_LOCK:
             fails, until = AUTH_FAILS.get(key, (0, 0))
         if until > now:
-            return page("Prea multe încercări greșite. Reîncearcă peste 15 minute.")
+            return page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}.")
         length = body_length(self.headers, 4096)
         if length is None:
             return self.reply(413, "body prea mare")
@@ -1058,7 +1138,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         if not ok:
             with AUTH_LOCK:
                 fails += 1
-                AUTH_FAILS[key] = (fails, now + AUTH_LOCK_SECONDS if fails >= AUTH_MAX_FAILS else 0)
+                AUTH_FAILS[key] = (fails, now + lock_seconds if fails >= max_fails else 0)
             log(f"portal: failed login for {email!r} from {ip}")
             return page("E-mail sau parolă greșită.")
         if not portal_user(rows[0]["id"]):
@@ -1200,6 +1280,8 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(200, {"ok": True})
         if action.startswith("license/"):
             return self.reply(*license_action(action[len("license/"):], v))
+        if action.startswith("lockout/"):
+            return self.reply(*lockout_action(action[len("lockout/"):], v))
         if action == "backup/create":
             try:
                 path = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "manual")

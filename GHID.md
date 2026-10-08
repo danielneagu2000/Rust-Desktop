@@ -127,6 +127,14 @@ Ce arată:
 - **Dispozitive:** ce calculatoare sunt online, nume, utilizator, sistem, IP public, și butonul
   **Deconectează** pentru a închide imediat o sesiune activă.
 
+### Blocarea după încercări greșite
+
+În tab-ul **IP-uri blocate**, cardul **Blocare după încercări greșite** stabilește, separat pentru
+autentificarea în panou, în portalul clienților și pentru codurile de licență greșite introduse în
+aplicație, după câte încercări se blochează o adresă IP și pentru câte minute (maxim 7 zile).
+Implicit: panou și portal 10 încercări / 15 minute, coduri de licență 20 / 60 de minute.
+Schimbarea se aplică imediat. Dedesubt vezi adresele blocate acum și le poți debloca.
+
 ### Panoul pe internet, cu autentificare în doi pași
 
 Pe un VPS poți deschide panoul la o adresă proprie, de exemplu `https://panou.rdndata.ro`:
@@ -251,7 +259,8 @@ Ce poate face administratorul clientului:
 - **Istoric** (30 de zile) și **Rapoarte** lunare, cu CSV pentru Excel.
 
 Limitele licenței (calculatoare, conexiuni simultane, bandă, prelungire) rămân la tine, în panou.
-După 10 parole greșite de pe aceeași adresă, autentificarea în portal se blochează 15 minute.
+După 10 parole greșite de pe aceeași adresă, autentificarea în portal se blochează 15 minute
+(valorile se schimbă din panou, vezi mai jos).
 Dacă revoci licența, conturile ei din portal nu mai pot intra.
 
 ## Backup și restaurare

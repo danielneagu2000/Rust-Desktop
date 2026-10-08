@@ -125,6 +125,24 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       <div class="scroll"><table><thead><tr><th>IP</th><th>Adăugat</th><th>Notă</th><th></th></tr></thead><tbody id="t-blocklist"></tbody></table></div>
     </div>
     <div class="card">
+      <h2>Blocare după încercări greșite (server)</h2>
+      <p class="hint">După atâtea încercări greșite de pe aceeași adresă IP, adresa e blocată pentru durata aleasă. Se aplică imediat.</p>
+      <form class="add" id="lock-form" style="display:block">
+        <div class="scroll"><table><thead><tr><th>Unde</th><th>Încercări greșite</th><th>Durata blocării (minute)</th></tr></thead><tbody>
+          <tr><td>Autentificare în acest panou</td><td><input type="number" min="1" max="1000" id="lock-panel-fails" required style="width:110px"></td>
+            <td><input type="number" min="1" max="10080" id="lock-panel-minutes" required style="width:130px"></td></tr>
+          <tr><td>Autentificare în portalul clienților</td><td><input type="number" min="1" max="1000" id="lock-portal-fails" required style="width:110px"></td>
+            <td><input type="number" min="1" max="10080" id="lock-portal-minutes" required style="width:130px"></td></tr>
+          <tr><td>Coduri de licență greșite (în aplicație)</td><td><input type="number" min="1" max="1000" id="lock-activation-fails" required style="width:110px"></td>
+            <td><input type="number" min="1" max="10080" id="lock-activation-minutes" required style="width:130px"></td></tr>
+        </tbody></table></div>
+        <div style="margin-top:10px"><button class="primary" type="submit">Salvează</button>
+          <span class="sub" style="margin-left:8px">Maxim 10080 de minute (7 zile).</span></div>
+      </form>
+      <div class="scroll"><table><thead><tr><th>IP</th><th>Unde</th><th class="num">Încercări</th><th>Blocat până la</th>
+        <th><button class="small" type="button" data-unlock="*">Deblochează toate</button></th></tr></thead><tbody id="t-lockouts"></tbody></table></div>
+    </div>
+    <div class="card">
       <h2>Blocate automat de calculatoare (anti brute-force)</h2>
       <p class="hint">Raportate de calculatoarele controlate: după 6 parole greșite într-un minut IP-ul e blocat 1 minut; după 30 e blocat până la repornirea aplicației.</p>
       <div class="scroll"><table><thead><tr><th>IP</th><th>Motiv</th><th>Stare</th><th class="num">De câte ori</th><th>Calculatoare</th><th>Ultima dată</th><th></th></tr></thead><tbody id="t-clientblocks"></tbody></table></div>
@@ -309,6 +327,18 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(when(r.added)) + "</td><td>" + esc(r.note) +
         "</td><td>" + blockBtn(r.ip, true) + "</td></tr>";
     }, 4);
+    var lk = data.lockouts, lockForm = document.getElementById("lock-form");
+    if (!lockForm.dataset.dirty) {
+      Object.keys(lk.settings).forEach(function (k) {
+        document.getElementById("lock-" + k + "-fails").value = lk.settings[k].fails;
+        document.getElementById("lock-" + k + "-minutes").value = lk.settings[k].minutes;
+      });
+    }
+    var LOCK_KINDS = { panel: "Panou", portal: "Portal", activation: "Cod de licență" };
+    rows("t-lockouts", lk.blocked, function (r) {
+      return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(LOCK_KINDS[r.kind] || r.kind) + '</td><td class="num">' + r.fails +
+        "</td><td>" + esc(when(r.until)) + '</td><td><button class="small" data-unlock="' + esc(r.ip) + '">Deblochează</button></td></tr>';
+    }, 5);
     rows("t-clientblocks", data.client_blocks, function (r) {
       return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(r.label) + "</td><td>" +
         (r.active ? pill("probabil activ", "bad") : pill("expirat", "mute")) + '</td><td class="num">' + r.n +
@@ -524,6 +554,25 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       document.getElementById("lic-client").value = ""; document.getElementById("lic-note").value = "";
       load();
     }).catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  var lockForm = document.getElementById("lock-form");
+  lockForm.addEventListener("input", function () { lockForm.dataset.dirty = "1"; });
+  lockForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var body = {};
+    ["panel", "portal", "activation"].forEach(function (k) {
+      body[k] = { fails: Number(document.getElementById("lock-" + k + "-fails").value),
+                  minutes: Number(document.getElementById("lock-" + k + "-minutes").value) };
+    });
+    post("lockout/save", body).then(function () { delete lockForm.dataset.dirty; toast("Setări de blocare salvate"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.body.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-unlock]"); if (!el) return;
+    var all = el.dataset.unlock === "*";
+    if (all && !confirm("Deblochezi toate adresele blocate după încercări greșite?")) return;
+    post("lockout/clear", { ip: all ? "" : el.dataset.unlock }).then(function () { toast("Deblocat"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
   });
   document.getElementById("add-block").addEventListener("submit", function (e) {
     e.preventDefault();
