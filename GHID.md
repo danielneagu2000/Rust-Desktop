@@ -164,6 +164,20 @@ pornire afișează „Licență necesară” cu butonul **Activează licența**.
   Dispozitive), de exemplu când clientul își schimbă calculatorul.
 - Tab-ul **Dispozitive** arată pentru fiecare calculator licența și data expirării, plus cine e
   online fără licență validă.
+- **Bandă** (coloana din tabel, butonul **Schimbă**, sau câmpul „Bandă Mbit/s” la creare):
+  limita de internet pentru calculatoarele licenței, în Mbit/s (gol sau 0 = nelimitat).
+  Se aplică în câteva secunde, fără repornire.
+
+Cum funcționează limita de bandă: fiecare calculator își limitează singur ce **trimite** într-o
+sesiune (imaginea ecranului, sunetul, fișierele descărcate de pe el), indiferent dacă legătura
+e directă sau prin serverul tău. Calitatea imaginii și fluiditatea se adaptează automat la limită,
+ca pe o conexiune mai lentă. Ce contează e licența calculatorului **controlat**: dacă un client
+cu limită 5 Mbit/s își controlează propriul calculator, sesiunea folosește cel mult ~5 Mbit/s.
+Orientativ: 2–3 Mbit/s merg pentru lucru de birou, 5–10 Mbit/s pentru imagine fluidă la
+rezoluție mare.
+
+Clientul se poate conecta fără restricții între propriile dispozitive (calculator → calculator,
+telefon → calculator), cât timp fiecare dispozitiv are licența activată (ocupă câte un loc).
 
 Licența e necesară pe **toate** dispozitivele: și pe calculatoarele clienților, și pe ale
 tehnicienilor. Pentru calculatoarele tale creează o licență „nelimitată” (de ex. „Intern RDN”).

@@ -94,6 +94,10 @@ def db():
     conn = sqlite3.connect(DB_FILE, check_same_thread=False, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    # Databases (and backups) from before per-license bandwidth limits.
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(licenses)")}
+    if cols and "bandwidth" not in cols:
+        conn.execute("ALTER TABLE licenses ADD COLUMN bandwidth INTEGER DEFAULT 0")
     return conn
 
 
@@ -130,7 +134,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS nonces (nonce TEXT PRIMARY KEY, ts REAL);
         CREATE TABLE IF NOT EXISTS licenses (
             code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
-            created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT
+            created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT,
+            bandwidth INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
@@ -413,14 +418,15 @@ def issue_token(uuid, lic):
     if not seed:
         return None
     expires = lic["expires"]
-    key = (uuid, lic["code"], expires)
+    bandwidth = int(lic.get("bandwidth") or 0)
+    key = (uuid, lic["code"], expires, bandwidth)
     cached = _TOKEN_CACHE.get(key)
     now = time.time()
     if cached and now - cached[1] < 3600:
         return cached[0]
     token_exp = now + TOKEN_TTL if expires is None else min(expires, now + TOKEN_TTL)
     payload = json.dumps(
-        {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or ""},
+        {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or "", "b": bandwidth},
         separators=(",", ":"), ensure_ascii=False,
     ).encode()
     payload = TOKEN_PREFIX + payload
@@ -868,6 +874,17 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.reply(404, {"error": "unknown action"})
 
 
+def bandwidth_kbps(mbps):
+    """Mbit/s typed in the panel -> kbit/s stored in the license; 0 = unlimited."""
+    try:
+        value = float(str(mbps if mbps not in (None, "") else 0).replace(",", "."))
+    except ValueError:
+        return None
+    if not 0 <= value <= 10000:
+        return None
+    return int(round(value * 1000))
+
+
 def license_action(action, v):
     code = as_text(v.get("code"), 40) or ""
     if action == "create":
@@ -879,18 +896,21 @@ def license_action(action, v):
             return 400, {"error": "Număr de calculatoare invalid"}
         if months not in PERIODS:
             return 400, {"error": "Perioadă invalidă"}
+        kbps = bandwidth_kbps(v.get("mbps"))
+        if kbps is None:
+            return 400, {"error": "Limită de bandă invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
         for _ in range(5):
             code = new_code()
             try:
-                x("INSERT INTO licenses(code, client, seats, months, created, note) VALUES(?,?,?,?,?,?)",
-                  (code, client, seats, months, time.time(), as_text(v.get("note"), 300) or ""))
+                x("INSERT INTO licenses(code, client, seats, months, created, note, bandwidth) VALUES(?,?,?,?,?,?,?)",
+                  (code, client, seats, months, time.time(), as_text(v.get("note"), 300) or "", kbps))
                 break
             except sqlite3.IntegrityError:
                 continue
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -913,6 +933,13 @@ def license_action(action, v):
         if not seats or not 1 <= seats <= 10000:
             return 400, {"error": "Număr de calculatoare invalid"}
         x("UPDATE licenses SET seats=? WHERE code=?", (seats, code))
+        return 200, {"ok": True}
+    if action == "bandwidth":
+        kbps = bandwidth_kbps(v.get("mbps"))
+        if kbps is None:
+            return 400, {"error": "Limită invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
+        x("UPDATE licenses SET bandwidth=? WHERE code=?", (kbps, code))
+        log(f"licenses: {code} bandwidth {kbps or 'unlimited'} kbit/s")
         return 200, {"ok": True}
     if action == "release":
         uuid = as_text(v.get("uuid"), 100)

@@ -6,8 +6,10 @@
 //! heartbeat response and sends an empty token once the license is revoked or expired.
 //! When `REQUIRED` is false (unbranded builds) nothing here has any effect.
 
-use hbb_common::{config::Config, log, tokio, ResultType};
+use base::message_proto::Message;
+use hbb_common::{config::Config, log, protobuf::Message as _, tokio, ResultType};
 use serde::Deserialize;
+use std::time::{Duration, Instant};
 
 /// Set by branding/apply.py (LICENSE_REQUIRED in branding/brand.env).
 pub const REQUIRED: bool = false;
@@ -30,6 +32,9 @@ struct Claims {
     /// Client the license was issued to.
     #[serde(default)]
     n: String,
+    /// Upload limit for this computer in kbit/s, set per license in the panel; 0 = none.
+    #[serde(default)]
+    b: u32,
 }
 
 fn now() -> i64 {
@@ -132,4 +137,64 @@ async fn activate_(code: &str) -> ResultType<()> {
     }
     crate::ui_interface::set_option(OPTION_TOKEN.to_owned(), token.to_owned());
     Ok(())
+}
+
+/// Upper bound of one file transfer block (BUF_SIZE in base::fs), charged per block sent.
+pub const FILE_BLOCK: usize = 128 * 1024;
+
+/// Outgoing limit (kbit/s) from this computer's license; 0 = unlimited.
+fn bandwidth_kbps() -> u32 {
+    if !REQUIRED {
+        return 0;
+    }
+    verify(&Config::get_option(OPTION_TOKEN))
+        .map(|c| c.b)
+        .unwrap_or(0)
+}
+
+/// Paces what a connection sends (screen, sound, files) to the license's bandwidth limit.
+/// Waiting before a send is what a slower link would do, so the video quality control
+/// adapts to it the same way.
+#[derive(Default)]
+pub struct Throttle {
+    kbps: u32,
+    checked: Option<Instant>,
+    next: Option<Instant>,
+}
+
+impl Throttle {
+    const REFRESH: Duration = Duration::from_secs(10);
+    const BURST: Duration = Duration::from_millis(200);
+
+    pub async fn wait_msg(&mut self, msg: &Message) {
+        if self.limit() > 0 {
+            self.wait(msg.compute_size() as usize).await;
+        }
+    }
+
+    pub async fn wait(&mut self, bytes: usize) {
+        let kbps = self.limit();
+        if kbps == 0 {
+            return;
+        }
+        let now = Instant::now();
+        let cost = Duration::from_secs_f64(bytes as f64 * 8.0 / (kbps as f64 * 1000.0));
+        let next = self.next.map_or(now, |n| n.max(now)) + cost;
+        self.next = Some(next);
+        let ahead = next.saturating_duration_since(now);
+        if ahead > Self::BURST {
+            tokio::time::sleep(ahead - Self::BURST).await;
+        }
+    }
+
+    fn limit(&mut self) -> u32 {
+        if self.checked.map_or(true, |t| t.elapsed() >= Self::REFRESH) {
+            self.kbps = bandwidth_kbps();
+            self.checked = Some(Instant::now());
+            if self.kbps == 0 {
+                self.next = None;
+            }
+        }
+        self.kbps
+    }
 }

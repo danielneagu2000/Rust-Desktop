@@ -362,6 +362,7 @@ pub struct Connection {
     read_jobs: Vec<fs::TransferJob>,
     timer: crate::RustDeskInterval,
     file_timer: crate::RustDeskInterval,
+    bandwidth: crate::license::Throttle,
     file_transfer: Option<(String, bool)>,
     view_camera: bool,
     terminal: bool,
@@ -578,6 +579,7 @@ impl Connection {
             read_jobs: Vec::new(),
             timer: crate::rustdesk_interval(time::interval(SEC30)),
             file_timer: crate::rustdesk_interval(time::interval(SEC30)),
+            bandwidth: Default::default(),
             file_transfer: None,
             view_camera: false,
             terminal: false,
@@ -1049,6 +1051,7 @@ impl Connection {
                 _ = conn.file_timer.tick() => {
                     if !conn.read_jobs.is_empty() {
                         conn.send_to_cm(ipc::Data::FileTransferLog(("transfer".to_string(), fs::serialize_transfer_jobs(&conn.read_jobs))));
+                        conn.bandwidth.wait(crate::license::FILE_BLOCK).await;
                         match fs::handle_read_jobs(&mut conn.read_jobs, &mut conn.stream).await {
                             Ok(log) => {
                                 if !log.is_empty() {
@@ -1077,6 +1080,7 @@ impl Connection {
                             video_service::notify_video_frame_fetched(vf.display as usize, id, Some(instant.into()));
                         }
                     }
+                    conn.bandwidth.wait_msg(&value).await;
                     if let Err(err) = conn.stream.send(&value as &Message).await {
                         conn.on_close(&err.to_string(), false).await;
                         break;
@@ -1138,6 +1142,7 @@ impl Connection {
                     }
 
                     let msg: &Message = &msg;
+                    conn.bandwidth.wait_msg(msg).await;
                     if let Err(err) = conn.stream.send(msg).await {
                         conn.on_close(&err.to_string(), false).await;
                         break;
