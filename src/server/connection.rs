@@ -1069,7 +1069,7 @@ impl Connection {
                 }
                 Ok(conns) = hbbs_rx.recv() => {
                     if conns.contains(&id) {
-                        conn.send_close_reason_no_retry("Closed manually by web console").await;
+                        conn.send_close_reason_no_retry(&crate::license::disconnect_reason()).await;
                         conn.on_close("web console", true).await;
                         break;
                     }

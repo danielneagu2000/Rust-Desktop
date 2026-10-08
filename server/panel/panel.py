@@ -71,7 +71,9 @@ ALARMS = {
     8: "Login OS terminal: prea multe sesiuni simultane",
     9: "Încălcare de scope a sesiunii",
     10: "Respins: ID-ul nu e în whitelist",
+    100: "Închisă: limita de conexiuni simultane a licenței",
 }
+ALARM_SESSION_LIMIT = 100
 BLOCKING_ALARMS = (1, 2, 6)
 
 DB_LOCK = threading.Lock()
@@ -98,6 +100,8 @@ def db():
     cols = {r[1] for r in conn.execute("PRAGMA table_info(licenses)")}
     if cols and "bandwidth" not in cols:
         conn.execute("ALTER TABLE licenses ADD COLUMN bandwidth INTEGER DEFAULT 0")
+    if cols and "sessions" not in cols:
+        conn.execute("ALTER TABLE licenses ADD COLUMN sessions INTEGER DEFAULT 1")
     return conn
 
 
@@ -135,7 +139,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS licenses (
             code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
             created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT,
-            bandwidth INTEGER DEFAULT 0
+            bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
@@ -280,6 +284,59 @@ def ingest_conn(v, src_ip):
                 s["id"],
             ),
         )
+        enforce_session_limit(uuid, conn_id, as_text(peer[0] if len(peer) > 0 else "", 40), device_id)
+
+
+# Why the panel closed a connection, per device; sent with the next heartbeat's "disconnect".
+DISCONNECT_REASON = {}
+
+
+def enforce_session_limit(uuid, conn_id, peer_id, device_id):
+    """Closes a new session when the controller's license already has `sessions` open.
+
+    A session counts once per (controlling device, controlled device): a second window
+    (file transfer, camera) on a computer already being controlled is not a new one.
+    """
+    if not peer_id:
+        return
+    rows = q("SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code WHERE a.device_id = ?", (peer_id,))
+    if not rows:
+        return
+    lic = rows[0]
+    limit = int(lic.get("sessions") or 0)
+    if limit <= 0:
+        return
+    open_rows = q(
+        """SELECT s.uuid, s.conn_id, s.peer_id, d.conns, d.last_seen FROM sessions s
+           JOIN activations a ON a.device_id = s.peer_id AND a.code = ?
+           JOIN devices d ON d.uuid = s.uuid
+           WHERE s.ended IS NULL AND s.authed IS NOT NULL""",
+        (lic["code"],),
+    )
+    now, pairs = time.time(), set()
+    for r in open_rows:
+        if r["uuid"] == uuid and r["conn_id"] == conn_id:
+            continue
+        try:
+            live = r["conn_id"] in json.loads(r["conns"] or "[]")
+        except ValueError:
+            live = False
+        if live and now - (r["last_seen"] or 0) < ONLINE_SECONDS:
+            pairs.add((r["peer_id"], r["uuid"]))
+    if (peer_id, uuid) in pairs or len(pairs) < limit:
+        return
+    x("INSERT INTO pending_disconnect(uuid, conn_id, ts) VALUES(?,?,?)", (uuid, conn_id, now))
+    DISCONNECT_REASON[uuid] = (
+        f"Licența {lic['client'] or ''} permite {limit} "
+        f"{'conexiune simultană' if limit == 1 else 'conexiuni simultane'}, iar limita e atinsă. "
+        "Închide o altă sesiune sau contactează RDN Network Data pentru mai multe conexiuni."
+    )
+    x(
+        "INSERT INTO alarms(ts, uuid, device_id, typ, ip, info) VALUES(?,?,?,?,?,?)",
+        (now, uuid, device_id, ALARM_SESSION_LIMIT, None,
+         json.dumps({"licență": lic["code"], "client": lic["client"], "de la": peer_id, "limită": limit}, ensure_ascii=False)),
+    )
+    log(f"licenses: {lic['code']} at its limit of {limit} sessions; closing {peer_id} -> {device_id}")
 
 
 def ingest_alarm(v, src_ip):
@@ -514,6 +571,9 @@ def heartbeat(v, src_ip):
     if pending:
         out["disconnect"] = [p["conn_id"] for p in pending]
         x("DELETE FROM pending_disconnect WHERE uuid=?", (uuid,))
+        reason = DISCONNECT_REASON.pop(uuid, None)
+        if reason:
+            out["disconnect_reason"] = reason
     lic = device_license(uuid)
     if license_ok(lic):
         token = issue_token(uuid, lic)
@@ -899,18 +959,22 @@ def license_action(action, v):
         kbps = bandwidth_kbps(v.get("mbps"))
         if kbps is None:
             return 400, {"error": "Limită de bandă invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
+        sessions = as_int(v.get("sessions"))
+        sessions = 1 if v.get("sessions") in (None, "") else sessions
+        if sessions is None or not 0 <= sessions <= 1000:
+            return 400, {"error": "Număr de conexiuni simultane invalid (0 = nelimitat)"}
         for _ in range(5):
             code = new_code()
             try:
-                x("INSERT INTO licenses(code, client, seats, months, created, note, bandwidth) VALUES(?,?,?,?,?,?,?)",
-                  (code, client, seats, months, time.time(), as_text(v.get("note"), 300) or "", kbps))
+                x("INSERT INTO licenses(code, client, seats, months, created, note, bandwidth, sessions) VALUES(?,?,?,?,?,?,?,?)",
+                  (code, client, seats, months, time.time(), as_text(v.get("note"), 300) or "", kbps, sessions))
                 break
             except sqlite3.IntegrityError:
                 continue
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats", "bandwidth") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -940,6 +1004,13 @@ def license_action(action, v):
             return 400, {"error": "Limită invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
         x("UPDATE licenses SET bandwidth=? WHERE code=?", (kbps, code))
         log(f"licenses: {code} bandwidth {kbps or 'unlimited'} kbit/s")
+        return 200, {"ok": True}
+    if action == "sessions":
+        sessions = as_int(v.get("sessions"))
+        if sessions is None or not 0 <= sessions <= 1000:
+            return 400, {"error": "Număr de conexiuni invalid (0 = nelimitat)"}
+        x("UPDATE licenses SET sessions=? WHERE code=?", (sessions, code))
+        log(f"licenses: {code} simultaneous sessions {sessions or 'unlimited'}")
         return 200, {"ok": True}
     if action == "release":
         uuid = as_text(v.get("uuid"), 100)

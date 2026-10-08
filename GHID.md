@@ -164,6 +164,11 @@ pornire afișează „Licență necesară” cu butonul **Activează licența**.
   Dispozitive), de exemplu când clientul își schimbă calculatorul.
 - Tab-ul **Dispozitive** arată pentru fiecare calculator licența și data expirării, plus cine e
   online fără licență validă.
+- **Conexiuni** (coloana din tabel, butonul **Schimbă**, sau câmpul „Conexiuni simultane” la creare):
+  câte sesiuni pot porni simultan dispozitivele licenței (implicit 1, 0 = nelimitat). O sesiune
+  nouă peste limită se închide în ~3 secunde, cu mesajul „Licența … permite N conexiuni
+  simultane…”, și apare în tab-ul **Alarme**. Un tehnician care deschide și transferul de fișiere
+  spre același calculator nu consumă o conexiune în plus.
 - **Bandă** (coloana din tabel, butonul **Schimbă**, sau câmpul „Bandă Mbit/s” la creare):
   limita de internet pentru calculatoarele licenței, în Mbit/s (gol sau 0 = nelimitat).
   Se aplică în câteva secunde, fără repornire.

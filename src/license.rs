@@ -139,6 +139,23 @@ async fn activate_(code: &str) -> ResultType<()> {
     Ok(())
 }
 
+/// Reason the panel gave with its last heartbeat "disconnect" (e.g. the license's limit
+/// of simultaneous sessions); empty for a plain disconnect from the web console.
+static DISCONNECT_REASON: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub fn set_disconnect_reason(reason: &str) {
+    *DISCONNECT_REASON.lock().unwrap() = reason.chars().take(300).collect();
+}
+
+pub fn disconnect_reason() -> String {
+    let reason = DISCONNECT_REASON.lock().unwrap().clone();
+    if reason.is_empty() {
+        "Closed manually by web console".to_owned()
+    } else {
+        reason
+    }
+}
+
 /// Upper bound of one file transfer block (BUF_SIZE in base::fs), charged per block sent.
 pub const FILE_BLOCK: usize = 128 * 1024;
 
