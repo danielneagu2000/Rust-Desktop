@@ -358,7 +358,9 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
         '</td><td>' + (l.bandwidth ? (l.bandwidth / 1000) + " Mbit/s" : "nelimitată") +
         '<br><button class="small" data-bandwidth="' + esc(l.code) + '" data-mbps="' + (l.bandwidth / 1000 || 0) + '" style="margin-top:4px">Schimbă</button>' + "</td><td>" +
         (l.revoked ? '<button class="small" data-restore="' + esc(l.code) + '">Reactivează</button>'
-                   : '<button class="small danger" data-revoke="' + esc(l.code) + '">Revocă</button>') + "</td></tr>";
+                   : '<button class="small danger" data-revoke="' + esc(l.code) + '">Revocă</button>') +
+        '<br><button class="small" data-portal="' + esc(l.code) + '" data-client="' + esc(l.client) + '" style="margin-top:4px" title="Cont de administrator în portalul organizației">Portal' +
+        (l.portal_users ? " (" + l.portal_users + ")" : "") + "</button></td></tr>";
     }, 11);
   }
 
@@ -403,7 +405,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
   });
   document.body.addEventListener("click", function (e) {
-    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions]");
+    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-portal]");
     if (lic) { licenseClick(lic); return; }
     var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
     if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
@@ -445,6 +447,14 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
         "Se aplică la ce trimite fiecare calculator al licenței (imagine, sunet, fișiere), în câteva secunde.", d.mbps);
       if (v === null) return;
       post("license/bandwidth", { code: d.bandwidth, mbps: v.trim() }).then(function () { toast("Limită salvată"); load(); }).catch(fail);
+    } else if (d.portal) {
+      var email = prompt("Contul de administrator al clientului " + d.client + " în portal (" + location.origin.replace("panou.", "remote.") + "/portal/).\n" +
+        "E-mailul administratorului (dacă are deja cont, primește o parolă nouă):");
+      if (!email) return;
+      post("license/portal", { code: d.portal, email: email.trim() }).then(function (r) {
+        prompt((r.reset ? "Parolă nouă pentru " : "Cont creat pentru ") + r.email + ". Copiază parola și trimite-o clientului (nu se mai afișează):", r.password);
+        load();
+      }).catch(fail);
     } else if (d.release) {
       if (!confirm("Eliberezi locul de licență al acestui calculator? Calculatorul se blochează până primește un cod.")) return;
       post("license/release", { uuid: d.release }).then(function () { toast("Loc eliberat"); load(); }).catch(fail);

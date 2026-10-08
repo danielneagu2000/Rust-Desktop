@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Portal RDN Remote</title>
+<style>
+:root {
+  --bg: #f5f4f5; --card: #ffffff; --text: #1d1416; --muted: #6b5f63; --line: #e7e1e3;
+  --accent: #c8102e; --accent-weak: #fde8eb; --ok: #157a3f; --ok-weak: #e3f5ea;
+  --warn: #9a5b00; --warn-weak: #fff1d6; --bad: #b42318; --bad-weak: #fde7e5;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141011; --card: #1e1819; --text: #efe8e9; --muted: #a8999c; --line: #352a2c;
+    --accent: #ff6b7d; --accent-weak: #3b1a20; --ok: #5fd08a; --ok-weak: #15301f;
+    --warn: #f0b44c; --warn-weak: #3a2b10; --bad: #ff7b6e; --bad-weak: #3d1714;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2; }
+h1 { font-size: 18px; margin: 0; }
+.sub { color: var(--muted); font-size: 12px; }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input, select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; min-width: 0; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { color: var(--bad); }
+button.small { padding: 3px 9px; font-size: 12px; }
+main { padding: 20px 24px 48px; max-width: 1300px; margin: 0 auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.tile .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tile .l { color: var(--muted); font-size: 12px; }
+.tile.bad .v { color: var(--bad); } .tile.warn .v { color: var(--warn); } .tile.ok .v { color: var(--ok); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
+nav button { border-radius: 999px; }
+nav button.on { background: var(--accent-weak); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+section { display: none; } section.on { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+.card h2 { font-size: 14px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.card p.hint { margin: 0; padding: 10px 16px; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--line); }
+.card form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.empty { color: var(--muted); text-align: center; padding: 18px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+.muted { color: var(--muted); font-size: 12px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.pill.ok { background: var(--ok-weak); color: var(--ok); }
+.pill.warn { background: var(--warn-weak); color: var(--warn); }
+.pill.bad { background: var(--bad-weak); color: var(--bad); }
+.pill.off { background: var(--bg); color: var(--muted); }
+label.sw { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; font-size: 13px; }
+.admin-only { display: none; } body.admin .admin-only { display: revert; }
+.secret { margin: 12px 16px; padding: 12px 14px; border-radius: 10px; background: var(--warn-weak); color: var(--text); }
+.secret .mono { font-size: 15px; font-weight: 700; user-select: all; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #222; color: #fff; padding: 9px 16px;
+  border-radius: 10px; font-size: 13.5px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 92vw; }
+#toast.on { opacity: 1; }
+@media (max-width: 640px) { header, main { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <div><h1 id="org">Portal RDN Remote</h1><div class="sub" id="who"></div></div>
+  <div class="tools"><span class="sub" id="status"></span><button id="refresh">Reîncarcă</button><button id="logout">Ieșire</button></div>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <nav id="tabs">
+    <button data-tab="devices" class="on">Dispozitive</button>
+    <button data-tab="history">Istoric</button>
+    <button data-tab="reports">Rapoarte</button>
+    <button data-tab="users" class="admin-only">Utilizatori</button>
+    <button data-tab="account">Contul meu</button>
+  </nav>
+
+  <section id="devices" class="on">
+    <div class="card">
+      <h2>Dispozitivele organizației</h2>
+      <p class="hint">Calculatoarele și telefoanele activate cu licența organizației. <b>Poate controla</b>: dispozitivul poate porni sesiuni
+        către alte calculatoare. <b>Acceptă din afară</b>: calculatorul primește conexiuni și de la dispozitive care nu sunt ale organizației.
+        Modificările se aplică la următoarea conexiune.</p>
+      <div class="scroll"><table><thead><tr><th>Dispozitiv</th><th>ID</th><th>Stare</th><th>Sistem</th><th>Activat</th>
+        <th>Drepturi</th><th class="admin-only"></th></tr></thead><tbody id="t-devices"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="history">
+    <div class="card">
+      <h2>Sesiuni din ultimele 30 de zile</h2>
+      <p class="hint">Conexiunile pornite de pe dispozitivele organizației și cele primite de calculatoarele ei.</p>
+      <div class="scroll"><table><thead><tr><th>Început</th><th>Durată</th><th>De la</th><th>Către</th><th>Tip</th><th>IP</th>
+        <th class="num">Fișiere</th></tr></thead><tbody id="t-sessions"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="reports">
+    <div class="card">
+      <h2>Raport lunar</h2>
+      <form id="rep-form"><input type="month" id="rep-month" required><button class="primary" type="submit">Afișează</button>
+        <button type="button" id="rep-csv">Descarcă pentru Excel (CSV)</button></form>
+      <div class="tiles" id="rep-tiles" style="padding:12px 16px 0;margin:0"></div>
+      <div class="scroll"><table><thead><tr><th>Dispozitiv</th><th>ID</th><th class="num">Sesiuni pornite</th><th class="num">Ore pornite</th>
+        <th class="num">Sesiuni primite</th><th class="num">Ore primite</th></tr></thead><tbody id="t-report"></tbody></table></div>
+      <p class="hint" id="rep-hint" style="border-bottom:0;border-top:1px solid var(--line)"></p>
+    </div>
+  </section>
+
+  <section id="users">
+    <div class="card">
+      <h2>Utilizatorii portalului</h2>
+      <p class="hint"><b>Administrator</b>: schimbă drepturile dispozitivelor, închide sesiuni, eliberează locuri de licență și gestionează
+        utilizatorii. <b>Vizualizare</b>: vede dispozitivele, istoricul și rapoartele.</p>
+      <form id="user-form"><input type="email" id="u-email" placeholder="E-mail" required style="width:240px">
+        <input type="text" id="u-name" placeholder="Nume (opțional)" style="width:200px">
+        <select id="u-role"><option value="viewer">Vizualizare</option><option value="admin">Administrator</option></select>
+        <button class="primary" type="submit">Adaugă utilizator</button></form>
+      <div id="u-secret"></div>
+      <div class="scroll"><table><thead><tr><th>E-mail</th><th>Nume</th><th>Rol</th><th>Creat</th><th>Ultima autentificare</th><th></th></tr></thead>
+        <tbody id="t-users"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="account">
+    <div class="card">
+      <h2>Schimbă parola</h2>
+      <form id="pw-form"><input type="password" id="pw-cur" placeholder="Parola actuală" autocomplete="current-password" required>
+        <input type="password" id="pw-new" placeholder="Parola nouă (minim 10 caractere)" autocomplete="new-password" minlength="10" required>
+        <input type="password" id="pw-new2" placeholder="Repetă parola nouă" autocomplete="new-password" minlength="10" required>
+        <button class="primary" type="submit">Salvează</button></form>
+      <p class="hint" style="border-bottom:0">Pentru alte limite ale licenței (calculatoare, conexiuni simultane, bandă, prelungire)
+        scrie-ne la RDN Network Data.</p>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+<script>
+(function () {
+  "use strict";
+  var base = location.pathname.endsWith("/") ? location.pathname : location.pathname + "/";
+  var data = null, admin = false;
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function when(ts) { return ts ? new Date(ts * 1000).toLocaleString("ro-RO") : "—"; }
+  function day(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("ro-RO") : "—"; }
+  function ago(ts) {
+    if (!ts) return "niciodată";
+    var s = Math.max(0, Math.round(data.now - ts));
+    if (s < 60) return "acum " + s + "s";
+    if (s < 3600) return "acum " + Math.round(s / 60) + " min";
+    if (s < 86400) return "acum " + Math.round(s / 3600) + " h";
+    return when(ts);
+  }
+  function dur(a, b) {
+    if (!a) return "—";
+    var s = Math.max(0, Math.round((b || data.now) - a));
+    var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+    return (h ? h + "h " : "") + m + "m" + (b ? "" : " (în curs)");
+  }
+  function hours(v) { return String(v).replace(".", ","); }
+  function pill(text, cls) { return '<span class="pill ' + cls + '">' + esc(text) + "</span>"; }
+  function toast(msg) {
+    var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("on");
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove("on"); }, 4000);
+  }
+  function rows(id, list, fn, cols, empty) {
+    document.getElementById(id).innerHTML = list.length ? list.map(fn).join("")
+      : '<tr><td class="empty" colspan="' + cols + '">' + esc(empty || "Nimic de afișat") + "</td></tr>";
+  }
+  function devName(d) { return d.alias || d.hostname || d.device_id || "?"; }
+  var STATUS = { "activă": ["Activă", "ok"], "neactivată": ["Neactivată", "warn"], "expirată": ["Expirată", "bad"], "revocată": ["Suspendată", "bad"] };
+
+  function render() {
+    var o = data.org, me = data.me;
+    admin = me.role === "admin";
+    document.body.classList.toggle("admin", admin);
+    document.getElementById("org").textContent = o.client || "Portal RDN Remote";
+    document.getElementById("who").textContent = (me.name ? me.name + " · " : "") + me.email + " · " + (admin ? "administrator" : "vizualizare");
+    var st = STATUS[o.status] || [o.status, "off"];
+    var left = o.expires ? Math.ceil((o.expires - data.now) / 86400) : null;
+    var online = data.devices.filter(function (d) { return d.online; }).length;
+    var live = data.devices.reduce(function (n, d) { return n + d.conns.length; }, 0);
+    document.getElementById("tiles").innerHTML = [
+      ['<span class="pill ' + st[1] + '" style="font-size:18px">' + esc(st[0]) + "</span>", "Licența " + esc(o.code), ""],
+      [o.expires ? esc(day(o.expires)) : "—", o.expires ? (left > 0 ? "Expiră în " + left + " zile" : "Expirată") : "Fără expirare", left !== null && left <= 14 ? "warn" : ""],
+      [o.used + " / " + o.seats, "Dispozitive activate", o.used >= o.seats ? "warn" : ""],
+      [online, "Online acum", "ok"],
+      [live + " / " + (o.sessions || "∞"), "Sesiuni în curs / limită simultană", ""],
+      [o.bandwidth ? hours(o.bandwidth / 1000) + " Mbit/s" : "Nelimitată", "Bandă per dispozitiv", ""]
+    ].map(function (t) { return '<div class="tile ' + t[2] + '"><div class="v">' + t[0] + '</div><div class="l">' + t[1] + "</div></div>"; }).join("");
+
+    rows("t-devices", data.devices, function (d) {
+      var rights = admin
+        ? '<label class="sw"><input type="checkbox" data-right="can_control" data-uuid="' + esc(d.uuid) + '"' + (d.can_control ? " checked" : "") + "> Poate controla</label><br>" +
+          '<label class="sw"><input type="checkbox" data-right="accept_external" data-uuid="' + esc(d.uuid) + '"' + (d.accept_external ? " checked" : "") + "> Acceptă din afară</label>"
+        : (d.can_control ? pill("Poate controla", "ok") : pill("Fără control", "off")) + " " +
+          (d.accept_external ? pill("Acceptă din afară", "ok") : pill("Doar organizația", "warn"));
+      var conns = d.conns.map(function (c) {
+        return '<button class="small danger admin-only" data-disc="' + esc(d.uuid) + '" data-conn="' + Number(c) + '">Închide sesiunea</button>';
+      }).join(" ");
+      return "<tr><td><b>" + esc(devName(d)) + "</b>" + (d.alias && d.hostname ? '<div class="muted">' + esc(d.hostname) + "</div>" : "") +
+        (admin ? '<div><button class="small" data-alias="' + esc(d.uuid) + '" data-name="' + esc(d.alias || "") + '" style="margin-top:4px">Redenumește</button></div>' : "") +
+        '</td><td class="mono">' + esc(d.device_id || "—") + "</td><td>" +
+        (d.online ? pill(d.conns.length ? "În sesiune" : "Online", d.conns.length ? "warn" : "ok") : pill("Offline", "off")) +
+        '<div class="muted">' + esc(d.online ? "" : ago(d.last_seen)) + "</div>" + conns + "</td><td>" + esc(d.os || "—") +
+        (d.username ? '<div class="muted">' + esc(d.username) + "</div>" : "") + "</td><td>" + esc(day(d.activated)) + "</td><td>" + rights +
+        '</td><td class="admin-only"><button class="small danger" data-release="' + esc(d.uuid) + '" data-name="' + esc(devName(d)) + '">Eliberează locul</button></td></tr>';
+    }, 7, "Niciun dispozitiv activat încă. Introdu codul licenței în aplicația RDN Remote.");
+
+    rows("t-sessions", data.sessions, function (s) {
+      var from = (s.peer_name ? esc(s.peer_name) + " " : "") + '<span class="mono muted">' + esc(s.peer_id || "") + "</span>" +
+        (s.outgoing ? "" : " " + pill("din afară", "warn"));
+      var to = esc(s.target_name || "") + ' <span class="mono muted">' + esc(s.target_id || "") + "</span>" +
+        (s.incoming ? "" : " " + pill("din afară", "off"));
+      return "<tr><td>" + esc(when(s.authed)) + "</td><td>" + esc(dur(s.authed, s.ended)) + "</td><td>" + from + "</td><td>" + to +
+        "</td><td>" + esc(s.type || "") + '</td><td class="mono">' + esc(s.remote_ip || "—") + '</td><td class="num">' + (s.files || 0) + "</td></tr>";
+    }, 7, "Nicio sesiune în ultimele 30 de zile.");
+
+    if (admin && data.users) {
+      rows("t-users", data.users, function (u) {
+        var self = u.id === me.id;
+        return "<tr><td>" + esc(u.email) + (self ? " " + pill("tu", "off") : "") + "</td><td>" + esc(u.name || "") + "</td><td>" +
+          (u.role === "admin" ? "Administrator" : "Vizualizare") + "</td><td>" + esc(day(u.created)) + "</td><td>" + esc(u.last_login ? when(u.last_login) : "niciodată") +
+          "</td><td>" + (self ? "" : '<button class="small" data-reset="' + u.id + '" data-email="' + esc(u.email) + '">Parolă nouă</button> ' +
+          '<button class="small danger" data-del="' + u.id + '" data-email="' + esc(u.email) + '">Șterge</button>') + "</td></tr>";
+      }, 6);
+    }
+    document.getElementById("status").textContent = "Actualizat " + new Date().toLocaleTimeString("ro-RO");
+  }
+
+  function load() {
+    return fetch(base + "api/state", { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) { data = d; render(); })
+      .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });
+  }
+  function post(action, body) {
+    return fetch(base + "api/" + action, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Portal": "1" }, body: JSON.stringify(body)
+    }).then(function (r) {
+      if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); }
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; });
+    });
+  }
+  function fail(err) { toast("Eroare: " + err.message); load(); }
+  function showSecret(r, what) {
+    document.getElementById("u-secret").innerHTML = '<div class="secret">' + esc(what) + " <b>" + esc(r.email) +
+      '</b>. Parola (afișată o singură dată, transmite-o persoanei respective): <span class="mono">' + esc(r.password) + "</span></div>";
+  }
+
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var t = e.target.closest("button[data-tab]"); if (!t) return;
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", b === t); });
+    document.querySelectorAll("main section").forEach(function (s) { s.classList.toggle("on", s.id === t.dataset.tab); });
+    if (t.dataset.tab === "reports" && !document.getElementById("t-report").innerHTML) loadReport();
+  });
+  document.getElementById("refresh").addEventListener("click", load);
+  document.getElementById("logout").addEventListener("click", function () {
+    post("logout", {}).then(function () { location.reload(); }, function () { location.reload(); });
+  });
+
+  document.body.addEventListener("change", function (e) {
+    var el = e.target.closest("[data-right]"); if (!el) return;
+    var body = { uuid: el.dataset.uuid }; body[el.dataset.right] = el.checked;
+    post("device/update", body).then(function () { toast("Drepturi salvate"); load(); }).catch(fail);
+  });
+  document.body.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-alias],[data-release],[data-disc],[data-reset],[data-del]"); if (!el) return;
+    var d = el.dataset;
+    if (d.alias) {
+      var name = prompt("Numele afișat pentru acest dispozitiv (gol = numele calculatorului):", d.name);
+      if (name === null) return;
+      post("device/update", { uuid: d.alias, alias: name.trim() }).then(function () { toast("Nume salvat"); load(); }).catch(fail);
+    } else if (d.release) {
+      if (!confirm("Eliberezi locul de licență ocupat de " + d.name + "? Dispozitivul nu mai poate fi folosit până nu se introduce din nou codul.")) return;
+      post("device/release", { uuid: d.release }).then(function () { toast("Loc eliberat"); load(); }).catch(fail);
+    } else if (d.disc) {
+      if (!confirm("Închizi această sesiune?")) return;
+      post("device/disconnect", { uuid: d.disc, conn_id: Number(d.conn) })
+        .then(function () { toast("Sesiunea se închide în câteva secunde"); setTimeout(load, 5000); }).catch(fail);
+    } else if (d.reset) {
+      if (!confirm("Generezi o parolă nouă pentru " + d.email + "? Parola veche nu mai funcționează.")) return;
+      post("user/reset", { id: Number(d.reset) }).then(function (r) { showSecret(r, "Parolă nouă pentru"); load(); }).catch(fail);
+    } else if (d.del) {
+      if (!confirm("Ștergi contul " + d.email + " din portal?")) return;
+      post("user/delete", { id: Number(d.del) }).then(function () { toast("Cont șters"); load(); }).catch(fail);
+    }
+  });
+  document.getElementById("user-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("user/create", {
+      email: document.getElementById("u-email").value.trim(), name: document.getElementById("u-name").value.trim(),
+      role: document.getElementById("u-role").value
+    }).then(function (r) { showSecret(r, "Cont creat pentru"); e.target.reset(); load(); }).catch(fail);
+  });
+  document.getElementById("pw-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var n = document.getElementById("pw-new").value;
+    if (n !== document.getElementById("pw-new2").value) { toast("Parolele noi nu coincid"); return; }
+    post("password", { current: document.getElementById("pw-cur").value, new: n })
+      .then(function () { toast("Parola a fost schimbată"); e.target.reset(); }).catch(function (err) { toast("Eroare: " + err.message); });
+  });
+
+  var month = document.getElementById("rep-month");
+  month.value = new Date().toISOString().slice(0, 7);
+  function loadReport() {
+    fetch(base + "api/report?month=" + encodeURIComponent(month.value), { credentials: "same-origin", cache: "no-store" })
+      .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } return r.json(); })
+      .then(function (r) {
+        if (r.error) throw new Error(r.error);
+        document.getElementById("rep-tiles").innerHTML = [
+          [r.out_sessions, "Sesiuni pornite"], [hours(r.out_hours), "Ore pornite"],
+          [r.in_sessions, "Sesiuni primite"], [hours(r.in_hours), "Ore primite"], [r.files, "Fișiere transferate"]
+        ].map(function (t) { return '<div class="tile"><div class="v">' + esc(t[0]) + '</div><div class="l">' + t[1] + "</div></div>"; }).join("");
+        rows("t-report", r.devices, function (d) {
+          return "<tr><td>" + esc(d.name || "—") + '</td><td class="mono">' + esc(d.device_id || "—") + '</td><td class="num">' + d.out_sessions +
+            '</td><td class="num">' + hours(d.out_hours) + '</td><td class="num">' + d.in_sessions + '</td><td class="num">' + hours(d.in_hours) + "</td></tr>";
+        }, 6, "Nicio sesiune în luna aleasă.");
+        document.getElementById("rep-hint").textContent = "Istoricul se păstrează " + (data ? data.retention_days : 180) +
+          " de zile. Fișierul CSV conține fiecare sesiune și se deschide direct în Excel.";
+      }).catch(function (e) { toast("Eroare: " + e.message); });
+  }
+  document.getElementById("rep-form").addEventListener("submit", function (e) { e.preventDefault(); loadReport(); });
+  document.getElementById("rep-csv").addEventListener("click", function () {
+    location.href = base + "api/report.csv?month=" + encodeURIComponent(month.value);
+  });
+
+  load();
+  setInterval(function () { if (!document.hidden) load(); }, 15000);
+})();
+</script>
+</body>
+</html>

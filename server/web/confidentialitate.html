@@ -69,13 +69,15 @@ th { color: var(--muted); font-weight: 600; font-size: 13px; }
     <li><strong>evenimente de securitate:</strong> încercări de conectare eșuate, blocări automate după parole greșite repetate și adresele IP implicate;</li>
     <li><strong>licența:</strong> codul de licență, numele clientului căruia i-a fost emisă, dispozitivele pe care este activată (ID și numele calculatorului), data activării și a ultimei verificări, precum și limitele de conexiuni și de bandă ale abonamentului.</li>
   </ul>
-  <h3>b) Ce nu prelucrăm</h3>
+  <h3>b) Când folosești portalul organizației</h3>
+  <p>Pentru conturile din portalul de management (remote.rdndata.ro/portal) păstrăm adresa de e-mail, numele (dacă este completat), rolul (administrator sau vizualizare), data creării și a ultimei autentificări. Parola este păstrată doar sub formă de hash ireversibil. Setările făcute în portal (numele afișate ale dispozitivelor și drepturile lor) se păstrează cât timp există licența. Portalul folosește un singur cookie strict necesar, pentru sesiunea de autentificare, valabil 12 ore. Administratorii unei organizații văd doar dispozitivele, sesiunile și conturile licenței lor.</p>
+  <h3>c) Ce nu prelucrăm</h3>
   <ul>
     <li><strong>Conținutul sesiunii</strong> (imaginea ecranului, tastele apăsate, fișierele și clipboard-ul) este criptat de la un capăt la altul între calculatorul tău și cel al tehnicianului. Serverul nostru doar transmite datele criptate și nu are acces la ele. Tehnicianul vede ecranul tău doar pe durata sesiunii, cu acordul tău.</li>
     <li>Serverul nostru nu înregistrează sesiunile. Înregistrarea video a unei sesiuni poate fi pornită doar de cel care controlează, în aplicația lui, și se salvează pe calculatorul lui; cel care folosește această funcție răspunde de informarea persoanei al cărei ecran îl înregistrează.</li>
     <li>Nu salvăm parolele de acces. Parola unică afișată de aplicație expiră după folosire.</li>
   </ul>
-  <h3>c) Când vizitezi acest site</h3>
+  <h3>d) Când vizitezi acest site</h3>
   <p>Site-ul nu folosește cookie-uri, instrumente de analiză sau publicitate și nu încarcă resurse de la terți. Serverul web nu păstrează jurnale cu vizitatorii. Adresa IP este folosită doar tehnic, pentru a livra pagina și fișierele descărcate.</p>
 
   <h2>3. De ce și pe ce temei</h2>
@@ -93,6 +95,7 @@ th { color: var(--muted); font-weight: 600; font-size: 13px; }
   <h2>5. Cine are acces la date</h2>
   <ul>
     <li>Doar personalul autorizat al <span data-f="company"></span>, pentru scopurile de mai sus.</li>
+    <li>Administratorii desemnați de firma care deține licența, în portalul organizației, doar pentru dispozitivele și sesiunile acelei licențe.</li>
     <li>Serverul este administrat de noi, pe infrastructura proprie, și nu transferăm datele în afara Spațiului Economic European.</li>
     <li>Nu vindem și nu închiriem datele. Le putem comunica autorităților doar când legea ne obligă.</li>
   </ul>
@@ -108,7 +111,8 @@ th { color: var(--muted); font-weight: 600; font-size: 13px; }
   <ul>
     <li>criptare end-to-end a sesiunilor și server care acceptă doar aplicațiile noastre;</li>
     <li>blocarea automată a adreselor IP după parole greșite repetate și monitorizarea încercărilor de acces;</li>
-    <li>panoul de administrare accesibil doar personalului autorizat, cu parolă;</li>
+    <li>panoul de administrare accesibil doar personalului autorizat, cu parolă și cod de autentificare în doi pași;</li>
+    <li>conturile din portalul organizației au parole păstrate doar ca hash și se blochează temporar după încercări greșite repetate;</li>
     <li>ștergerea automată a jurnalelor după perioada de păstrare.</li>
   </ul>
 

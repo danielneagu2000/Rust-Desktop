@@ -10,7 +10,11 @@
 	@installers path /files/*/*
 	header @installers Cache-Control "public, max-age=86400"
 
-	header {
+	# Portalul organizațiilor (clienți) e servit de panou cu antetele lui de securitate.
+	@portal path /portal /portal/*
+	@site not path /portal /portal/*
+
+	header @site {
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
@@ -23,6 +27,11 @@
 	# Nu servi scriptul de actualizare și fișierele temporare.
 	@private path /update_downloads.py /files/.incoming-* /files/*.tmp
 	respond @private 404
+
+	handle @portal {
+		header Strict-Transport-Security "max-age=31536000"
+		reverse_proxy 127.0.0.1:21120
+	}
 
 	file_server
 }

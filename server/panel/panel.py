@@ -21,6 +21,7 @@ import csv
 import io
 import datetime
 import secrets
+import hashlib
 import hmac
 import ipaddress
 import json
@@ -77,6 +78,8 @@ ALARMS = {
     9: "Încălcare de scope a sesiunii",
     10: "Respins: ID-ul nu e în whitelist",
     100: "Închisă: limita de conexiuni simultane a licenței",
+    101: "Închisă: dispozitivul nu are drept de control (portal)",
+    102: "Închisă: calculatorul acceptă doar dispozitive din organizație (portal)",
 }
 ALARM_SESSION_LIMIT = 100
 BLOCKING_ALARMS = (1, 2, 6)
@@ -107,6 +110,11 @@ def db():
         conn.execute("ALTER TABLE licenses ADD COLUMN bandwidth INTEGER DEFAULT 0")
     if cols and "sessions" not in cols:
         conn.execute("ALTER TABLE licenses ADD COLUMN sessions INTEGER DEFAULT 1")
+    # Organization portal: names and rights per device (set by the client's administrator).
+    acols = {r[1] for r in conn.execute("PRAGMA table_info(activations)")}
+    for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1")):
+        if acols and col not in acols:
+            conn.execute(f"ALTER TABLE activations ADD COLUMN {col} {ddl}")
     return conn
 
 
@@ -148,7 +156,12 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
-            activated REAL, last_seen REAL
+            activated REAL, last_seen REAL,
+            alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS portal_users (
+            id INTEGER PRIMARY KEY, code TEXT, email TEXT UNIQUE, name TEXT, pw_hash TEXT,
+            role TEXT DEFAULT 'admin', created REAL, last_login REAL
         );
         """
     )
@@ -289,11 +302,44 @@ def ingest_conn(v, src_ip):
                 s["id"],
             ),
         )
-        enforce_session_limit(uuid, conn_id, as_text(peer[0] if len(peer) > 0 else "", 40), device_id)
+        peer_id = as_text(peer[0] if len(peer) > 0 else "", 40)
+        if not enforce_device_rights(uuid, conn_id, peer_id, device_id):
+            enforce_session_limit(uuid, conn_id, peer_id, device_id)
 
 
 # Why the panel closed a connection, per device; sent with the next heartbeat's "disconnect".
 DISCONNECT_REASON = {}
+
+
+def close_session(uuid, conn_id, device_id, typ, reason, info):
+    x("INSERT INTO pending_disconnect(uuid, conn_id, ts) VALUES(?,?,?)", (uuid, conn_id, time.time()))
+    DISCONNECT_REASON[uuid] = reason
+    x(
+        "INSERT INTO alarms(ts, uuid, device_id, typ, ip, info) VALUES(?,?,?,?,?,?)",
+        (time.time(), uuid, device_id, typ, None, json.dumps(info, ensure_ascii=False)),
+    )
+
+
+def enforce_device_rights(uuid, conn_id, peer_id, device_id):
+    """Rights set in the organization portal; True when the session was closed."""
+    if not peer_id:
+        return False
+    ctrl = q("""SELECT a.code, a.can_control, l.client FROM activations a JOIN licenses l ON l.code = a.code
+                WHERE a.device_id = ?""", (peer_id,))
+    if ctrl and not ctrl[0]["can_control"]:
+        close_session(uuid, conn_id, device_id, 101,
+                      f"Dispozitivul tău nu are drept de control în organizația {ctrl[0]['client'] or ''}. "
+                      "Cere-l administratorului din portalul RDN Remote.",
+                      {"licență": ctrl[0]["code"], "de la": peer_id})
+        return True
+    target = q("""SELECT a.code, a.accept_external, l.client FROM activations a JOIN licenses l ON l.code = a.code
+                  WHERE a.uuid = ?""", (uuid,))
+    if target and not target[0]["accept_external"] and (not ctrl or ctrl[0]["code"] != target[0]["code"]):
+        close_session(uuid, conn_id, device_id, 102,
+                      "Acest calculator acceptă conexiuni doar de la dispozitivele organizației lui.",
+                      {"licență": target[0]["code"], "de la": peer_id})
+        return True
+    return False
 
 
 def enforce_session_limit(uuid, conn_id, peer_id, device_id):
@@ -816,9 +862,11 @@ def state(search):
                    LEFT JOIN devices d ON d.uuid = a.uuid ORDER BY a.activated"""):
         a_["online"] = now - (a_["dev_seen"] or 0) < ONLINE_SECONDS
         acts.setdefault(a_["code"], []).append(a_)
+    portal = {r["code"]: r["n"] for r in q("SELECT code, COUNT(*) AS n FROM portal_users GROUP BY code")}
     for l_ in licenses:
         l_["status"] = license_status(l_, now)
         l_["devices"] = acts.get(l_["code"], [])
+        l_["portal_users"] = portal.get(l_["code"], 0)
 
     def one(sql, args=()):
         return q(sql, args)[0]["n"] or 0
@@ -948,7 +996,127 @@ class PanelHandler(BaseHTTPRequestHandler):
             ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
         ])
 
+    # ------------------------------------------------------------ organization portal
+
+    def portal(self):
+        """Handles /portal/...; True when the request was the portal's."""
+        path = urlparse(self.path).path
+        m = re.search(r"^(.*?/portal)(/.*)?$", path)
+        if not m:
+            return False
+        prefix, rest = m.group(1), m.group(2) or ""
+        if not rest:
+            self.reply(301, "", headers=[("Location", prefix + "/")])
+            return True
+        if self.command == "POST" and rest == "/login":
+            self.portal_login(prefix)
+            return True
+        user = self.portal_session()
+        if not user:
+            if rest.startswith("/api/"):
+                self.reply(401, {"error": "autentificare necesară"})
+            else:
+                self.reply(200, portal_login_page(), "text/html; charset=utf-8")
+            return True
+        if self.command == "GET":
+            self.portal_get(user, rest)
+        else:
+            self.portal_post(user, prefix, rest)
+        return True
+
+    def portal_token(self):
+        for part in self.headers.get("Cookie", "").split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == PORTAL_COOKIE and re.fullmatch(r"[A-Za-z0-9_-]{20,100}", value):
+                return value
+        return None
+
+    def portal_session(self):
+        token = self.portal_token()
+        with AUTH_LOCK:
+            expiry, uid = PORTAL_SESSIONS.get(token, (0, None)) if token else (0, None)
+        if expiry <= time.time():
+            return None
+        return portal_user(uid)
+
+    def portal_login(self, prefix):
+        ip, now = self.client_ip(), time.time()
+        key = "portal:" + ip
+        page = lambda err: self.reply(200, portal_login_page(err), "text/html; charset=utf-8")
+        with AUTH_LOCK:
+            fails, until = AUTH_FAILS.get(key, (0, 0))
+        if until > now:
+            return page("Prea multe încercări greșite. Reîncearcă peste 15 minute.")
+        length = body_length(self.headers, 4096)
+        if length is None:
+            return self.reply(413, "body prea mare")
+        form = parse_qs(self.rfile.read(length).decode("utf-8", "replace") if length else "")
+        email = (form.get("user") or [""])[0].strip().lower()[:254]
+        pwd = (form.get("password") or [""])[0]
+        rows = q("SELECT * FROM portal_users WHERE email = ?", (email,))
+        ok = pw_ok(pwd, rows[0]["pw_hash"] if rows else "")
+        if not ok:
+            with AUTH_LOCK:
+                fails += 1
+                AUTH_FAILS[key] = (fails, now + AUTH_LOCK_SECONDS if fails >= AUTH_MAX_FAILS else 0)
+            log(f"portal: failed login for {email!r} from {ip}")
+            return page("E-mail sau parolă greșită.")
+        if not portal_user(rows[0]["id"]):
+            return page("Licența organizației este suspendată. Contactează RDN Network Data.")
+        token = secrets.token_urlsafe(32)
+        with AUTH_LOCK:
+            AUTH_FAILS.pop(key, None)
+            for t in [t for t, (e, _) in PORTAL_SESSIONS.items() if e <= now]:
+                del PORTAL_SESSIONS[t]
+            PORTAL_SESSIONS[token] = (now + SESSION_TTL, rows[0]["id"])
+        x("UPDATE portal_users SET last_login=? WHERE id=?", (now, rows[0]["id"]))
+        log(f"portal: {email} logged in from {ip}")
+        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+        self.reply(303, "", headers=[
+            ("Location", prefix + "/"),
+            ("Set-Cookie", f"{PORTAL_COOKIE}={token}; Path={prefix}/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
+        ])
+
+    def portal_get(self, user, rest):
+        query = parse_qs(urlparse(self.path).query)
+        if rest == "/api/state":
+            return self.reply(200, portal_state(user))
+        if rest == "/api/report":
+            data = portal_report(user["code"], (query.get("month") or [""])[0])
+            return self.reply(200, data) if data else self.reply(400, {"error": "lună invalidă"})
+        if rest == "/api/report.csv":
+            body, name = report_csv((query.get("month") or [""])[0], user["code"])
+            if not body:
+                return self.reply(400, "lună invalidă")
+            return self.reply(200, body, "text/csv; charset=utf-8",
+                              headers=[("Content-Disposition", f'attachment; filename="{name}"')])
+        if rest.startswith("/api/"):
+            return self.reply(404, {"error": "inexistent"})
+        self.reply(200, PORTAL_HTML, "text/html; charset=utf-8")
+
+    def portal_post(self, user, prefix, rest):
+        if self.headers.get("X-Portal") != "1" or not rest.startswith("/api/"):
+            return self.reply(403, {"error": "missing header"})
+        action = rest[len("/api/"):]
+        if action == "logout":
+            with AUTH_LOCK:
+                PORTAL_SESSIONS.pop(self.portal_token(), None)
+            return self.reply(200, {"ok": True}, headers=[
+                ("Set-Cookie", f"{PORTAL_COOKIE}=; Path={prefix}/; HttpOnly; SameSite=Strict; Max-Age=0")])
+        length = body_length(self.headers, MAX_BODY)
+        if length is None:
+            return self.reply(413, {"error": "bad or too large body"})
+        try:
+            v = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            return self.reply(400, {"error": "bad json"})
+        if not isinstance(v, dict):
+            return self.reply(400, {"error": "bad json"})
+        self.reply(*portal_action(user, action, v))
+
     def do_GET(self):
+        if self.portal():
+            return
         if not self.authorized():
             return
         # Paths are matched on their last segment so the panel also works behind a
@@ -979,6 +1147,8 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.reply(200, INDEX_HTML, "text/html; charset=utf-8")
 
     def do_POST(self):
+        if self.portal():
+            return
         if urlparse(self.path).path.endswith("/login"):
             return self.login()
         if not self.authorized():
@@ -1080,7 +1250,7 @@ def license_action(action, v):
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1111,6 +1281,19 @@ def license_action(action, v):
         x("UPDATE licenses SET bandwidth=? WHERE code=?", (kbps, code))
         log(f"licenses: {code} bandwidth {kbps or 'unlimited'} kbit/s")
         return 200, {"ok": True}
+    if action == "portal":
+        email = (as_text(v.get("email"), 254) or "").strip().lower()
+        existing = q("SELECT id FROM portal_users WHERE email = ? AND code = ?", (email, code))
+        if existing:
+            password = new_password()
+            x("UPDATE portal_users SET pw_hash=? WHERE id=?", (pw_hash(password), existing[0]["id"]))
+            portal_logout_user(existing[0]["id"])
+            log(f"portal: password reset for {email} ({code})")
+            return 200, {"ok": True, "email": email, "password": password, "reset": True}
+        st, out = portal_create_user(code, email, v.get("name"), "admin")
+        if st == 200:
+            log(f"portal: administrator {out['email']} created for {code}")
+        return st, out
     if action == "sessions":
         sessions = as_int(v.get("sessions"))
         if sessions is None or not 0 <= sessions <= 1000:
@@ -1223,6 +1406,215 @@ def report_csv(month, code=None):
     return csv_bytes(header, rows), f"raport-{code}-{month}.csv"
 
 
+# ---------------------------------------------------------------- organization portal
+#
+# Clients log in at /portal with their own accounts (created by the operator for a license,
+# then by the client's administrators). Everything a portal user sees or changes is limited
+# to the devices and sessions of that one license.
+
+PORTAL_COOKIE = "rdn_portal"
+PORTAL_SESSIONS = {}  # token -> (expiry, user id)
+PW_ITER = 200_000
+EMAIL_RE = re.compile(r"[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}")
+
+
+def pw_hash(password):
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PW_ITER)
+    return f"pbkdf2${PW_ITER}${salt.hex()}${digest.hex()}"
+
+
+def pw_ok(password, stored):
+    try:
+        _, it, salt, digest = stored.split("$")
+        calc = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), int(it))
+    except (ValueError, AttributeError):
+        # Same work as a real check, so timing does not reveal unknown accounts.
+        hashlib.pbkdf2_hmac("sha256", password.encode(), b"0" * 16, PW_ITER)
+        return False
+    return hmac.compare_digest(calc.hex(), digest)
+
+
+def new_password():
+    alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(16))
+
+
+def portal_create_user(code, email, name, role):
+    email = (as_text(email, 254) or "").strip().lower()
+    if not EMAIL_RE.fullmatch(email):
+        return 400, {"error": "Adresă de e-mail invalidă"}
+    if role not in ("admin", "viewer"):
+        return 400, {"error": "Rol invalid"}
+    password = new_password()
+    try:
+        x("INSERT INTO portal_users(code, email, name, pw_hash, role, created) VALUES(?,?,?,?,?,?)",
+          (code, email, (as_text(name, 100) or "").strip(), pw_hash(password), role, time.time()))
+    except sqlite3.IntegrityError:
+        return 409, {"error": "Există deja un cont cu această adresă de e-mail"}
+    return 200, {"ok": True, "email": email, "password": password}
+
+
+def portal_user(uid):
+    rows = q("""SELECT u.*, l.revoked FROM portal_users u JOIN licenses l ON l.code = u.code WHERE u.id = ?""", (uid,))
+    return rows[0] if rows and not rows[0]["revoked"] else None
+
+
+def portal_state(user):
+    code, now = user["code"], time.time()
+    lic = q("SELECT * FROM licenses WHERE code = ?", (code,))[0]
+    devices = q(
+        """SELECT a.uuid, a.device_id, COALESCE(d.hostname, a.hostname) AS hostname, a.alias, a.activated,
+                  a.can_control, a.accept_external, d.last_seen, d.os, d.username, d.conns, d.ver
+           FROM activations a LEFT JOIN devices d ON d.uuid = a.uuid WHERE a.code = ? ORDER BY a.activated""",
+        (code,),
+    )
+    for d in devices:
+        d["online"] = now - (d["last_seen"] or 0) < ONLINE_SECONDS
+        d["conns"] = json.loads(d["conns"] or "[]") if d["online"] else []
+    since = now - 30 * 86400
+    sessions = q(
+        """SELECT s.id, s.uuid, s.conn_id, s.authed, s.ended, s.peer_id, s.peer_name, s.conn_type, s.files,
+                  s.remote_ip, COALESCE(td.hostname, ta.hostname) AS target_name, s.device_id AS target_id,
+                  (ta.uuid IS NOT NULL) AS incoming, (pa.uuid IS NOT NULL) AS outgoing
+           FROM sessions s
+           LEFT JOIN activations ta ON ta.uuid = s.uuid AND ta.code = ?
+           LEFT JOIN activations pa ON pa.device_id = s.peer_id AND pa.code = ?
+           LEFT JOIN devices td ON td.uuid = s.uuid
+           WHERE s.authed IS NOT NULL AND s.authed > ? AND (ta.uuid IS NOT NULL OR pa.uuid IS NOT NULL)
+           ORDER BY s.authed DESC LIMIT 300""",
+        (code, code, since),
+    )
+    for r in sessions:
+        r["type"] = CONN_TYPES.get(r["conn_type"], "")
+    out = {
+        "now": now,
+        "me": {"id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"]},
+        "org": {
+            "client": lic["client"], "code": lic["code"], "status": license_status(lic, now),
+            "expires": lic["expires"], "seats": lic["seats"], "used": len(devices),
+            "sessions": lic.get("sessions") or 0, "bandwidth": lic.get("bandwidth") or 0,
+        },
+        "devices": devices,
+        "sessions": sessions,
+        "retention_days": RETENTION_DAYS,
+    }
+    if user["role"] == "admin":
+        out["users"] = q("SELECT id, email, name, role, created, last_login FROM portal_users WHERE code = ? ORDER BY created",
+                         (code,))
+    return out
+
+
+def portal_action(user, action, v):
+    code = user["code"]
+    if action == "password":
+        cur, new = str(v.get("current") or ""), str(v.get("new") or "")
+        if not pw_ok(cur, user["pw_hash"]):
+            return 400, {"error": "Parola actuală e greșită"}
+        if len(new) < 10:
+            return 400, {"error": "Parola nouă trebuie să aibă cel puțin 10 caractere"}
+        x("UPDATE portal_users SET pw_hash=? WHERE id=?", (pw_hash(new), user["id"]))
+        return 200, {"ok": True}
+    if user["role"] != "admin":
+        return 403, {"error": "Doar administratorii organizației pot face modificări"}
+    if action.startswith("device/"):
+        uuid = as_text(v.get("uuid"), 100)
+        if not q("SELECT 1 FROM activations WHERE uuid = ? AND code = ?", (uuid, code)):
+            return 404, {"error": "Dispozitiv inexistent"}
+        if action == "device/update":
+            if "alias" in v:
+                x("UPDATE activations SET alias=? WHERE uuid=?", ((as_text(v.get("alias"), 80) or "").strip(), uuid))
+            for key in ("can_control", "accept_external"):
+                if key in v:
+                    x(f"UPDATE activations SET {key}=? WHERE uuid=?", (1 if v.get(key) else 0, uuid))
+            return 200, {"ok": True}
+        if action == "device/disconnect":
+            conn_id = as_int(v.get("conn_id"))
+            if conn_id is None:
+                return 400, {"error": "Sesiune invalidă"}
+            x("INSERT INTO pending_disconnect(uuid, conn_id, ts) VALUES(?,?,?)", (uuid, conn_id, time.time()))
+            DISCONNECT_REASON[uuid] = "Sesiunea a fost închisă de administratorul organizației."
+            return 200, {"ok": True}
+        if action == "device/release":
+            x("DELETE FROM activations WHERE uuid=? AND code=?", (uuid, code))
+            log(f"portal: {user['email']} released a seat of {code}")
+            return 200, {"ok": True}
+    if action == "user/create":
+        st, out = portal_create_user(code, v.get("email"), v.get("name"), v.get("role") or "viewer")
+        if st == 200:
+            log(f"portal: {user['email']} created {out['email']} for {code}")
+        return st, out
+    if action in ("user/delete", "user/reset"):
+        uid = as_int(v.get("id"))
+        target = q("SELECT * FROM portal_users WHERE id = ? AND code = ?", (uid, code))
+        if not target:
+            return 404, {"error": "Cont inexistent"}
+        if uid == user["id"]:
+            return 400, {"error": "Pentru propriul cont folosește „Contul meu”"}
+        if action == "user/delete":
+            x("DELETE FROM portal_users WHERE id=?", (uid,))
+            portal_logout_user(uid)
+            log(f"portal: {user['email']} deleted {target[0]['email']} ({code})")
+            return 200, {"ok": True}
+        password = new_password()
+        x("UPDATE portal_users SET pw_hash=? WHERE id=?", (pw_hash(password), uid))
+        portal_logout_user(uid)
+        return 200, {"ok": True, "email": target[0]["email"], "password": password}
+    return 404, {"error": "acțiune necunoscută"}
+
+
+def portal_report(code, month):
+    rng = month_range(month)
+    if not rng:
+        return None
+    start, end = rng
+    sent = license_sessions(code, start, end, "out")
+    recv = license_sessions(code, start, end, "in")
+    names = {a["device_id"]: a["alias"] or a["hostname"] or "" for a in
+             q("SELECT device_id, alias, hostname FROM activations WHERE code = ?", (code,))}
+    per = {}
+    for r in sent:
+        d = per.setdefault(r["peer_id"] or "?", {"device_id": r["peer_id"], "name": names.get(r["peer_id"], r["peer_name"] or ""),
+                                                 "out_sessions": 0, "out_hours": 0, "in_sessions": 0, "in_hours": 0})
+        d["out_sessions"] += 1
+        d["out_hours"] += r["seconds"] / 3600
+    for r in recv:
+        did = r["target_id"] or r["device_id"] or "?"
+        d = per.setdefault(did, {"device_id": did, "name": names.get(did, r["target_name"] or ""),
+                                 "out_sessions": 0, "out_hours": 0, "in_sessions": 0, "in_hours": 0})
+        d["in_sessions"] += 1
+        d["in_hours"] += r["seconds"] / 3600
+    for d in per.values():
+        d["out_hours"], d["in_hours"] = round(d["out_hours"], 2), round(d["in_hours"], 2)
+    return {
+        "month": month,
+        "out_sessions": len(sent), "out_hours": round(sum(r["seconds"] for r in sent) / 3600, 2),
+        "in_sessions": len(recv), "in_hours": round(sum(r["seconds"] for r in recv) / 3600, 2),
+        "files": sum(r["files"] or 0 for r in sent + recv),
+        "devices": sorted(per.values(), key=lambda d: -(d["out_hours"] + d["in_hours"])),
+    }
+
+
+def portal_logout_user(uid):
+    with AUTH_LOCK:
+        for t in [t for t, (_, u) in PORTAL_SESSIONS.items() if u == uid]:
+            del PORTAL_SESSIONS[t]
+
+
+PORTAL_LOGIN_HTML = LOGIN_HTML.replace("Panou securitate · autentificare", "Portal RDN Remote · autentificare").replace(
+    "<h1>Panou securitate</h1><p>RDN Remote · autentificare</p>",
+    "<h1>Portal RDN Remote</h1><p>Administrarea dispozitivelor organizației tale</p>").replace(
+    '<label for="u">Utilizator</label><input id="u" name="user" autocomplete="username" required autofocus>',
+    '<label for="u">E-mail</label><input id="u" name="user" type="email" autocomplete="username" required autofocus>')
+
+
+def portal_login_page(error=""):
+    html = PORTAL_LOGIN_HTML.replace("<!--TOTP-->", "")
+    if error:
+        html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
+    return html
+
+
 # ---------------------------------------------------------------- backups
 
 def list_backups():
@@ -1319,6 +1711,7 @@ def main():
 
 
 INDEX_HTML = (Path(__file__).with_name("index.html")).read_text(encoding="utf-8")
+PORTAL_HTML = (Path(__file__).with_name("portal.html")).read_text(encoding="utf-8")
 
 if __name__ == "__main__":
     main()

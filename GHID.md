@@ -227,6 +227,33 @@ transferate, de câte ori s-a atins limita de conexiuni și ultima activitate.
 Istoricul se păstrează 180 de zile (`RETENTION_DAYS` în `server/.env`), deci rapoartele acoperă
 ultimele ~6 luni. Pentru evidență pe termen lung, descarcă lunar CSV-ul.
 
+## Portalul organizației (pentru clienți)
+
+Administratorii unei firme își gestionează singuri dispozitivele la
+`https://remote.rdndata.ro/portal/` (merge și pe subdomeniul panoului, `/portal/`). Fiecare cont
+vede doar licența lui.
+
+1. În panou, tab-ul **Licențe**, apasă **Portal** pe rândul clientului și scrie e-mailul
+   administratorului. Panoul afișează **o singură dată** parola generată; trimite-o clientului
+   împreună cu adresa portalului. Dacă e-mailul are deja cont, primește o parolă nouă (așa resetezi
+   parola unui client care a uitat-o). Numărul din buton arată câte conturi are licența.
+2. Clientul se autentifică, își schimbă parola din **Contul meu** și poate adăuga colegi:
+   **Administrator** (modifică) sau **Vizualizare** (doar vede).
+
+Ce poate face administratorul clientului:
+
+- **Dispozitive**: le vede pe toate (online, în sesiune, sistem, utilizator), le redenumește,
+  închide o sesiune în curs și eliberează locul de licență al unui dispozitiv.
+- **Drepturi pe dispozitiv**, aplicate la următoarea conexiune:
+  - **Poate controla**: dacă e debifat, sesiunile pornite de pe acel dispozitiv se închid în câteva
+    secunde, cu un mesaj explicit.
+  - **Acceptă din afară**: dacă e debifat, calculatorul acceptă doar dispozitive din aceeași licență.
+- **Istoric** (30 de zile) și **Rapoarte** lunare, cu CSV pentru Excel.
+
+Limitele licenței (calculatoare, conexiuni simultane, bandă, prelungire) rămân la tine, în panou.
+După 10 parole greșite de pe aceeași adresă, autentificarea în portal se blochează 15 minute.
+Dacă revoci licența, conturile ei din portal nu mai pot intra.
+
 ## Backup și restaurare
 
 Un backup conține tot ce nu poate fi refăcut: **cheia serverului** (`id_ed25519`, de care depind
@@ -359,6 +386,11 @@ Reguli:
 
 - Nu modifica fișiere din repo direct pe server (de ex. `server/web/site.json`): modifică-le
   în GitHub. Dacă găsește modificări locale, actualizarea serverului se oprește ca să nu le piardă.
+- Serverul urmează **ultimul release final**. Dacă aduci pe server cod mai nou din `master`
+  (`git checkout master && git pull`), actualizarea zilnică îl readuce la release, deci și site-ul
+  și panoul revin la versiunea aceea. Ca să rămâi pe `master` până la următorul release, oprește
+  temporar actualizarea: `sudo systemctl disable --now rdn-update.timer`. După publicarea
+  release-ului, o pornești la loc cu `sudo systemctl enable --now rdn-update.timer`.
 - Actualizarea automată pe Windows/macOS e pornită implicit (`AUTO_UPDATE=Y` în
   `branding/brand.env`); utilizatorul o poate opri din setările aplicației.
 - Încap 9 versiuni (`1.5.0-1` … `1.5.0-9`) peste aceeași versiune RustDesk; după aceea
