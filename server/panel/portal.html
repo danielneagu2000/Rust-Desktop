@@ -241,6 +241,10 @@ label.sw { display: inline-flex; gap: 6px; align-items: center; cursor: pointer;
           '<button class="small danger" data-del="' + u.id + '" data-email="' + esc(u.email) + '">Șterge</button>') + "</td></tr>";
       }, 6);
     }
+    ["pw-new", "pw-new2"].forEach(function (id) {
+      var el = document.getElementById(id); el.minLength = data.min_password;
+      if (id === "pw-new") el.placeholder = "Parola nouă (minim " + data.min_password + " caractere)";
+    });
     document.getElementById("status").textContent = "Actualizat " + new Date().toLocaleTimeString("ro-RO");
   }
 

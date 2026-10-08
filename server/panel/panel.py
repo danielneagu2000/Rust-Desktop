@@ -162,8 +162,8 @@ def init_db():
             alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS shop_orders (
-            order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, message TEXT,
-            note_sent INTEGER DEFAULT 0, error TEXT, created REAL, updated REAL
+            order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, new_codes TEXT, message TEXT,
+            note_sent INTEGER DEFAULT 0, note_due REAL, error TEXT, created REAL, updated REAL
         );
         CREATE TABLE IF NOT EXISTS shop_licenses (code TEXT PRIMARY KEY, email TEXT, product TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS portal_users (
@@ -819,7 +819,6 @@ def lockout_action(action, v):
         return 200, {"ok": True}
     return 404, {"error": "unknown action"}
 SESSION_COOKIE = "rdn_panel"
-SESSION_TTL = 12 * 3600
 PANEL_SESSIONS = {}  # token -> expiry
 TOTP_LAST = [0]  # last accepted time step; a code works only once
 
@@ -991,6 +990,7 @@ def state(search):
         "blocklist": sorted(blocked.values(), key=lambda r: -r["added"]),
         "lockouts": lockout_state(),
         "shop": shop_state(),
+        "config": config_state(),
         "devices": devices,
         "licenses": licenses,
         "licensing_ready": signing_seed() is not None,
@@ -1085,13 +1085,14 @@ class PanelHandler(BaseHTTPRequestHandler):
             AUTH_FAILS.pop(ip, None)
             for t in [t for t, e in PANEL_SESSIONS.items() if e <= now]:
                 del PANEL_SESSIONS[t]
-            PANEL_SESSIONS[token] = now + SESSION_TTL
+            ttl = conf("panel_session_hours") * 3600
+            PANEL_SESSIONS[token] = now + ttl
         log(f"panel: login from {ip}")
         secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
         path = urlparse(self.path).path
         self.reply(303, "", headers=[
             ("Location", path[: -len("login")] or "/"),
-            ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
+            ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={ttl}{secure}"),
         ])
 
     def shop_webhook(self):
@@ -1188,13 +1189,14 @@ class PanelHandler(BaseHTTPRequestHandler):
             AUTH_FAILS.pop(key, None)
             for t in [t for t, (e, _) in PORTAL_SESSIONS.items() if e <= now]:
                 del PORTAL_SESSIONS[t]
-            PORTAL_SESSIONS[token] = (now + SESSION_TTL, rows[0]["id"])
+            ttl = conf("portal_session_hours") * 3600
+            PORTAL_SESSIONS[token] = (now + ttl, rows[0]["id"])
         x("UPDATE portal_users SET last_login=? WHERE id=?", (now, rows[0]["id"]))
         log(f"portal: {email} logged in from {ip}")
         secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
         self.reply(303, "", headers=[
             ("Location", prefix + "/"),
-            ("Set-Cookie", f"{PORTAL_COOKIE}={token}; Path={prefix}/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
+            ("Set-Cookie", f"{PORTAL_COOKIE}={token}; Path={prefix}/; HttpOnly; SameSite=Strict; Max-Age={ttl}{secure}"),
         ])
 
     def portal_get(self, user, rest):
@@ -1324,6 +1326,8 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(*license_action(action[len("license/"):], v))
         if action.startswith("lockout/"):
             return self.reply(*lockout_action(action[len("lockout/"):], v))
+        if action == "settings":
+            return self.reply(*config_action(v))
         if action.startswith("shop/"):
             return self.reply(*shop_settings_action(action[len("shop/"):], v))
         if action == "backup/create":
@@ -1490,7 +1494,7 @@ def report(month):
             "files": sum(r["files"] or 0 for r in sent + recv),
             "limit_hits": limit_hits,
         })
-    return {"month": month, "rows": out, "retention_days": RETENTION_DAYS}
+    return {"month": month, "rows": out, "retention_days": conf("retention_days")}
 
 
 def csv_bytes(header, rows):
@@ -1623,7 +1627,8 @@ def portal_state(user):
         },
         "devices": devices,
         "sessions": sessions,
-        "retention_days": RETENTION_DAYS,
+        "retention_days": conf("retention_days"),
+        "min_password": conf("portal_min_password"),
     }
     if user["role"] == "admin":
         out["users"] = q("SELECT id, email, name, role, created, last_login FROM portal_users WHERE code = ? ORDER BY created",
@@ -1637,8 +1642,8 @@ def portal_action(user, action, v):
         cur, new = str(v.get("current") or ""), str(v.get("new") or "")
         if not pw_ok(cur, user["pw_hash"]):
             return 400, {"error": "Parola actuală e greșită"}
-        if len(new) < 10:
-            return 400, {"error": "Parola nouă trebuie să aibă cel puțin 10 caractere"}
+        if len(new) < conf("portal_min_password"):
+            return 400, {"error": f"Parola nouă trebuie să aibă cel puțin {conf('portal_min_password')} caractere"}
         x("UPDATE portal_users SET pw_hash=? WHERE id=?", (pw_hash(new), user["id"]))
         return 200, {"ok": True}
     if user["role"] != "admin":
@@ -1750,12 +1755,11 @@ def portal_login_page(error=""):
 # WooCommerce e-mails; otherwise it waits in the panel's Shop tab.
 
 SHOP_LOCK = threading.Lock()
-SHOP_PAID = ("processing", "completed")
 SHOP_MIN_SECRET = 24
 SHOP_MAX_BODY = 1024 * 1024
 SHOP_DEFAULT_PRODUCTS = {
-    "176": {"name": "Standard", "seats": 500, "sessions": 1, "mbps": 0},
-    "183": {"name": "Advanced", "seats": 2000, "sessions": 5, "mbps": 0},
+    "176": {"name": "Standard", "seats": 500, "sessions": 1, "mbps": 0, "months": 0},
+    "183": {"name": "Advanced", "seats": 2000, "sessions": 5, "mbps": 0, "months": 0},
 }
 
 
@@ -1766,6 +1770,99 @@ def setting(key, default=""):
 
 def set_setting(key, value):
     x("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", (key, value))
+
+
+SHOP_STATUSES = {"pending": "Plată în așteptare", "on-hold": "În așteptare", "processing": "În procesare",
+                 "completed": "Finalizată"}
+SHOP_NOTE_NEW = ("Mulțumim pentru comandă!\n\nCodul tău de licență RDN Remote {produs} ({luni}): {cod}\n\n"
+                 "Descarcă aplicația de la {site} și introdu codul la prima pornire. Perioada începe la prima activare.")
+SHOP_NOTE_RENEW = ("Mulțumim pentru comandă!\n\nLicența RDN Remote {produs} {cod} a fost prelungită cu {luni}. "
+                   "Nu trebuie să faci nimic în aplicație.")
+SHOP_NOTE_FOOTER = "Suport: office@rdndata.ro | 0723 122 097"
+
+# Everything the operator can change in the panel: key -> (type, default, min, max or choices).
+CONFIG = {
+    "panel_session_hours": ("int", 12, 1, 720),
+    "portal_session_hours": ("int", 12, 1, 720),
+    "portal_min_password": ("int", 10, 8, 64),
+    "retention_days": ("int", RETENTION_DAYS, 7, 3650),
+    "shop_statuses": ("set", "processing,completed", tuple(SHOP_STATUSES)),
+    "shop_renew": ("bool", 1),
+    "shop_quantity": ("choice", "sessions", ("sessions", "seats", "months", "none")),
+    "shop_send_note": ("bool", 1),
+    "shop_note_delay_minutes": ("int", 300, 0, 10080),
+    "shop_revoke_refund": ("bool", 0),
+    "shop_site_url": ("text", "", 0, 200),
+    "shop_note_new": ("text", SHOP_NOTE_NEW, 1, 3000),
+    "shop_note_renew": ("text", SHOP_NOTE_RENEW, 1, 3000),
+    "shop_note_footer": ("text", SHOP_NOTE_FOOTER, 0, 1000),
+}
+
+
+def conf(key):
+    kind, default = CONFIG[key][0], CONFIG[key][1]
+    raw = setting(key, None)
+    if raw is None:
+        value = default
+    elif kind in ("int", "bool"):
+        value = as_int(raw)
+        value = default if value is None else value
+    else:
+        value = raw
+    if kind == "int":
+        return min(max(value, CONFIG[key][2]), CONFIG[key][3])
+    if kind == "bool":
+        return 1 if value else 0
+    if kind == "set":
+        return [v for v in str(value).split(",") if v in CONFIG[key][2]]
+    if kind == "choice":
+        return value if value in CONFIG[key][2] else default
+    return str(value)
+
+
+def config_state():
+    state = {key: conf(key) for key in CONFIG}
+    state["defaults"] = {key: spec[1] for key, spec in CONFIG.items() if spec[0] == "text"}
+    return state
+
+
+def config_action(v):
+    """Saves the settings present in v; nothing is saved when one of them is invalid."""
+    rows = []
+    for key, value in v.items():
+        if key not in CONFIG:
+            return 400, {"error": f"Setare necunoscută: {key}"}
+        spec = CONFIG[key]
+        kind = spec[0]
+        if kind == "int":
+            n = as_int(value)
+            if n is None or not spec[2] <= n <= spec[3]:
+                return 400, {"error": f"Valoare invalidă ({spec[2]}–{spec[3]})", "field": key}
+            rows.append((key, str(n)))
+        elif kind == "bool":
+            rows.append((key, "1" if value else "0"))
+        elif kind == "set":
+            items = value if isinstance(value, list) else str(value or "").split(",")
+            items = [str(i) for i in items if str(i)]
+            if not items or any(i not in spec[2] for i in items):
+                return 400, {"error": "Alege cel puțin o stare a comenzii", "field": key}
+            rows.append((key, ",".join(items)))
+        elif kind == "choice":
+            if value not in spec[2]:
+                return 400, {"error": "Opțiune invalidă", "field": key}
+            rows.append((key, value))
+        else:
+            text = str(value if value is not None else "").replace("\r\n", "\n").strip()
+            if not spec[2] <= len(text) <= spec[3]:
+                return 400, {"error": f"Textul trebuie să aibă între {spec[2]} și {spec[3]} caractere", "field": key}
+            if key == "shop_site_url" and text and not re.fullmatch(r"https?://\S+", text):
+                return 400, {"error": "Adresa site-ului trebuie să înceapă cu https://", "field": key}
+            rows.append((key, text))
+    for row in rows:
+        set_setting(*row)
+    if rows:
+        log("panel: settings changed: " + ", ".join(k for k, _ in rows))
+    return 200, {"ok": True}
 
 
 def shop_products():
@@ -1794,6 +1891,7 @@ def shop_state():
         "url": setting("shop_url", "https://shop.rdndata.ro"),
         "api_set": bool(setting("shop_ck") and setting("shop_cs")),
         "products": shop_products(),
+        "statuses": SHOP_STATUSES,
         "orders": q("SELECT * FROM shop_orders ORDER BY updated DESC LIMIT 200"),
     }
 
@@ -1825,11 +1923,14 @@ def shop_settings_action(action, v):
         for row in v.get("products") or []:
             pid = str(as_int(row.get("id")) or "")
             seats, sessions = as_int(row.get("seats")), as_int(row.get("sessions"))
+            months = as_int(row.get("months") or 0)
             kbps = bandwidth_kbps(row.get("mbps"))
-            if not pid or not seats or not 1 <= seats <= 10000 or sessions is None or not 0 <= sessions <= 1000 or kbps is None:
-                return 400, {"error": "Verifică ID-ul produsului, calculatoarele (1–10000), conexiunile (0–1000) și banda"}
+            if not pid or not seats or not 1 <= seats <= 10000 or sessions is None or not 0 <= sessions <= 1000 or kbps is None \
+                    or months is None or not 0 <= months <= 120:
+                return 400, {"error": "Verifică ID-ul produsului, calculatoarele (1–10000), conexiunile (0–1000), "
+                                      "perioada (0–120 luni) și banda"}
             products[pid] = {"name": (as_text(row.get("name"), 40) or "").strip() or pid, "seats": seats,
-                             "sessions": sessions, "mbps": kbps / 1000}
+                             "sessions": sessions, "mbps": kbps / 1000, "months": months}
         if not products:
             return 400, {"error": "Adaugă cel puțin un produs"}
         set_setting("shop_products", json.dumps(products, ensure_ascii=False))
@@ -1839,8 +1940,8 @@ def shop_settings_action(action, v):
         if not order or not order[0]["message"]:
             return 404, {"error": "Comandă inexistentă"}
         err = shop_send_note(order[0]["order_id"], order[0]["message"])
-        x("UPDATE shop_orders SET note_sent=?, error=?, updated=? WHERE order_id=?",
-          (0 if err else 1, err or "", time.time(), order[0]["order_id"]))
+        x("UPDATE shop_orders SET note_sent=?, note_due=?, error=?, updated=? WHERE order_id=?",
+          (0 if err else 1, order[0]["note_due"] if err else None, err or "", time.time(), order[0]["order_id"]))
         return (502, {"error": err}) if err else (200, {"ok": True})
     return 404, {"error": "unknown action"}
 
@@ -1872,6 +1973,24 @@ def shop_send_note(order_id, text):
         return f"Shopul nu a primit nota: {e}"[:300]
 
 
+def months_text(m):
+    return "1 lună" if m == 1 else f"{m} luni"
+
+
+def fill_template(text, values):
+    return re.sub(r"\{(\w+)\}", lambda m: str(values.get(m.group(1), m.group(0))), text)
+
+
+def shop_extend(code, months):
+    lic = q("SELECT * FROM licenses WHERE code=?", (code,))[0]
+    if lic["starts"] is None:
+        if lic["months"]:
+            x("UPDATE licenses SET months=? WHERE code=?", (lic["months"] + months, code))
+    elif lic["expires"] is not None:
+        x("UPDATE licenses SET expires=? WHERE code=?", (add_months(max(lic["expires"], time.time()), months), code))
+    log(f"licenses: {code} extended by {months} months (shop)")
+
+
 def shop_order(order):
     """Handles one order from the webhook; returns a short status for the log."""
     order_id = as_int(order.get("id"))
@@ -1889,18 +2008,18 @@ def shop_order(order):
         if seen and seen[0]["codes"]:
             x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
             if status in ("refunded", "cancelled") and seen[0]["status"] != status:
-                log(f"shop: order {order_id} is now {status}; its licenses {seen[0]['codes']} need a manual check")
+                return shop_cancelled(seen[0], status)
             return "deja procesată"
         if not seen:
             x("INSERT INTO shop_orders(order_id, status, email, client, created, updated) VALUES(?,?,?,?,?,?)",
               (order_id, status, email, client, now, now))
         else:
             x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
-        if status not in SHOP_PAID:
+        if status not in conf("shop_statuses"):
             return f"în așteptare ({status})"
-        products = shop_products()
-        codes, lines, errors = [], [], []
-        site = f"https://{server_host()}/" if server_host() else ""
+        products, quantity_mode = shop_products(), conf("shop_quantity")
+        site = conf("shop_site_url") or (f"https://{server_host()}/" if server_host() else "")
+        codes, new_codes, notes, errors = [], [], [], []
         for item in order.get("line_items") or []:
             if not isinstance(item, dict):
                 continue
@@ -1908,47 +2027,96 @@ def shop_order(order):
             product = products.get(pid)
             if not product:
                 continue
-            months, qty = shop_months(item), max(1, as_int(item.get("quantity")) or 1)
-            if months not in (1, 3, 6, 9, 12):
+            months = shop_months(item) or product.get("months") or None
+            qty = max(1, as_int(item.get("quantity")) or 1)
+            if not months or not 1 <= months <= 120:
                 errors.append(f"perioadă necunoscută la {item.get('name')}")
                 continue
-            sessions = product["sessions"] * qty
+            seats, sessions = product["seats"], product["sessions"]
+            if quantity_mode == "sessions":
+                sessions *= qty
+            elif quantity_mode == "seats":
+                seats = min(10000, seats * qty)
+            elif quantity_mode == "months":
+                months = min(120, months * qty)
             prev = q("""SELECT l.* FROM shop_licenses s JOIN licenses l ON l.code = s.code
                         WHERE s.email = ? AND s.product = ? AND l.revoked = 0 ORDER BY s.created DESC LIMIT 1""",
-                     (email, pid)) if email else []
+                     (email, pid)) if email and conf("shop_renew") else []
             if prev:
-                code = prev[0]["code"]
-                license_action("extend", {"code": code, "months": months})
+                code, template = prev[0]["code"], conf("shop_note_renew")
+                shop_extend(code, months)
                 if sessions and (prev[0]["sessions"] or 0) and sessions > prev[0]["sessions"]:
                     x("UPDATE licenses SET sessions=? WHERE code=?", (sessions, code))
-                lines.append(f"Licența RDN Remote {product['name']} {code} a fost prelungită cu {months} "
-                             f"{'lună' if months == 1 else 'luni'}. Nu trebuie să faci nimic în aplicație.")
+                if seats > (prev[0]["seats"] or 0):
+                    x("UPDATE licenses SET seats=? WHERE code=?", (seats, code))
             else:
                 st, out = license_action("create", {
-                    "client": client, "seats": product["seats"], "months": months, "sessions": sessions,
+                    "client": client, "seats": seats, "months": 1, "sessions": sessions,
                     "mbps": product.get("mbps") or 0, "note": f"Shop: comanda #{order_id}, {email}"})
                 if st != 200:
                     errors.append(out.get("error", "eroare"))
                     continue
-                code = out["code"]
+                code, template = out["code"], conf("shop_note_new")
+                x("UPDATE licenses SET months=? WHERE code=?", (months, code))
                 x("INSERT INTO shop_licenses(code, email, product, created) VALUES(?,?,?,?)", (code, email, pid, now))
-                lines.append(f"Codul tău de licență RDN Remote {product['name']} ({months} {'lună' if months == 1 else 'luni'}): {code}")
+                new_codes.append(code)
             codes.append(code)
+            notes.append(fill_template(template, {"cod": code, "produs": product["name"], "luni": months_text(months),
+                                                  "client": client, "comanda": order_id, "site": site, "email": email}))
         if not codes:
             x("UPDATE shop_orders SET error=? WHERE order_id=?", ("; ".join(errors) or "niciun produs RDN Remote", order_id))
             return "; ".join(errors) or "niciun produs RDN Remote"
-        message = "Mulțumim pentru comandă!\n\n" + "\n".join(lines)
-        if any("Codul tău" in line for line in lines):
-            message += ("\n\nDescarcă aplicația" + (f" de la {site}" if site else "") +
-                        " și introdu codul la prima pornire. Perioada începe la prima activare.")
-        message += "\n\nSuport: office@rdndata.ro"
-        x("UPDATE shop_orders SET codes=?, message=?, error=? WHERE order_id=?",
-          (", ".join(codes), message, "; ".join(errors), order_id))
-    err = shop_send_note(order_id, message)
+        message = "\n\n".join(notes + ([conf("shop_note_footer")] if conf("shop_note_footer") else []))
+        x("UPDATE shop_orders SET codes=?, new_codes=?, message=?, error=? WHERE order_id=?",
+          (", ".join(codes), ", ".join(new_codes), message, "; ".join(errors), order_id))
+    delay = conf("shop_note_delay_minutes") * 60
+    if conf("shop_send_note") and delay:
+        x("UPDATE shop_orders SET note_due=? WHERE order_id=?", (time.time() + delay, order_id))
+        log(f"shop: order {order_id} -> {', '.join(codes)} (code e-mailed in {delay // 60} min)")
+        return "licențe: " + ", ".join(codes)
+    err = shop_send_note(order_id, message) if conf("shop_send_note") else "Trimiterea automată e oprită; trimite codul manual."
     x("UPDATE shop_orders SET note_sent=?, error=? WHERE order_id=?",
       (0 if err else 1, "; ".join(filter(None, errors + [err or ""])), order_id))
     log(f"shop: order {order_id} -> {', '.join(codes)}{' (note not sent)' if err else ''}")
     return "licențe: " + ", ".join(codes)
+
+
+def shop_send_due(now=None):
+    """Sends the codes whose delay has passed; a failed send is retried after 30 minutes."""
+    now = now or time.time()
+    if not conf("shop_send_note"):
+        return
+    for row in q("SELECT order_id, message FROM shop_orders WHERE note_sent=0 AND note_due IS NOT NULL AND note_due <= ?", (now,)):
+        err = shop_send_note(row["order_id"], row["message"])
+        if err:
+            x("UPDATE shop_orders SET error=?, note_due=? WHERE order_id=?", (err, now + 1800, row["order_id"]))
+        else:
+            x("UPDATE shop_orders SET note_sent=1, note_due=NULL, error='' WHERE order_id=?", (row["order_id"],))
+            log(f"shop: code for order {row['order_id']} sent")
+
+
+def shop_sender():
+    while True:
+        try:
+            shop_send_due()
+        except Exception as e:
+            log(f"shop: {e!r}")
+        time.sleep(60)
+
+
+def shop_cancelled(row, status):
+    if not conf("shop_revoke_refund"):
+        log(f"shop: order {row['order_id']} is now {status}; its licenses {row['codes']} need a manual check")
+        return "anulată; verifică manual"
+    revoked = [c for c in (row["new_codes"] or "").split(", ") if c]
+    for code in revoked:
+        x("UPDATE licenses SET revoked=1 WHERE code=?", (code,))
+    extended = [c for c in row["codes"].split(", ") if c and c not in revoked]
+    note = f"Comanda e {status}: " + (f"revocate {', '.join(revoked)}" if revoked else "nimic revocat") + \
+        (f"; prelungirea pentru {', '.join(extended)} trebuie scăzută manual" if extended else "")
+    x("UPDATE shop_orders SET error=? WHERE order_id=?", (note, row["order_id"]))
+    log(f"shop: order {row['order_id']} {status}; revoked {revoked or 'none'}")
+    return note
 
 
 # ---------------------------------------------------------------- backups
@@ -2010,7 +2178,7 @@ def restore_live(blob):
 def housekeeping():
     while True:
         try:
-            cutoff = time.time() - RETENTION_DAYS * 86400
+            cutoff = time.time() - conf("retention_days") * 86400
             x("DELETE FROM sessions WHERE started < ?", (cutoff,))
             x("DELETE FROM alarms WHERE ts < ?", (cutoff,))
             x("DELETE FROM devices WHERE last_seen < ?", (cutoff,))
@@ -2044,6 +2212,7 @@ def main():
     init_db()
     sync_hbbr_blocklist()
     threading.Thread(target=housekeeping, daemon=True).start()
+    threading.Thread(target=shop_sender, daemon=True).start()
     threading.Thread(target=serve, args=(ApiHandler, API_BIND, API_PORT, "audit API"), daemon=True).start()
     serve(PanelHandler, PANEL_BIND, PANEL_PORT, "dashboard")
 

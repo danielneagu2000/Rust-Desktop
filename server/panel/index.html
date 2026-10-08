@@ -60,6 +60,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pill.ok { background: var(--ok-weak); color: var(--ok); }
 .pill.warn { background: var(--warn-weak); color: var(--warn); }
 .pill.bad { background: var(--bad-weak); color: var(--bad); }
+label.sw { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+textarea, select { font: inherit; }
+textarea { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); box-sizing: border-box; }
 .pill.mute { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); }
 .ipcell { display: inline-flex; gap: 6px; align-items: center; }
@@ -96,6 +99,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="reports">Rapoarte</button>
     <button data-tab="shop">Shop</button>
     <button data-tab="backup">Backup</button>
+    <button data-tab="settings">Setări</button>
   </nav>
 
   <section id="conns" class="on"><div class="card">
@@ -191,7 +195,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
   <section id="shop">
     <div class="card">
       <h2>Legătura cu shopul</h2>
-      <p class="hint">La o comandă plătită (În procesare / Finalizată) panoul creează licența, sau o prelungește pe cea pe care clientul o are deja pentru același produs (codul rămâne același), și trimite codul clientului ca notă la comandă, pe e-mail. În WooCommerce → Setări → Avansat → Webhook-uri adaugă: subiect <b>Comandă actualizată</b>, URL de livrare <span class="mono" id="shop-hook"></span>, cheie secretă de mai jos.</p>
+      <p class="hint">Când o comandă ajunge în starea aleasă la „Reguli pentru comenzi” panoul creează licența, sau o prelungește pe cea pe care clientul o are deja pentru același produs (codul rămâne același), și trimite codul clientului ca notă la comandă, pe e-mail (după întârzierea aleasă). În WooCommerce → Setări → Avansat → Webhook-uri adaugă: subiect <b>Comandă actualizată</b>, URL de livrare <span class="mono" id="shop-hook"></span>, cheie secretă de mai jos.</p>
       <form class="add" id="shop-secret-form">
         <input type="text" id="shop-secret" placeholder="Cheie secretă (minim 24 de caractere; gol = generează)" style="width:380px" autocomplete="off">
         <button class="primary" type="submit">Salvează cheia</button>
@@ -208,16 +212,56 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       <p class="hint">Cheile REST API (WooCommerce → Setări → Avansat → REST API, permisiune <b>Citire/Scriere</b>) servesc doar la trimiterea notei cu codul. Fără ele, codurile apar mai jos și le trimiți tu.</p>
     </div>
     <div class="card">
+      <h2>Reguli pentru comenzi</h2>
+      <form id="shop-rules-form" style="padding:12px 16px;display:grid;gap:10px">
+        <div><b>Creează licența când comanda ajunge în starea:</b> <span id="shop-statuses"></span></div>
+        <label class="sw"><input type="checkbox" id="shop_renew"> Dacă clientul (același e-mail) are deja o licență pentru produs, o prelungește (codul rămâne același)</label>
+        <label>Cantitatea comandată înmulțește:
+          <select id="shop_quantity" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+            <option value="sessions">conexiunile simultane</option><option value="seats">numărul de calculatoare</option>
+            <option value="months">perioada</option><option value="none">nimic (se ignoră)</option></select></label>
+        <label class="sw"><input type="checkbox" id="shop_send_note"> Trimite automat codul clientului (notă la comandă, pe e-mail)</label>
+        <label>Trimite codul după (minute; 0 = imediat, 300 = 5 ore) <input type="number" id="shop_note_delay_minutes" min="0" max="10080" required style="width:110px"></label>
+        <label class="sw"><input type="checkbox" id="shop_revoke_refund"> La comandă rambursată sau anulată, revocă licențele create de ea</label>
+        <label>Adresa site-ului din mesaj ({site}): <input type="text" id="shop_site_url" placeholder="implicit: https://domeniul-serverului/" style="width:320px"></label>
+        <div><button class="primary" type="submit">Salvează regulile</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Mesajul către client</h2>
+      <p class="hint">Variabile: <span class="mono">{cod} {produs} {luni} {client} {comanda} {email} {site}</span>. La mai multe produse în aceeași comandă, mesajele se pun unul sub altul, apoi semnătura.</p>
+      <form id="shop-notes-form" style="padding:12px 16px;display:grid;gap:10px">
+        <label>Licență nouă<br><textarea id="shop_note_new" rows="5" style="width:100%"></textarea></label>
+        <label>Licență prelungită<br><textarea id="shop_note_renew" rows="4" style="width:100%"></textarea></label>
+        <label>Semnătură (la final)<br><textarea id="shop_note_footer" rows="2" style="width:100%"></textarea></label>
+        <div><button class="primary" type="submit">Salvează mesajele</button> <button type="button" id="shop-notes-default">Textele implicite</button></div>
+      </form>
+    </div>
+    <div class="card">
       <h2>Produse</h2>
-      <p class="hint">Ce primește fiecare produs din shop. Perioada se ia din variația comandată („Perioadă Abonament”); cantitatea înmulțește conexiunile simultane.</p>
+      <p class="hint">Ce primește fiecare produs din shop. Perioada se ia din variația comandată (de ex. „12 Luni”); „Perioadă implicită” se folosește doar dacă variația nu are perioadă (0 = comanda e refuzată). Rândurile cu ID gol se ignoră.</p>
       <form id="shop-products-form">
-        <div class="scroll"><table><thead><tr><th>ID produs</th><th>Nume</th><th class="num">Calculatoare</th><th class="num">Conexiuni simultane</th><th class="num">Bandă Mbit/s (0 = nelimitat)</th></tr></thead><tbody id="t-shop-products"></tbody></table></div>
+        <div class="scroll"><table><thead><tr><th>ID produs</th><th>Nume</th><th class="num">Calculatoare</th><th class="num">Conexiuni simultane</th><th class="num">Bandă Mbit/s (0 = nelimitat)</th><th class="num">Perioadă implicită (luni)</th></tr></thead><tbody id="t-shop-products"></tbody></table></div>
         <div style="padding:10px 16px"><button class="primary" type="submit">Salvează produsele</button></div>
       </form>
     </div>
     <div class="card">
       <h2>Comenzi</h2>
       <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Stare</th><th>Licențe</th><th>Cod trimis</th><th>Actualizată</th><th></th></tr></thead><tbody id="t-shop-orders"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="settings">
+    <div class="card">
+      <h2>Setări generale</h2>
+      <form id="settings-form" style="padding:12px 16px;display:grid;gap:10px;max-width:640px">
+        <label>Sesiunea în acest panou expiră după (ore) <input type="number" id="panel_session_hours" min="1" max="720" required style="width:110px"></label>
+        <label>Sesiunea în portalul clienților expiră după (ore) <input type="number" id="portal_session_hours" min="1" max="720" required style="width:110px"></label>
+        <label>Parola din portal are minim (caractere) <input type="number" id="portal_min_password" min="8" max="64" required style="width:110px"></label>
+        <label>Istoricul conexiunilor și alarmele se păstrează (zile) <input type="number" id="retention_days" min="7" max="3650" required style="width:110px"></label>
+        <div><button class="primary" type="submit">Salvează</button> <span class="sub">Sesiunile noi folosesc imediat noile durate; cele deschise își păstrează expirarea.</span></div>
+      </form>
+      <p class="hint" style="border-top:1px solid var(--line);border-bottom:0">Blocările după încercări greșite se setează în tab-ul <b>IP-uri blocate</b>, iar legătura cu shopul în tab-ul <b>Shop</b>. Parola și 2FA-ul acestui panou rămân în <span class="mono">server/.env</span> (pe server).</p>
     </div>
   </section>
 
@@ -373,21 +417,39 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       var ids = Object.keys(sh.products);
       while (ids.length < 3) ids.push("");
       document.getElementById("t-shop-products").innerHTML = ids.map(function (id) {
-        var pr = sh.products[id] || { name: "", seats: "", sessions: "", mbps: "" };
+        var pr = sh.products[id] || { name: "", seats: "", sessions: "", mbps: "", months: "" };
         return '<tr data-prod><td><input type="number" min="1" name="id" value="' + esc(id) + '" style="width:100px"></td>' +
           '<td><input type="text" name="name" value="' + esc(pr.name) + '" style="width:140px"></td>' +
           '<td class="num"><input type="number" min="1" max="10000" name="seats" value="' + esc(pr.seats) + '" style="width:100px"></td>' +
           '<td class="num"><input type="number" min="0" max="1000" name="sessions" value="' + esc(pr.sessions) + '" style="width:100px"></td>' +
-          '<td class="num"><input type="number" min="0" max="10000" step="0.5" name="mbps" value="' + esc(pr.mbps) + '" style="width:100px"></td></tr>';
+          '<td class="num"><input type="number" min="0" max="10000" step="0.5" name="mbps" value="' + esc(pr.mbps) + '" style="width:100px"></td>' +
+          '<td class="num"><input type="number" min="0" max="120" name="months" value="' + esc(pr.months || 0) + '" style="width:90px"></td></tr>';
       }).join("");
     }
     rows("t-shop-orders", sh.orders, function (o) {
       return '<tr><td class="mono">#' + o.order_id + "</td><td>" + esc(o.client || "") + '<div class="sub">' + esc(o.email || "") + "</div></td><td>" +
         esc(({ processing: "În procesare", completed: "Finalizată", "on-hold": "În așteptare", pending: "Neplătită",
         cancelled: "Anulată", refunded: "Rambursată", failed: "Eșuată" })[o.status] || o.status || "") + '</td><td class="mono">' + esc(o.codes || "—") + (o.error ? '<div class="sub" style="color:var(--bad);white-space:normal;max-width:320px">' + esc(o.error) + "</div>" : "") +
-        "</td><td>" + (o.codes ? (o.note_sent ? pill("da", "ok") : pill("nu", "warn")) : "—") + "</td><td>" + esc(when(o.updated)) + "</td><td>" +
-        (o.codes && !o.note_sent ? '<button class="small" data-resend="' + o.order_id + '">Trimite din nou</button>' : "") + "</td></tr>";
+        "</td><td>" + (o.codes ? (o.note_sent ? pill("da", "ok") : o.note_due ? pill("programat " + when(o.note_due), "mute") : pill("nu", "warn")) : "—") +
+        "</td><td>" + esc(when(o.updated)) + "</td><td>" +
+        (o.codes && !o.note_sent ? '<button class="small" data-resend="' + o.order_id + '">Trimite acum</button>' : "") + "</td></tr>";
     }, 7);
+    var cf = data.config;
+    ["settings-form", "shop-rules-form", "shop-notes-form"].forEach(function (fid) {
+      var form = document.getElementById(fid);
+      if (form.dataset.dirty) return;
+      form.querySelectorAll("input[id],select[id],textarea[id]").forEach(function (el) {
+        if (!(el.id in cf)) return;
+        if (el.type === "checkbox") el.checked = !!cf[el.id]; else el.value = cf[el.id];
+      });
+    });
+    var stBox = document.getElementById("shop-statuses");
+    if (!document.getElementById("shop-rules-form").dataset.dirty) {
+      stBox.innerHTML = Object.keys(sh.statuses).map(function (k) {
+        return '<label class="sw" style="margin-right:12px"><input type="checkbox" data-status="' + esc(k) + '"' +
+          (cf.shop_statuses.indexOf(k) >= 0 ? " checked" : "") + "> " + esc(sh.statuses[k]) + "</label>";
+      }).join("");
+    }
     var lk = data.lockouts, lockForm = document.getElementById("lock-form");
     if (!lockForm.dataset.dirty) {
       Object.keys(lk.settings).forEach(function (k) {
@@ -633,6 +695,32 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       .then(function () { document.getElementById("shop-ck").value = ""; document.getElementById("shop-cs").value = ""; toast("Salvat"); load(); })
       .catch(function (err) { toast("Eroare: " + err.message); });
   });
+  function configForm(fid, extra) {
+    var form = document.getElementById(fid);
+    form.addEventListener("input", function () { form.dataset.dirty = "1"; });
+    form.addEventListener("change", function () { form.dataset.dirty = "1"; });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var body = {};
+      form.querySelectorAll("input[id],select[id],textarea[id]").forEach(function (el) {
+        body[el.id] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      if (extra) extra(body);
+      post("settings", body).then(function () { delete form.dataset.dirty; toast("Salvat"); load(); })
+        .catch(function (err) { toast("Eroare: " + err.message); });
+    });
+  }
+  configForm("settings-form");
+  configForm("shop-notes-form");
+  document.getElementById("shop-notes-default").addEventListener("click", function () {
+    var d = data.config.defaults;
+    ["shop_note_new", "shop_note_renew", "shop_note_footer"].forEach(function (k) { document.getElementById(k).value = d[k]; });
+    document.getElementById("shop-notes-form").dataset.dirty = "1";
+    toast("Textele implicite sunt puse în formular; apasă Salvează mesajele");
+  });
+  configForm("shop-rules-form", function (body) {
+    body.shop_statuses = Array.prototype.map.call(document.querySelectorAll("#shop-statuses input:checked"), function (el) { return el.dataset.status; });
+  });
   var prodForm = document.getElementById("shop-products-form");
   prodForm.addEventListener("input", function () { prodForm.dataset.dirty = "1"; });
   prodForm.addEventListener("submit", function (e) {
@@ -640,7 +728,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     var list = [];
     prodForm.querySelectorAll("tr[data-prod]").forEach(function (tr) {
       var f = function (n) { return tr.querySelector('[name="' + n + '"]').value.trim(); };
-      if (f("id")) list.push({ id: f("id"), name: f("name"), seats: f("seats"), sessions: f("sessions"), mbps: f("mbps") });
+      if (f("id")) list.push({ id: f("id"), name: f("name"), seats: f("seats"), sessions: f("sessions"), mbps: f("mbps"), months: f("months") });
     });
     post("shop/products", { products: list }).then(function () { delete prodForm.dataset.dirty; toast("Produse salvate"); load(); })
       .catch(function (err) { toast("Eroare: " + err.message); });

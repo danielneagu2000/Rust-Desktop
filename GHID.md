@@ -234,6 +234,7 @@ aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `do
 La o comandă plătită în shop.rdndata.ro, panoul creează singur licența. Dacă același client
 (același e-mail) are deja o licență pentru produsul respectiv, o prelungește, iar codul rămâne
 același. Codul ajunge la client ca notă la comandă, pe care WooCommerce o trimite pe e-mail.
+Implicit, nota pleacă **la 5 ore** după plată.
 
 Configurare, o singură dată:
 
@@ -246,14 +247,32 @@ Configurare, o singură dată:
 3. WooCommerce → Setări → Avansat → **REST API** → Adaugă cheie, permisiune **Citire/Scriere**.
    Pune în panou cheia client (`ck_...`) și secretul client (`cs_...`). Fără ele, licențele se
    creează, dar codul îl trimiți tu (îl vezi în lista **Comenzi**).
-4. Verifică la **Produse** ce primește fiecare produs: Standard (ID 176) și Advanced (ID 183),
-   adică numărul de calculatoare, conexiunile simultane și banda. Perioada se ia din variația
-   comandată („Perioadă Abonament”), iar cantitatea înmulțește conexiunile simultane.
 
-Licența se creează doar când comanda e **În procesare** sau **Finalizată**. Pentru transfer
-bancar, asta se întâmplă când marchezi plata. O comandă rambursată sau anulată nu revocă
-automat licența: o vezi în listă și o revoci tu, dacă e cazul. Webhook-ul fără semnătura
-corectă e refuzat.
+Tot din tab-ul **Shop** schimbi tot ce ține de comenzi:
+
+- **Reguli pentru comenzi**:
+  - starea în care se creează licența (implicit În procesare și Finalizată);
+  - dacă se prelungește licența existentă a clientului;
+  - ce înmulțește cantitatea: conexiunile, calculatoarele, perioada sau nimic;
+  - trimiterea automată a codului și întârzierea ei în minute (0 = imediat, 300 = 5 ore);
+  - revocarea licențelor la rambursare sau anulare;
+  - adresa site-ului din mesaj.
+- **Mesajul către client**: textul pentru licență nouă, pentru prelungire și semnătura, cu
+  variabilele `{cod} {produs} {luni} {client} {comanda} {email} {site}`. Butonul
+  **Textele implicite** le readuce pe cele inițiale.
+- **Produse**: pentru fiecare ID de produs din WooCommerce, câte calculatoare, conexiuni și ce
+  bandă primește. Perioada se ia din variația comandată (de ex. „12 Luni”); **Perioada
+  implicită** e folosită doar dacă variația nu are perioadă.
+- **Comenzi**: vezi fiecare comandă, codurile, când pleacă e-mailul și poți apăsa
+  **Trimite acum**. O trimitere eșuată se reîncearcă la 30 de minute.
+
+Webhook-ul fără semnătura corectă e refuzat.
+
+## Setări generale
+
+Tab-ul **Setări**: cât durează sesiunea în panou și în portal, lungimea minimă a parolei din
+portal și câte zile se păstrează istoricul (înlocuiește `RETENTION_DAYS` din `server/.env`).
+Parola și 2FA-ul panoului rămân în `server/.env`, pe server.
 
 ## Raport pe client
 
