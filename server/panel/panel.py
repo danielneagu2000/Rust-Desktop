@@ -1732,6 +1732,7 @@ def restore_live(blob):
     safety = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "inainte-de-restaurare")
     blocked_before = [r_["ip"] for r_ in q("SELECT ip FROM blocklist")]
     restored = []
+    settings = q("SELECT key, value FROM settings")
     with DB_LOCK:
         if "panel.sqlite3" in contents:
             DB.close()
@@ -1739,6 +1740,7 @@ def restore_live(blob):
                 (DATA_DIR / ("panel.sqlite3" + suffix)).unlink(missing_ok=True)
             backup._atomic_write(DB_FILE, contents["panel.sqlite3"])
             DB = db()
+            DB.executemany("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", [(r_["key"], r_["value"]) for r_ in settings])
             restored.append("licențe, istoric, dispozitive")
     if "panel.sqlite3" in contents:
         # The blocklist lives in the panel database; make hbbr match the restored one.

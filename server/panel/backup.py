@@ -6,7 +6,8 @@ A backup is a .tar.gz with:
   db_v2.sqlite3                hbbs: registered IDs and their keys
   panel.sqlite3                panel: licenses, connection history, alarms, devices
   blocklist.txt                IPs blocked on the relay
-  server.env                   server/.env (host, panel password, settings)
+  server.env                   server/.env (host, panel password, settings); a restore keeps
+                               this server's site domain and panel login
   manifest.json                creation time and SHA-256 of every file
 
 SQLite files are copied with SQLite's online backup API, so a backup taken while the
@@ -130,16 +131,74 @@ def restore(archive, data_dir, env_file):
     manifest, contents = read(archive)
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
+    settings = read_settings(data_dir / "panel.sqlite3")
     for name, data in contents.items():
         if name == ENV_NAME:
             if env_file:
-                _atomic_write(env_file, data)
+                _atomic_write(env_file, _keep_current_env(env_file, data))
             continue
         if name in SQLITE:
             for suffix in ("-wal", "-shm"):
                 (data_dir / (name + suffix)).unlink(missing_ok=True)
         _atomic_write(data_dir / name, data, 0o644 if name.endswith(".pub") or name == "blocklist.txt" else 0o600)
+    if "panel.sqlite3" in contents:
+        write_settings(data_dir / "panel.sqlite3", settings)
     return manifest
+
+
+def read_settings(path):
+    """The panel's settings (lockouts), which a restore keeps as they are on this server."""
+    if not Path(path).exists():
+        return []
+    try:
+        c = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            return c.execute("SELECT key, value FROM settings").fetchall()
+        finally:
+            c.close()
+    except sqlite3.Error:
+        return []
+
+
+def write_settings(path, rows):
+    if not rows:
+        return
+    c = sqlite3.connect(path)
+    try:
+        c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+        c.executemany("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", rows)
+        c.commit()
+    finally:
+        c.close()
+
+
+# Settings of this server that a restore leaves as they are: the site's domain and the panel's
+# address and login. Everything else in server/.env comes from the backup.
+KEEP_ENV = ("SERVER_HOST", "WEB_ADDRESS", "COMPOSE_PROFILES", "PANEL_DOMAIN", "PANEL_BIND",
+            "PANEL_USER", "PANEL_PASSWORD", "PANEL_TOTP_SECRET")
+
+
+def _keep_current_env(env_file, data):
+    try:
+        current = Path(env_file).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return data
+    keep = {}
+    for line in current:
+        key, sep, value = line.partition("=")
+        if sep and key in KEEP_ENV and value:
+            keep[key] = line
+    out, seen = [], set()
+    for line in data.decode("utf-8", "replace").splitlines():
+        key = line.partition("=")[0]
+        if key in keep:
+            if key not in seen:
+                out.append(keep[key])
+                seen.add(key)
+            continue
+        out.append(line)
+    out += [keep[k] for k in KEEP_ENV if k in keep and k not in seen]
+    return ("\n".join(out) + "\n").encode()
 
 
 def prune(out_dir, label, keep):

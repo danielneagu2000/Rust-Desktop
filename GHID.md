@@ -279,6 +279,11 @@ IP-urile blocate și setările (`server/.env`).
 Se restaurează licențele, istoricul, dispozitivele și IP-urile blocate; înainte se face automat
 un backup al stării curente. Un backup de pe alt server (altă cheie) e refuzat aici.
 
+Restaurarea **nu schimbă site-ul**: fișierele lui nu sunt în backup. Rămân ca înainte și domeniul
+site-ului și al panoului, parola și codul 2FA ale panoului, precum și setările de blocare din
+panou; din backup vin doar datele (licențe, istoric, dispozitive, IP-uri blocate) și restul
+setărilor din `server/.env`.
+
 **Restaurare completă** (mini PC nou, disc defect, cheie pierdută):
 
 ```bash
@@ -395,11 +400,12 @@ Reguli:
 
 - Nu modifica fișiere din repo direct pe server (de ex. `server/web/site.json`): modifică-le
   în GitHub. Dacă găsește modificări locale, actualizarea serverului se oprește ca să nu le piardă.
-- Serverul urmează **ultimul release final**. Dacă aduci pe server cod mai nou din `master`
-  (`git checkout master && git pull`), actualizarea zilnică îl readuce la release, deci și site-ul
-  și panoul revin la versiunea aceea. Ca să rămâi pe `master` până la următorul release, oprește
-  temporar actualizarea: `sudo systemctl disable --now rdn-update.timer`. După publicarea
-  release-ului, o pornești la loc cu `sudo systemctl enable --now rdn-update.timer`.
+- Serverul doar **avansează**: trece la un release final numai dacă acesta e mai nou decât codul
+  pe care îl are. Dacă ai adus pe server cod mai nou din `master` (`git checkout master && git pull`),
+  rămâne pe el până apare un release care îl include; site-ul și panoul nu revin la o versiune
+  mai veche. Backup-ul și restaurarea nu ating site-ul. Singurul lucru de pe site pe care
+  actualizarea îl schimbă singură e lista de kituri din secțiunea de descărcări, când apare o
+  versiune nouă a aplicației.
 - Actualizarea automată pe Windows/macOS e pornită implicit (`AUTO_UPDATE=Y` în
   `branding/brand.env`); utilizatorul o poate opri din setările aplicației.
 - Încap 9 versiuni (`1.5.0-1` … `1.5.0-9`) peste aceeași versiune RustDesk; după aceea

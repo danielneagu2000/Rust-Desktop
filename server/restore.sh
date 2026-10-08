@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Restaurare completă din backup: cheia serverului, ID-urile înregistrate, licențele,
-# istoricul, IP-urile blocate și server/.env.
+# istoricul, IP-urile blocate și server/.env. Domeniul site-ului și al panoului, parola și
+# 2FA-ul panoului și setările de blocare rămân cele ale acestui server.
 #
 #   sudo ./restore.sh /cale/rdn-backup-AAAALLZZ-HHMMSS-....tar.gz
 #

@@ -3,7 +3,8 @@
 #   1. aduce pe pagina de descărcare ultimul release finalizat de pe GitHub și anunță
 #      versiunea clienților (panoul răspunde la /version/latest);
 #   2. aduce serverul (panou, site, configurație) la același release, dacă s-a schimbat.
-# Serverul urmează doar release-urile finalizate, niciodată modificările nepublicate din master.
+# Serverul urmează doar release-urile finalizate, niciodată modificările nepublicate din master,
+# și nu coboară niciodată la un release mai vechi decât codul pe care îl are.
 #
 # Manual:  sudo systemctl start rdn-update    Jurnal:  journalctl -u rdn-update
 set -euo pipefail
@@ -37,6 +38,16 @@ TARGET="$(git_ rev-parse "refs/tags/$TAG^{commit}")"
 CURRENT="$(git_ rev-parse HEAD)"
 if [[ "$TARGET" == "$CURRENT" ]]; then
   echo "Serverul este deja la $TAG."
+  exit 0
+fi
+# Doar înainte: un release mai vechi decât codul de pe server (de ex. după un `git pull` pe
+# master) nu readuce site-ul și panoul la o versiune anterioară.
+if git_ merge-base --is-ancestor "$TARGET" "$CURRENT"; then
+  echo "Serverul rulează cod mai nou decât $TAG; rămâne cum este."
+  exit 0
+fi
+if ! git_ merge-base --is-ancestor "$CURRENT" "$TARGET"; then
+  echo "$TAG nu continuă codul de pe server (${CURRENT:0:12}); nu schimb nimic. Verifică manual cu git log." >&2
   exit 0
 fi
 if ! git_ diff --quiet || ! git_ diff --cached --quiet; then
