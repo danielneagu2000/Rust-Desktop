@@ -3,184 +3,446 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RDN Remote: descărcare</title>
-<meta name="description" content="Descarcă RDN Remote, aplicația de asistență la distanță de la RDN Network Data.">
+<title>RDN Remote – program de control la distanță pentru firme | RDN Network Data</title>
+<meta name="description" content="RDN Remote: control la distanță rapid și sigur pentru calculatoare și telefoane, pe server propriu în România. Conexiuni criptate, de la 10 €/lună. Descarcă gratuit.">
+<link rel="canonical" href="https://remote.rdndata.ro/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ro_RO">
+<meta property="og:site_name" content="RDN Network Data">
+<meta property="og:url" content="https://remote.rdndata.ro/">
+<meta property="og:title" content="RDN Remote – control la distanță pentru firme, pe server din România">
+<meta property="og:description" content="Asistență IT și acces la distanță pe Windows, macOS, Linux și Android. Conexiuni criptate, fără limită de viteză impusă, de la 10 €/lună.">
+<meta property="og:image" content="https://remote.rdndata.ro/assets/logo.png">
+<meta name="theme-color" content="#b3121f">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="footer.css">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "RDN Remote",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Windows, macOS, Linux, Android",
+      "url": "https://remote.rdndata.ro/",
+      "description": "Program de control și asistență la distanță pentru firme, găzduit pe serverele RDN Network Data din România.",
+      "publisher": { "@type": "Organization", "name": "RDN Network Data", "url": "https://rdndata.ro/", "email": "office@rdndata.ro", "telephone": "+40723122097" },
+      "offers": [
+        { "@type": "Offer", "name": "Standard", "price": "10", "priceCurrency": "EUR", "url": "https://remote.rdndata.ro/#preturi" },
+        { "@type": "Offer", "name": "Advanced", "price": "50", "priceCurrency": "EUR", "url": "https://remote.rdndata.ro/#preturi" }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Ce este RDN Remote?", "acceptedAnswer": { "@type": "Answer", "text": "RDN Remote este un program de control la distanță prin care te conectezi la calculatoare și telefoane de oriunde, pentru asistență IT, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile trec prin serverele RDN Network Data din România." } },
+        { "@type": "Question", "name": "Este RDN Remote o alternativă la AnyDesk sau TeamViewer?", "acceptedAnswer": { "@type": "Answer", "text": "Da. Oferă control complet de la distanță, transfer de fișiere și acces nesupravegheat, cu diferența că datele trec prin serverul nostru din România, nu prin servere străine, iar suportul este în limba română." } },
+        { "@type": "Question", "name": "Este sigur?", "acceptedAnswer": { "@type": "Answer", "text": "Conexiunile sunt criptate de la un capăt la altul între cele două dispozitive. Serverul doar le pune în legătură și nu poate vedea imaginea, tastatura sau fișierele. Încercările repetate de ghicire a parolei sunt blocate automat." } },
+        { "@type": "Question", "name": "Pe ce sisteme funcționează?", "acceptedAnswer": { "@type": "Answer", "text": "Pe Windows, macOS, Linux și Android. De pe iPhone și iPad poți controla alte dispozitive, dar acestea nu pot fi controlate, din cauza unei limitări impuse de Apple." } },
+        { "@type": "Question", "name": "Cum activez licența?", "acceptedAnswer": { "@type": "Answer", "text": "După comandă primești un cod de licență. Instalezi aplicația, introduci codul la prima pornire și poți începe imediat. Fiecare dispozitiv pe care instalezi aplicația ocupă un loc din licență." } },
+        { "@type": "Question", "name": "Există limită de viteză?", "acceptedAnswer": { "@type": "Answer", "text": "Nu impunem o limită de viteză: calitatea imaginii depinde de conexiunea la internet a dispozitivelor. La cerere, putem limita banda folosită de fiecare client." } }
+      ]
+    }
+  ]
+}
+</script>
 <style>
 :root {
-  --ink: #1d0a0d; --text: #2b2326; --muted: #6b5f63; --line: #eadfe1; --bg: #ffffff; --soft: #faf5f6;
-  --brand-dark: #3a0b12; --brand: #b3122b; --brand-bright: #e3263a; --ok: #146c3a;
+  --ink: #18090b; --text: #2d2629; --muted: #6c6366; --line: #ece6e7; --bg: #ffffff; --soft: #f6f4f5;
+  --brand: #b3121f; --brand-2: #d61f2c; --brand-dark: #2a0a0e; --nav: #5d6470; --accent: #5b3fd0; --ok: #12814a;
+  --radius: 14px; --shadow: 0 10px 30px rgba(24,9,11,.08);
   color-scheme: light;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; }
 body { margin: 0; background: var(--bg); color: var(--text);
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 a { color: var(--brand); }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-header.top { border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 5; }
-header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; gap: 16px; }
-header.top img { height: 44px; width: auto; display: block; }
-header.top nav { display: flex; gap: 22px; font-size: 15px; }
-header.top nav a { color: var(--text); text-decoration: none; }
-header.top nav a:hover { color: var(--brand); }
+img { max-width: 100%; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.cond { font-family: "Teko", "Oswald", "Bahnschrift", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif; font-stretch: condensed; }
 
-.hero { background: radial-gradient(1200px 500px at 85% -10%, rgba(227,38,58,.22), transparent 60%),
-  linear-gradient(135deg, #1d0508 0%, var(--brand-dark) 45%, #6d0f1c 100%); color: #fff; }
-.hero .wrap { display: grid; grid-template-columns: 1.25fr 1fr; gap: 40px; align-items: center; padding-top: 64px; padding-bottom: 72px; }
-.hero h1 { font-size: 44px; line-height: 1.12; margin: 0 0 16px; letter-spacing: -.5px; }
-.hero p.lead { font-size: 19px; color: #f1dde0; margin: 0 0 28px; max-width: 34em; }
-.cta { display: inline-flex; align-items: center; gap: 12px; background: var(--brand-bright); color: #fff; text-decoration: none;
-  font-weight: 650; font-size: 18px; padding: 15px 26px; border-radius: 12px; box-shadow: 0 10px 30px rgba(227,38,58,.35); }
-.cta:hover { background: #f03a4d; }
-.cta svg { width: 22px; height: 22px; }
-.cta.disabled { background: #5c2a31; box-shadow: none; pointer-events: none; }
-.hero .meta { margin-top: 14px; font-size: 14px; color: #e5c9cd; }
-.hero .meta a { color: #fff; }
-.hero .alt { margin-top: 8px; font-size: 14px; }
-.hero .alt a { color: #ffd5da; }
-.card-hero { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 26px; }
-.card-hero h3 { margin: 0 0 14px; font-size: 16px; color: #ffd5da; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
-.card-hero ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
-.card-hero li { counter-increment: s; display: flex; gap: 14px; padding: 10px 0; color: #fbeef0; }
-.card-hero li::before { content: counter(s); flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--brand-bright);
-  color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+/* Header, ca pe rdndata.ro: alb, meniu condensat, linie roșie dedesubt */
+header.top { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+  border-bottom: 2px solid var(--brand); }
+header.top .wrap { display: flex; align-items: center; gap: 24px; height: 76px; }
+header.top .logo img { height: 48px; width: auto; display: block; }
+header.top nav { display: flex; align-items: stretch; gap: 4px; margin-left: auto; height: 100%; }
+header.top nav a { display: flex; align-items: center; padding: 0 14px; color: var(--nav); text-decoration: none; font-size: 19px;
+  letter-spacing: .3px; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color .15s; }
+header.top nav a:hover { color: var(--accent); }
+header.top nav a.on { color: var(--accent); border-bottom-color: var(--brand); box-shadow: inset 0 1px 0 var(--accent); }
+.btn-red { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--brand); color: #fff;
+  text-decoration: none; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; font-size: 14px;
+  padding: 13px 24px; border-radius: 10px; border: 0; transition: background .15s, transform .15s; }
+.btn-red:hover { background: #8f0e19; transform: translateY(-1px); }
+.btn-red svg { width: 18px; height: 18px; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase; font-size: 14px; padding: 12px 22px; border-radius: 10px; border: 2px solid var(--ink); }
+.btn-ghost:hover { background: var(--ink); color: #fff; }
+header.top .btn-red { padding: 10px 18px; }
+.menu-btn { display: none; margin-left: auto; background: none; border: 0; padding: 8px; color: var(--ink); cursor: pointer; }
+.menu-btn svg { width: 28px; height: 28px; }
 
-section.block { padding: 64px 0; }
-section.block.soft { background: var(--soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-h2 { font-size: 30px; margin: 0 0 8px; color: var(--ink); letter-spacing: -.3px; }
-p.sub { color: var(--muted); margin: 0 0 30px; }
+/* Hero */
+.hero { position: relative; overflow: hidden; background:
+  radial-gradient(900px 420px at 92% 10%, rgba(214,31,44,.10), transparent 60%),
+  radial-gradient(700px 380px at 0% 100%, rgba(91,63,208,.07), transparent 60%), #fff; }
+.hero .wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items: center; padding-top: 72px; padding-bottom: 84px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--brand); background: #fdecee; padding: 6px 12px; border-radius: 999px; }
+.eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--brand-2); }
+.hero h1 { font-size: 54px; line-height: 1.04; margin: 18px 0 18px; color: var(--ink); font-weight: 700; letter-spacing: .3px; }
+.hero h1 em { font-style: normal; color: var(--brand); }
+.hero p.lead { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 33em; }
+.hero .ctas { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+#cta.disabled { background: #c9c2c4; pointer-events: none; }
+.hero .meta { margin-top: 14px; font-size: 14px; color: var(--muted); min-height: 22px; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; padding: 0; list-style: none; }
+.chips li { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); background: var(--soft);
+  border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; }
+.chips svg { width: 16px; height: 16px; color: var(--ok); }
 
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
-.os { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; }
-.os.current { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(179,18,43,.12); }
-.os .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.os .head svg { width: 28px; height: 28px; color: var(--brand-dark); }
-.os h3 { margin: 0; font-size: 19px; color: var(--ink); }
-.os .tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--brand); background: #fde8eb; padding: 2px 8px; border-radius: 999px; }
-.file { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+/* Ilustrație: fereastra aplicației */
+.mock { position: relative; }
+.win { background: #fff; border-radius: 18px; box-shadow: 0 30px 80px rgba(42,10,14,.18), 0 2px 6px rgba(42,10,14,.06);
+  border: 1px solid var(--line); overflow: hidden; }
+.win .bar { display: flex; align-items: center; gap: 7px; padding: 12px 16px; background: var(--soft); border-bottom: 1px solid var(--line); }
+.win .bar i { width: 11px; height: 11px; border-radius: 50%; background: #e1dadc; }
+.win .bar i:first-child { background: #ff5f57; } .win .bar i:nth-child(2) { background: #febc2e; } .win .bar i:nth-child(3) { background: #28c840; }
+.win .bar span { margin-left: 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.win .body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.win .pane { padding: 24px; }
+.win .pane + .pane { border-left: 1px solid var(--line); background: #fcfbfb; }
+.win .k { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.win .id { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: 1.5px; margin: 4px 0 14px; white-space: nowrap; }
+.win .pw { font-size: 18px; font-weight: 600; color: var(--ink); letter-spacing: 3px; }
+.win .field { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 15px; color: var(--muted); margin: 8px 0 12px; background: #fff; }
+.win .go { display: block; text-align: center; background: var(--brand); color: #fff; border-radius: 10px; padding: 10px; font-weight: 700; font-size: 14px; letter-spacing: .6px; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ok); font-weight: 600; margin-top: 18px; }
+.status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgba(18,129,74,.5);
+  animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(18,129,74,.45); } 70% { box-shadow: 0 0 0 10px rgba(18,129,74,0); } 100% { box-shadow: 0 0 0 0 rgba(18,129,74,0); } }
+.float { position: absolute; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 10px; }
+.float svg { width: 20px; height: 20px; color: var(--brand); }
+.float.f1 { left: -26px; bottom: -22px; } .float.f2 { right: -18px; top: -20px; }
+@media (prefers-reduced-motion: reduce) { .status::before { animation: none; } html { scroll-behavior: auto; } }
+
+/* Secțiuni */
+section.block { padding: 84px 0; }
+section.block.soft { background: var(--soft); }
+.head-c { text-align: center; max-width: 760px; margin: 0 auto 44px; }
+.kicker { font-size: 13px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--brand); }
+h2 { font-size: 42px; line-height: 1.1; margin: 8px 0 12px; color: var(--ink); font-weight: 700; letter-spacing: .3px; }
+.head-c p { color: var(--muted); font-size: 17px; margin: 0; }
+
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.feat { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; transition: transform .2s, box-shadow .2s; }
+.feat:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.feat .ic { width: 48px; height: 48px; border-radius: 12px; background: #fdecee; color: var(--brand); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+.feat .ic svg { width: 24px; height: 24px; }
+.feat h3 { margin: 0 0 8px; font-size: 19px; color: var(--ink); }
+.feat p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+/* Prețuri, în stilul cardurilor de pe rdndata.ro */
+.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 460px)); justify-content: center; gap: 28px; align-items: start; }
+.plan { background: #fff; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; text-align: center; box-shadow: var(--shadow); }
+.plan.pop { border-color: var(--brand); box-shadow: 0 24px 60px rgba(179,18,31,.18); }
+.plan .ph { padding: 28px 24px 8px; }
+.plan .name { font-size: 28px; font-weight: 700; color: var(--ink); letter-spacing: .5px; }
+.plan .badge { display: inline-block; margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  color: #fff; background: var(--brand); padding: 4px 10px; border-radius: 999px; }
+.plan .for { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+.plan .price { background: var(--soft); margin: 18px 0 0; padding: 18px 0; color: var(--brand); }
+.plan .price b { font-size: 64px; line-height: 1; font-weight: 800; }
+.plan .price span { font-size: 28px; color: #4b4447; margin-left: 4px; }
+.plan .price small { font-size: 13px; color: var(--muted); font-style: italic; margin-left: 4px; }
+.plan ul { list-style: none; margin: 0; padding: 0; }
+.plan li { padding: 15px 22px; border-top: 1px solid var(--line); color: #4b4447; font-size: 16px; }
+.plan li:first-child { border-top: 0; }
+.plan .pf { padding: 22px 24px 28px; border-top: 1px solid var(--line); }
+.plan .pf .btn-red { min-width: 170px; }
+.plans-note { text-align: center; color: var(--muted); font-size: 14px; margin-top: 22px; }
+
+/* Descărcări */
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.os { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px; display: flex; flex-direction: column; }
+.os.current { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(179,18,31,.08); }
+.os .head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.os .head svg { width: 30px; height: 30px; color: var(--ink); }
+.os h3 { margin: 0; font-size: 22px; color: var(--ink); }
+.os .tag { margin-left: auto; font-size: 11px; font-weight: 800; letter-spacing: .8px; color: #fff; background: var(--brand); padding: 3px 9px; border-radius: 999px; }
+.file { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .file:first-of-type { border-top: 0; }
 .file .l { font-size: 15px; line-height: 1.35; }
 .file .s { display: block; font-size: 12px; color: var(--muted); }
-.btn { flex: none; font-size: 14px; font-weight: 600; text-decoration: none; color: var(--brand); border: 1px solid #f0c6cc;
-  padding: 6px 12px; border-radius: 9px; background: #fff; }
-.btn:hover { background: #fde8eb; }
+.btn { flex: none; font-size: 13px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; text-decoration: none; color: var(--brand);
+  border: 2px solid var(--brand); padding: 6px 14px; border-radius: 9px; background: #fff; }
+.btn:hover { background: var(--brand); color: #fff; }
 .os .none { color: var(--muted); font-size: 14px; }
-.ios { margin-top: 18px; font-size: 14px; color: var(--muted); }
-
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-.step { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
-.step .n { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--brand-dark), var(--brand-bright));
-  color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
-.step h3 { margin: 0 0 6px; font-size: 18px; color: var(--ink); }
-.step p { margin: 0; color: var(--muted); font-size: 15px; }
-
-.safety { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-.point { display: flex; gap: 14px; padding: 18px; border-radius: 14px; background: #fff; border: 1px solid var(--line); }
-.point svg { flex: none; width: 26px; height: 26px; color: var(--ok); margin-top: 2px; }
-.point.warn svg { color: var(--brand-bright); }
-.point h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); }
-.point p { margin: 0; font-size: 15px; color: var(--muted); }
-
-.contact { display: flex; flex-wrap: wrap; gap: 14px; }
-.contact a, .contact span { display: inline-flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line);
-  background: #fff; text-decoration: none; color: var(--ink); font-weight: 600; }
-.contact svg { width: 20px; height: 20px; color: var(--brand); }
-
-details.sums { margin-top: 26px; font-size: 13px; color: var(--muted); }
+.ios { margin-top: 18px; font-size: 14px; color: var(--muted); text-align: center; }
+details.sums { margin-top: 22px; font-size: 13px; color: var(--muted); }
 details.sums summary { cursor: pointer; }
 details.sums code { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
 details.sums table { border-collapse: collapse; margin-top: 10px; width: 100%; }
 details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
 
-footer { border-top: 1px solid var(--line); padding: 26px 0 40px; font-size: 13px; color: var(--muted); }
-footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+/* Pași */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; counter-reset: s; }
+.step { position: relative; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px 26px; }
+.step::before { counter-increment: s; content: "0" counter(s); font-size: 46px; font-weight: 800; line-height: 1; color: #f3d3d6; display: block; margin-bottom: 10px; }
+.step h3 { margin: 0 0 6px; font-size: 19px; color: var(--ink); }
+.step p { margin: 0; color: var(--muted); font-size: 15.5px; }
 
+/* Siguranță: bandă închisă */
+.dark { background: linear-gradient(135deg, #1a0609 0%, #2a0a0e 55%, #4a0d15 100%); color: #f3e7e9; }
+.dark h2 { color: #fff; } .dark .head-c p { color: #d6c3c6; } .dark .kicker { color: #ff8a93; }
+.safety { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.point { display: flex; gap: 16px; padding: 22px; border-radius: var(--radius); background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.10); }
+.point svg { flex: none; width: 28px; height: 28px; color: #5fd49a; margin-top: 2px; }
+.point.warn svg { color: #ff8a93; }
+.point h3 { margin: 0 0 4px; font-size: 17px; color: #fff; }
+.point p { margin: 0; font-size: 15px; color: #d6c3c6; }
+
+/* Întrebări frecvente */
+.faq { max-width: 860px; margin: 0 auto; }
+.faq details { background: #fff; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; }
+.faq summary { cursor: pointer; list-style: none; padding: 18px 54px 18px 22px; font-weight: 650; color: var(--ink); font-size: 17px; position: relative; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; position: absolute; right: 22px; top: 50%; transform: translateY(-50%); font-size: 26px; color: var(--brand); font-weight: 400; }
+.faq details[open] summary::after { content: "–"; }
+.faq details p { margin: 0; padding: 0 22px 20px; color: var(--muted); }
+
+/* Contact */
+.cta-band { background: var(--brand); color: #fff; border-radius: 20px; padding: 40px 44px; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 22px; box-shadow: 0 24px 60px rgba(179,18,31,.25); }
+.cta-band h2 { color: #fff; font-size: 34px; margin: 0 0 6px; }
+.cta-band p { margin: 0; color: #ffd9dc; }
+.contact { display: flex; flex-wrap: wrap; gap: 12px; }
+.contact a { display: inline-flex; align-items: center; gap: 10px; padding: 13px 18px; border-radius: 12px; background: #fff; text-decoration: none;
+  color: var(--ink); font-weight: 700; }
+.contact a:hover { background: #ffe9eb; }
+.contact svg { width: 20px; height: 20px; color: var(--brand); }
+
+@media (max-width: 1080px) {
+  header.top nav a { padding: 0 9px; font-size: 17px; }
+  .hero h1 { font-size: 44px; }
+}
 @media (max-width: 960px) {
-  .grid { grid-template-columns: 1fr; }
-  .hero .wrap { grid-template-columns: 1fr; padding-top: 44px; padding-bottom: 52px; }
-  .hero h1 { font-size: 34px; }
+  .hero .wrap { grid-template-columns: 1fr; padding-top: 48px; padding-bottom: 64px; }
+  .features { grid-template-columns: repeat(2, 1fr); }
+  .grid, .safety { grid-template-columns: 1fr; }
+  .plans { grid-template-columns: minmax(0, 520px); }
+  header.top nav { display: none; position: absolute; left: 0; right: 0; top: 76px; height: auto; flex-direction: column; background: #fff;
+    border-bottom: 2px solid var(--brand); padding: 8px 0; box-shadow: var(--shadow); }
+  header.top nav.open { display: flex; }
+  header.top nav a { padding: 12px 24px; border: 0; margin: 0; }
+  header.top nav a.on { box-shadow: none; }
+  .menu-btn { display: block; }
+  header.top .btn-red.hdr { display: none; }
 }
 @media (max-width: 640px) {
   .wrap { padding: 0 16px; }
-  header.top nav { display: none; }
-  .grid, .steps, .safety { grid-template-columns: 1fr; }
-  .hero h1 { font-size: 29px; }
+  header.top .wrap { height: 66px; }
+  header.top nav { top: 66px; }
+  header.top .logo img { height: 40px; }
+  .hero h1 { font-size: 36px; }
   .hero p.lead { font-size: 17px; }
-  .cta { width: 100%; justify-content: center; }
-  section.block { padding: 46px 0; }
-  h2 { font-size: 25px; }
+  .hero .ctas a { width: 100%; justify-content: center; }
+  .features, .steps { grid-template-columns: 1fr; }
+  .win .body { grid-template-columns: 1fr; }
+  .win .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
+  .float { display: none; }
+  section.block { padding: 56px 0; }
+  h2 { font-size: 32px; }
+  .plan .price b { font-size: 54px; }
+  .cta-band { padding: 28px 22px; }
+  .cta-band h2 { font-size: 27px; }
 }
 </style>
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a href="#"><img src="assets/logo.png" alt="RDN Network Data"></a>
-  <nav><a href="#descarcari">Descărcări</a><a href="#cum">Cum funcționează</a><a href="#siguranta">Siguranță</a><a href="#contact" id="nav-contact">Contact</a></nav>
+  <a class="logo" href="https://rdndata.ro/"><img src="assets/logo.png" alt="RDN Network Data" width="73" height="48"></a>
+  <button class="menu-btn" id="menu-btn" aria-label="Meniu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <nav class="cond" id="nav">
+    <a href="https://rdndata.ro/">Acasă</a>
+    <a href="#functii">Funcții</a>
+    <a href="#preturi">Prețuri</a>
+    <a href="#descarcari">Descărcare</a>
+    <a href="#siguranta">Siguranță</a>
+    <a href="#intrebari">Întrebări</a>
+    <a href="#contact" id="nav-contact">Contact</a>
+  </nav>
+  <a class="btn-red hdr" href="#preturi">Comandă</a>
 </div></header>
 
+<main>
 <section class="hero"><div class="wrap">
   <div>
-    <h1>Asistență IT la distanță, rapid și în siguranță</h1>
-    <p class="lead">Descarcă <strong>RDN Remote</strong> ca un tehnician RDN Network Data să te poată ajuta direct pe calculatorul tău. Conexiunea este criptată de la un capăt la altul și trece doar prin serverul nostru.</p>
-    <a class="cta disabled" id="cta" href="#descarcari">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-      <span id="cta-text">Se încarcă…</span>
-    </a>
+    <span class="eyebrow">Server propriu în România</span>
+    <h1 class="cond">Control la distanță <em>rapid și sigur</em> pentru firma ta</h1>
+    <p class="lead"><strong>RDN Remote</strong> îți dă acces la calculatoarele și telefoanele tale de oriunde: asistență IT pentru clienți, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile sunt criptate și trec prin serverele RDN Network Data, nu prin servere străine.</p>
+    <div class="ctas">
+      <a class="btn-red disabled" id="cta" href="#descarcari">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span id="cta-text">Se încarcă…</span>
+      </a>
+      <a class="btn-ghost" href="#preturi">Vezi prețurile</a>
+    </div>
     <div class="meta" id="cta-meta"></div>
-    <div class="alt"><a href="#descarcari">Alt sistem de operare? Vezi toate descărcările</a></div>
+    <ul class="chips">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Criptare end-to-end</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Fără limită de viteză impusă</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Windows, macOS, Linux, Android</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>Suport în limba română</li>
+    </ul>
   </div>
-  <div class="card-hero">
-    <h3>În 3 pași</h3>
-    <ol>
-      <li><span>Descarcă RDN Remote și introdu <strong>codul de licență</strong> primit de la noi.</span></li>
-      <li><span>Comunică tehnicianului <strong>ID-ul</strong> și <strong>parola</strong> afișate în aplicație.</span></li>
-      <li><span>Vezi tot ce face tehnicianul și poți închide conexiunea oricând.</span></li>
-    </ol>
+  <div class="mock" aria-hidden="true">
+    <div class="win">
+      <div class="bar"><i></i><i></i><i></i><span>RDN Remote</span></div>
+      <div class="body">
+        <div class="pane">
+          <div class="k">ID-ul tău</div>
+          <div class="id">482 913 607</div>
+          <div class="k">Parolă unică</div>
+          <div class="pw">7h2k•••</div>
+          <div class="status">Gata de conectare</div>
+        </div>
+        <div class="pane">
+          <div class="k">Controlează un dispozitiv</div>
+          <div class="field">ID partener</div>
+          <span class="go">CONECTEAZĂ</span>
+          <div class="k" style="margin-top:16px">Recente</div>
+          <div class="field" style="margin-bottom:0">Birou contabilitate · online</div>
+        </div>
+      </div>
+    </div>
+    <div class="float f1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Conexiune criptată</div>
+    <div class="float f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg>Server în România</div>
   </div>
 </div></section>
 
-<section class="block" id="descarcari"><div class="wrap">
-  <h2>Descărcări</h2>
-  <p class="sub" id="dl-sub">Alege sistemul tău de operare.</p>
+<section class="block soft" id="functii"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Funcții</div>
+    <h2 class="cond">Tot ce îți trebuie pentru asistență IT la distanță</h2>
+    <p>O alternativă românească la AnyDesk și TeamViewer, găzduită pe infrastructura proprie RDN Network Data.</p>
+  </div>
+  <div class="features">
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><h3>Control complet de la distanță</h3><p>Vezi ecranul și lucrezi cu mouse-ul și tastatura ca și cum ai fi în fața calculatorului, inclusiv pe mai multe monitoare.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 11v6M9 14l3 3 3-3"/></svg></div><h3>Transfer de fișiere</h3><p>Copiezi fișiere și foldere între calculatoare, în ambele sensuri, direct din sesiune.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>Acces nesupravegheat</h3><p>Te conectezi oricând la serverele și calculatoarele tale, cu o parolă permanentă, fără să fie cineva la ele.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></div><h3>De pe telefon</h3><p>Controlezi calculatorul de pe Android, iPhone sau iPad, iar telefoanele Android pot fi asistate de la distanță.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><h3>Rapid, fără limită impusă</h3><p>Conexiune directă între dispozitive ori de câte ori se poate. Nu limităm viteza: imaginea e cât de fluidă permite internetul tău.</p></div>
+    <div class="feat"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><h3>Chat și suport în română</h3><p>Discuți cu persoana asistată direct în sesiune, iar echipa RDN Network Data te ajută în limba română.</p></div>
+  </div>
+</div></section>
+
+<section class="block" id="preturi"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Prețuri</div>
+    <h2 class="cond">Alege pachetul potrivit</h2>
+    <p>Abonament lunar, fără costuri ascunse. Primești codul de licență imediat după comandă.</p>
+  </div>
+  <div class="plans">
+    <div class="plan">
+      <div class="ph"><div class="name cond">Standard</div><div class="for">Pentru freelanceri și firme mici</div></div>
+      <div class="price"><b>10</b><span>€</span><small>/lună</small></div>
+      <ul>
+        <li>1 conexiune simultană, până la 20 la cerere</li>
+        <li>500 de dispozitive cu acces nesupravegheat</li>
+        <li>Sesiuni interactive nelimitate</li>
+        <li>Transfer de fișiere și înregistrarea sesiunilor</li>
+        <li>Mod privat și mai multe monitoare</li>
+        <li>Actualizări automate cât ține abonamentul</li>
+      </ul>
+      <div class="pf"><a class="btn-red" href="mailto:office@rdndata.ro?subject=Comand%C4%83%20RDN%20Remote%20Standard">Comandă</a></div>
+    </div>
+    <div class="plan pop">
+      <div class="ph"><span class="badge">Recomandat pentru firme</span><div class="name cond">Advanced</div><div class="for">Pentru echipe IT și companii</div></div>
+      <div class="price"><b>50</b><span>€</span><small>/lună</small></div>
+      <ul>
+        <li>5 utilizatori incluși, oricâți în plus</li>
+        <li>2.000 de dispozitive cu acces nesupravegheat</li>
+        <li>Autentificare unică (SSO) și spațiu de nume propriu</li>
+        <li>În cloud sau pe serverele firmei tale</li>
+        <li>Integrare cu CRM și cu sistemul de tichete</li>
+        <li>Echipă de suport dedicată, plus tot din Standard</li>
+      </ul>
+      <div class="pf"><a class="btn-red" href="mailto:office@rdndata.ro?subject=Comand%C4%83%20RDN%20Remote%20Advanced">Comandă</a></div>
+    </div>
+  </div>
+  <p class="plans-note">Ai nevoie de altceva? <a href="#contact">Contactează-ne</a> pentru o ofertă personalizată.</p>
+</div></section>
+
+<section class="block soft" id="descarcari"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Descărcare</div>
+    <h2 class="cond">Descarcă RDN Remote</h2>
+    <p id="dl-sub">Alege sistemul tău de operare.</p>
+  </div>
   <div class="grid" id="grid"></div>
-  <p class="ios">iPhone și iPad: aplicația poate doar controla alte dispozitive (iOS nu permite controlul de la distanță al telefonului). Disponibilă la cerere.</p>
+  <p class="ios">iPhone și iPad: aplicația poate controla alte dispozitive (iOS nu permite controlul de la distanță al telefonului). Disponibilă la cerere.</p>
   <details class="sums" id="sums" hidden><summary>Verificare integritate (SHA-256)</summary><table id="sums-t"></table></details>
 </div></section>
 
-<section class="block soft" id="cum"><div class="wrap">
-  <h2>Cum funcționează</h2>
-  <p class="sub">Fără cont, fără configurare. Aplicația se conectează automat la serverul RDN Network Data.</p>
+<section class="block" id="cum"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Cum funcționează</div>
+    <h2 class="cond">Conectat în mai puțin de un minut</h2>
+    <p>Fără configurări complicate: aplicația se conectează automat la serverul RDN Network Data.</p>
+  </div>
   <div class="steps">
-    <div class="step"><div class="n">1</div><h3>Instalezi aplicația</h3><p>Pe Windows rulezi fișierul descărcat; la prima pornire introduci <strong>codul de licență</strong> primit de la RDN Network Data. Pe Mac o tragi în Applications și permiți „Înregistrare ecran” și „Accesibilitate”.</p></div>
-    <div class="step"><div class="n">2</div><h3>Ne dai ID-ul și parola</h3><p>Aplicația afișează un ID și o parolă unică. Le comunici doar tehnicianului RDN cu care vorbești deja, la telefon sau pe e-mail.</p></div>
-    <div class="step"><div class="n">3</div><h3>Te ajutăm pe loc</h3><p>Vezi în timp real tot ce face tehnicianul. Când ați terminat, închizi aplicația; parola unică expiră și nu mai poate fi folosită.</p></div>
+    <div class="step"><h3>Instalezi aplicația</h3><p>Descarci RDN Remote pentru sistemul tău și introduci <strong>codul de licență</strong> la prima pornire. Pe Mac permiți „Înregistrare ecran” și „Accesibilitate”.</p></div>
+    <div class="step"><h3>Te conectezi</h3><p>Introduci ID-ul dispozitivului la care vrei să ajungi. Persoana de acolo îți comunică ID-ul și parola unică afișate în aplicație, sau folosești parola permanentă setată de tine.</p></div>
+    <div class="step"><h3>Lucrezi ca la birou</h3><p>Controlezi ecranul, muți fișiere și discuți prin chat. La final închizi sesiunea, iar parola unică expiră.</p></div>
   </div>
 </div></section>
 
-<section class="block" id="siguranta"><div class="wrap">
-  <h2>Siguranță</h2>
-  <p class="sub">Construită pe tehnologia open-source RustDesk, găzduită pe infrastructura proprie RDN Network Data.</p>
+<section class="block dark" id="siguranta"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Siguranță</div>
+    <h2 class="cond">Datele tale rămân ale tale</h2>
+    <p>Construit pe tehnologia open-source RustDesk și găzduit pe infrastructura proprie RDN Network Data.</p>
+  </div>
   <div class="safety">
-    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><h3>Criptare end-to-end</h3><p>Imaginea, tastatura și fișierele sunt criptate între cele două calculatoare. Nici serverul nu le poate vedea.</p></div></div>
-    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><div><h3>Tu ai controlul</h3><p>Vezi tot ce se întâmplă pe ecran și poți închide conexiunea oricând, dintr-un singur click.</p></div></div>
+    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><h3>Criptare end-to-end</h3><p>Imaginea, tastatura și fișierele sunt criptate între cele două dispozitive. Nici serverul nu le poate vedea.</p></div></div>
     <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/><path d="m9 12 2 2 4-4"/></svg><div><h3>Server propriu, în România</h3><p>Conexiunile trec prin serverul RDN Network Data, nu prin servere străine. Accesul este jurnalizat și monitorizat.</p></div></div>
+    <div class="point"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m4.9 4.9 14.2 14.2"/></svg><div><h3>Protecție împotriva atacurilor</h3><p>Încercările repetate de ghicire a parolei sunt blocate automat, iar adresele suspecte pot fi blocate pe server.</p></div></div>
     <div class="point warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><div><h3>Atenție la înșelătorii</h3><p>Nu da niciodată ID-ul și parola cuiva care te sună nesolicitat. RDN Network Data nu îți cere acces fără ca tu să ne fi contactat.</p></div></div>
   </div>
 </div></section>
 
-<section class="block soft" id="contact" hidden><div class="wrap">
-  <h2>Contact</h2>
-  <p class="sub" id="hours"></p>
-  <div class="contact" id="contact-list"></div>
+<section class="block soft" id="intrebari"><div class="wrap">
+  <div class="head-c">
+    <div class="kicker">Întrebări frecvente</div>
+    <h2 class="cond">Ce trebuie să știi despre RDN Remote</h2>
+  </div>
+  <div class="faq">
+    <details open><summary>Ce este RDN Remote?</summary><p>RDN Remote este un program de control la distanță prin care te conectezi la calculatoare și telefoane de oriunde, pentru asistență IT, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile trec prin serverele RDN Network Data din România.</p></details>
+    <details><summary>Este RDN Remote o alternativă la AnyDesk sau TeamViewer?</summary><p>Da. Oferă control complet de la distanță, transfer de fișiere și acces nesupravegheat, cu diferența că datele trec prin serverul nostru din România, nu prin servere străine, iar suportul este în limba română.</p></details>
+    <details><summary>Este sigur?</summary><p>Conexiunile sunt criptate de la un capăt la altul între cele două dispozitive. Serverul doar le pune în legătură și nu poate vedea imaginea, tastatura sau fișierele. Încercările repetate de ghicire a parolei sunt blocate automat.</p></details>
+    <details><summary>Pe ce sisteme funcționează?</summary><p>Pe Windows, macOS, Linux și Android. De pe iPhone și iPad poți controla alte dispozitive, dar acestea nu pot fi controlate, din cauza unei limitări impuse de Apple.</p></details>
+    <details><summary>Cum activez licența?</summary><p>După comandă primești un cod de licență. Instalezi aplicația, introduci codul la prima pornire și poți începe imediat. Fiecare dispozitiv pe care instalezi aplicația ocupă un loc din licență.</p></details>
+    <details><summary>Există limită de viteză?</summary><p>Nu impunem o limită de viteză: calitatea imaginii depinde de conexiunea la internet a dispozitivelor. La cerere, putem limita banda folosită de fiecare client.</p></details>
+  </div>
 </div></section>
 
-<footer><div class="wrap">
-  <span><span id="copy">© RDN Network Data</span> · <a href="confidentialitate.html">Politica de confidențialitate</a></span>
-  <span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0) · <a id="src" href="#" rel="noopener">Cod sursă</a></span>
-</div></footer>
+<section class="block" id="contact"><div class="wrap">
+  <div class="cta-band">
+    <div><h2 class="cond">Ai nevoie de ajutor sau de o ofertă?</h2><p id="hours">Echipa RDN Network Data îți răspunde în limba română.</p></div>
+    <div class="contact" id="contact-list"></div>
+  </div>
+</div></section>
+</main>
+
+<footer class="rdn-footer" id="site-footer"></footer>
+<script src="footer.js" defer></script>
 
 <script>
 (function () {
@@ -263,8 +525,6 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       } else {
         document.getElementById("nav-contact").remove();
       }
-      if (site.source_url) document.getElementById("src").href = site.source_url;
-      document.getElementById("copy").textContent = "© " + new Date().getFullYear() + " " + (site.company || "RDN Network Data");
     }
   }
 
@@ -272,6 +532,27 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     return fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
   }
   Promise.all([get("files/downloads.json"), get("site.json")]).then(function (r) { render(r[0], r[1]); });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  var nav = document.getElementById("nav"), btn = document.getElementById("menu-btn");
+  btn.addEventListener("click", function () {
+    var open = nav.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  nav.addEventListener("click", function (e) { if (e.target.closest("a")) { nav.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); } });
+  if (!("IntersectionObserver" in window)) return;
+  var links = {};
+  nav.querySelectorAll('a[href^="#"]').forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting || !links[en.target.id]) return;
+      Object.keys(links).forEach(function (k) { links[k].classList.toggle("on", k === en.target.id); });
+    });
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  Object.keys(links).forEach(function (id) { var s = document.getElementById(id); if (s) io.observe(s); });
 })();
 </script>
 </body>

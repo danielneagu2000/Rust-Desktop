@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /files/
+
+Sitemap: https://remote.rdndata.ro/sitemap.xml

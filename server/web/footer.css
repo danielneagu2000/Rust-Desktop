@@ -1,0 +1,49 @@
+/* Footer comun (index.html, confidentialitate.html); conținutul vine din site.json, vezi footer.js. */
+.rdn-footer { margin-top: 0; font-family: inherit; }
+.rdn-footer a { color: inherit; text-decoration: none; }
+.rdn-footer a:hover { text-decoration: underline; }
+.rdn-footer .ft-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+.rdn-footer .ft-top { background: #f5f5f6; border-top: 1px solid #e7e3e4; color: #2b2326; }
+.rdn-footer .ft-menu { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 16px 0 14px; border-bottom: 1px solid #e3dfe0;
+  font-size: 15px; }
+.rdn-footer .ft-info { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px 28px; padding: 18px 0 20px; }
+.rdn-footer .ft-contacts { display: flex; flex-wrap: wrap; gap: 14px 34px; }
+.rdn-footer .ft-item { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.rdn-footer .ft-item svg { width: 13px; height: 13px; flex: none; margin-top: 3px; color: #d32030; }
+.rdn-footer .ft-label { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6b5f63; }
+.rdn-footer .ft-value { font-size: 15.5px; color: #1d0a0d; }
+
+.rdn-footer .ft-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rdn-footer .ft-badge { display: flex; align-items: stretch; width: 225px; min-height: 60px; background: #fff; border-radius: 6px;
+  overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.rdn-footer .ft-badge .flag { width: 48px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; background: #1f3c8f; color: #fff; font-size: 10px; font-weight: 700; }
+.rdn-footer .ft-badge .flag svg { width: 24px; height: 16px; }
+.rdn-footer .ft-badge .txt { display: flex; flex-direction: column; justify-content: center; padding: 6px 10px; color: #3b2fa8;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; text-align: center; line-height: 1.35; }
+.rdn-footer .ft-badge:hover { text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.rdn-footer .ft-fb { display: inline-flex; align-items: center; gap: 8px; padding: 0 24px; height: 40px; border-radius: 999px;
+  background: #b3121f; color: #fff; font-weight: 700; font-size: 16px; }
+.rdn-footer .ft-fb:hover { background: #8f0e19; text-decoration: none; }
+.rdn-footer .ft-fb svg { width: 16px; height: 16px; }
+
+.rdn-footer .ft-bottom { background: #170809; color: #b9aeb0; font-size: 13px; }
+.rdn-footer .ft-clock { text-align: center; padding: 12px 0; border-bottom: 1px solid #2b1b1d; color: #d9d0d2; font-weight: 600; font-size: 14px; }
+.rdn-footer .ft-legal { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 16px 0 18px; }
+.rdn-footer .ft-legal { flex-wrap: nowrap; }
+.rdn-footer .ft-legal .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; flex: 1 1 auto; min-width: 0; }
+.rdn-footer .ft-legal .sep { opacity: .45; }
+.rdn-footer .ft-legal b { color: #fff; font-weight: 600; }
+.rdn-footer .ft-legal a:hover { color: #fff; }
+.rdn-footer .ft-logo { width: 48px; height: 48px; border-radius: 50%; background: #fff; border: 2px solid #c8102e; display: flex;
+  align-items: center; justify-content: center; flex: none; }
+.rdn-footer .ft-logo img { width: 34px; height: auto; }
+.rdn-footer .ft-attr { padding: 0 0 18px; font-size: 12px; color: #8e8285; }
+.rdn-footer .ft-attr a { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .rdn-footer .ft-menu { font-size: 14px; gap: 6px 14px; }
+  .rdn-footer .ft-info, .rdn-footer .ft-legal { flex-direction: column; align-items: flex-start; }
+  .rdn-footer .ft-badge { width: 100%; max-width: 320px; }
+}

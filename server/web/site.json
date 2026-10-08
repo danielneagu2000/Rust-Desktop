@@ -9,5 +9,114 @@
   "email": "office@rdndata.ro",
   "hours": "",
   "source_url": "https://github.com/danielneagu2000/Rust-Desktop",
-  "privacy_updated": "2026-10-01"
+  "privacy_updated": "2026-10-01",
+  "footer": {
+    "home_url": "https://rdndata.ro/",
+    "since": "2018",
+    "menu": [
+      {
+        "text": "Web Design",
+        "url": "https://rdndata.ro/web-design/"
+      },
+      {
+        "text": "Promovare website",
+        "url": "https://rdndata.ro/promovare-website/"
+      },
+      {
+        "text": "Mentenanță website",
+        "url": "https://rdndata.ro/mentenanta-website/"
+      },
+      {
+        "text": "Găzduire Web",
+        "url": "https://rdndata.ro/gazduire-web/"
+      },
+      {
+        "text": "Externalizare IT",
+        "url": "https://rdndata.ro/externalizare-it/"
+      },
+      {
+        "text": "RDN Remote",
+        "url": "https://remote.rdndata.ro/"
+      },
+      {
+        "text": "Colocare",
+        "url": "https://rdndata.ro/colocare/"
+      },
+      {
+        "text": "Certificate SSL",
+        "url": "https://rdndata.ro/certificate-ssl/"
+      },
+      {
+        "text": "Migrare WordPress",
+        "url": "https://rdndata.ro/migrare-wordpress/"
+      },
+      {
+        "text": "Portofoliu",
+        "url": "https://rdndata.ro/portofoliu/"
+      },
+      {
+        "text": "Blog",
+        "url": "https://rdndata.ro/blog/"
+      },
+      {
+        "text": "Contact",
+        "url": "https://rdndata.ro/contact/"
+      },
+      {
+        "text": "Hartă site",
+        "url": "https://rdndata.ro/harta-site/"
+      },
+      {
+        "text": "Shop",
+        "url": "https://rdndata.ro/shop/"
+      },
+      {
+        "text": "Autentificare",
+        "url": "https://rdndata.ro/contul-meu/"
+      },
+      {
+        "text": "Coșul meu",
+        "url": "https://rdndata.ro/cos/"
+      }
+    ],
+    "offices": [
+      {
+        "label": "Sediu București",
+        "address": "Drumul Timonierului, nr. 0, Sector 6"
+      },
+      {
+        "label": "Sediu Ilfov",
+        "address": "Vlad Țepeș, nr. 151, Chiajna"
+      },
+      {
+        "label": "Sediu Prahova",
+        "address": "Principală, nr. 101, Plopu"
+      }
+    ],
+    "anpc_sal_url": "https://anpc.ro/ce-este-sal/",
+    "sol_url": "https://ec.europa.eu/consumers/odr",
+    "facebook_url": "",
+    "legal": [
+      {
+        "text": "Termeni și Condiții",
+        "url": "https://rdndata.ro/termeni-si-conditii/"
+      },
+      {
+        "text": "Politica GDPR și Cookie-uri",
+        "url": "https://rdndata.ro/politica-gdpr-si-cookie-uri/"
+      },
+      {
+        "text": "Sitemap",
+        "url": "https://rdndata.ro/sitemap.xml"
+      },
+      {
+        "text": "Robots",
+        "url": "https://rdndata.ro/robots.txt"
+      },
+      {
+        "text": "Schema Markup",
+        "url": "https://rdndata.ro/schema-markup/"
+      }
+    ]
+  }
 }

@@ -7,6 +7,7 @@
 <meta name="description" content="Ce date prelucrează RDN Network Data prin aplicația RDN Remote, de ce, cât timp și ce drepturi ai.">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="footer.css">
 <style>
 :root { --ink: #1d0a0d; --text: #2b2326; --muted: #6b5f63; --line: #eadfe1; --soft: #faf5f6; --brand: #b3122b; color-scheme: light; }
 * { box-sizing: border-box; }
@@ -32,7 +33,6 @@ table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 10px 0;
 th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 9px 10px; vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .scroll { overflow-x: auto; }
-footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }
 @media (max-width: 640px) { .wrap { padding: 0 16px; } .hero h1 { font-size: 27px; } .box dl { grid-template-columns: 1fr; gap: 0 0; } .box dd { margin-bottom: 8px; } }
 </style>
 </head>
@@ -116,7 +116,8 @@ footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13p
   <p>Putem actualiza această politică atunci când se schimbă serviciul sau legislația. Versiunea în vigoare este întotdeauna cea de pe această pagină, cu data ultimei actualizări de mai sus.</p>
 </div></main>
 
-<footer><div class="wrap"><span data-f="copyright"></span></div></footer>
+<footer class="rdn-footer" id="site-footer"></footer>
+<script src="footer.js" defer></script>
 
 <script>
 (function () {
