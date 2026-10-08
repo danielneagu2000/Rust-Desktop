@@ -139,7 +139,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=$SERVER_DIR/auto_update.sh
+# Prin bash: SELinux nu lasă systemd să execute direct un script din /root (203/EXEC).
+ExecStart=/bin/bash $SERVER_DIR/auto_update.sh
 EOF
 cat > /etc/systemd/system/rdn-update.timer <<EOF
 [Unit]
