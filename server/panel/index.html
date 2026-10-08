@@ -27,7 +27,7 @@ header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify
 h1 { font-size: 18px; margin: 0; }
 .sub { color: var(--muted); font-size: 12px; }
 .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-input[type=search], input[type=text], input[type=number] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+input[type=search], input[type=text], input[type=number], input[type=password] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--bg); color: var(--text); font: inherit; min-width: 0; }
 input[type=search] { width: 260px; max-width: 60vw; }
 button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
@@ -94,6 +94,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="devices">Dispozitive</button>
     <button data-tab="licenses">Licențe</button>
     <button data-tab="reports">Rapoarte</button>
+    <button data-tab="shop">Shop</button>
     <button data-tab="backup">Backup</button>
   </nav>
 
@@ -133,6 +134,9 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
             <td><input type="number" min="1" max="10080" id="lock-panel-minutes" required style="width:130px"></td></tr>
           <tr><td>Autentificare în portalul clienților</td><td><input type="number" min="1" max="1000" id="lock-portal-fails" required style="width:110px"></td>
             <td><input type="number" min="1" max="10080" id="lock-portal-minutes" required style="width:130px"></td></tr>
+          <tr><td>Parole greșite la conectare (pe calculatoare)<div class="sub">0 = regulile aplicației: 6 într-un minut → 1 minut, 30 → până la repornire</div></td>
+            <td><input type="number" min="0" max="1000" id="lock-app-fails" required style="width:110px"></td>
+            <td><input type="number" min="0" max="10080" id="lock-app-minutes" required style="width:130px"></td></tr>
           <tr><td>Coduri de licență greșite (în aplicație)</td><td><input type="number" min="1" max="1000" id="lock-activation-fails" required style="width:110px"></td>
             <td><input type="number" min="1" max="10080" id="lock-activation-minutes" required style="width:130px"></td></tr>
         </tbody></table></div>
@@ -144,7 +148,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     </div>
     <div class="card">
       <h2>Blocate automat de calculatoare (anti brute-force)</h2>
-      <p class="hint">Raportate de calculatoarele controlate: după 6 parole greșite într-un minut IP-ul e blocat 1 minut; după 30 e blocat până la repornirea aplicației.</p>
+      <p class="hint">Raportate de calculatoarele controlate. Regulile se setează mai sus, la „Parole greșite la conectare”; implicit, după 6 parole greșite într-un minut IP-ul e blocat 1 minut, iar după 30 până la repornirea aplicației.</p>
       <div class="scroll"><table><thead><tr><th>IP</th><th>Motiv</th><th>Stare</th><th class="num">De câte ori</th><th>Calculatoare</th><th>Ultima dată</th><th></th></tr></thead><tbody id="t-clientblocks"></tbody></table></div>
     </div>
   </section>
@@ -181,6 +185,39 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <div class="card">
       <h2>Licențe</h2>
       <div class="scroll"><table><thead><tr><th>Cod</th><th>Client</th><th>Stare</th><th class="num">Calculatoare</th><th>Perioadă</th><th>Activată</th><th>Expiră</th><th>Prelungește</th><th class="num">Conexiuni</th><th>Bandă</th><th></th></tr></thead><tbody id="t-licenses"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="shop">
+    <div class="card">
+      <h2>Legătura cu shopul</h2>
+      <p class="hint">La o comandă plătită (În procesare / Finalizată) panoul creează licența, sau o prelungește pe cea pe care clientul o are deja pentru același produs (codul rămâne același), și trimite codul clientului ca notă la comandă, pe e-mail. În WooCommerce → Setări → Avansat → Webhook-uri adaugă: subiect <b>Comandă actualizată</b>, URL de livrare <span class="mono" id="shop-hook"></span>, cheie secretă de mai jos.</p>
+      <form class="add" id="shop-secret-form">
+        <input type="text" id="shop-secret" placeholder="Cheie secretă (minim 24 de caractere; gol = generează)" style="width:380px" autocomplete="off">
+        <button class="primary" type="submit">Salvează cheia</button>
+        <span class="sub" id="shop-secret-state"></span>
+      </form>
+      <div id="shop-secret-new"></div>
+      <form class="add" id="shop-api-form">
+        <input type="text" id="shop-url" placeholder="https://shop.rdndata.ro" style="width:230px">
+        <input type="text" id="shop-ck" placeholder="Cheie client (ck_...)" style="width:220px" autocomplete="off">
+        <input type="password" id="shop-cs" placeholder="Secret client (cs_...)" style="width:220px" autocomplete="off">
+        <button class="primary" type="submit">Salvează</button>
+        <span class="sub" id="shop-api-state"></span>
+      </form>
+      <p class="hint">Cheile REST API (WooCommerce → Setări → Avansat → REST API, permisiune <b>Citire/Scriere</b>) servesc doar la trimiterea notei cu codul. Fără ele, codurile apar mai jos și le trimiți tu.</p>
+    </div>
+    <div class="card">
+      <h2>Produse</h2>
+      <p class="hint">Ce primește fiecare produs din shop. Perioada se ia din variația comandată („Perioadă Abonament”); cantitatea înmulțește conexiunile simultane.</p>
+      <form id="shop-products-form">
+        <div class="scroll"><table><thead><tr><th>ID produs</th><th>Nume</th><th class="num">Calculatoare</th><th class="num">Conexiuni simultane</th><th class="num">Bandă Mbit/s (0 = nelimitat)</th></tr></thead><tbody id="t-shop-products"></tbody></table></div>
+        <div style="padding:10px 16px"><button class="primary" type="submit">Salvează produsele</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Comenzi</h2>
+      <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Stare</th><th>Licențe</th><th>Cod trimis</th><th>Actualizată</th><th></th></tr></thead><tbody id="t-shop-orders"></tbody></table></div>
     </div>
   </section>
 
@@ -327,6 +364,30 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(when(r.added)) + "</td><td>" + esc(r.note) +
         "</td><td>" + blockBtn(r.ip, true) + "</td></tr>";
     }, 4);
+    var sh = data.shop, prodForm = document.getElementById("shop-products-form");
+    document.getElementById("shop-hook").textContent = location.origin + base + "shop/webhook";
+    document.getElementById("shop-secret-state").innerHTML = sh.secret_set ? pill("cheie setată", "ok") : pill("fără cheie: legătura e oprită", "warn");
+    document.getElementById("shop-api-state").innerHTML = sh.api_set ? pill("chei REST setate", "ok") : pill("fără chei REST", "warn");
+    if (!document.getElementById("shop-url").value) document.getElementById("shop-url").value = sh.url;
+    if (!prodForm.dataset.dirty) {
+      var ids = Object.keys(sh.products);
+      while (ids.length < 3) ids.push("");
+      document.getElementById("t-shop-products").innerHTML = ids.map(function (id) {
+        var pr = sh.products[id] || { name: "", seats: "", sessions: "", mbps: "" };
+        return '<tr data-prod><td><input type="number" min="1" name="id" value="' + esc(id) + '" style="width:100px"></td>' +
+          '<td><input type="text" name="name" value="' + esc(pr.name) + '" style="width:140px"></td>' +
+          '<td class="num"><input type="number" min="1" max="10000" name="seats" value="' + esc(pr.seats) + '" style="width:100px"></td>' +
+          '<td class="num"><input type="number" min="0" max="1000" name="sessions" value="' + esc(pr.sessions) + '" style="width:100px"></td>' +
+          '<td class="num"><input type="number" min="0" max="10000" step="0.5" name="mbps" value="' + esc(pr.mbps) + '" style="width:100px"></td></tr>';
+      }).join("");
+    }
+    rows("t-shop-orders", sh.orders, function (o) {
+      return '<tr><td class="mono">#' + o.order_id + "</td><td>" + esc(o.client || "") + '<div class="sub">' + esc(o.email || "") + "</div></td><td>" +
+        esc(({ processing: "În procesare", completed: "Finalizată", "on-hold": "În așteptare", pending: "Neplătită",
+        cancelled: "Anulată", refunded: "Rambursată", failed: "Eșuată" })[o.status] || o.status || "") + '</td><td class="mono">' + esc(o.codes || "—") + (o.error ? '<div class="sub" style="color:var(--bad);white-space:normal;max-width:320px">' + esc(o.error) + "</div>" : "") +
+        "</td><td>" + (o.codes ? (o.note_sent ? pill("da", "ok") : pill("nu", "warn")) : "—") + "</td><td>" + esc(when(o.updated)) + "</td><td>" +
+        (o.codes && !o.note_sent ? '<button class="small" data-resend="' + o.order_id + '">Trimite din nou</button>' : "") + "</td></tr>";
+    }, 7);
     var lk = data.lockouts, lockForm = document.getElementById("lock-form");
     if (!lockForm.dataset.dirty) {
       Object.keys(lk.settings).forEach(function (k) {
@@ -555,12 +616,46 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       load();
     }).catch(function (err) { toast("Eroare: " + err.message); });
   });
+  document.getElementById("shop-secret-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = document.getElementById("shop-secret").value.trim();
+    if (!v && !confirm("Generez o cheie nouă? Va trebui pusă și în webhook-ul din WooCommerce.")) return;
+    post("shop/secret", { secret: v }).then(function (r) {
+      document.getElementById("shop-secret").value = "";
+      document.getElementById("shop-secret-new").innerHTML = '<p class="hint">Cheia (copiaz-o acum în WooCommerce, nu se mai afișează): <span class="mono" style="user-select:all;font-weight:700">' + esc(r.secret) + "</span></p>";
+      load();
+    }).catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.getElementById("shop-api-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("shop/api", { url: document.getElementById("shop-url").value.trim(), ck: document.getElementById("shop-ck").value.trim(),
+                       cs: document.getElementById("shop-cs").value.trim() })
+      .then(function () { document.getElementById("shop-ck").value = ""; document.getElementById("shop-cs").value = ""; toast("Salvat"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  var prodForm = document.getElementById("shop-products-form");
+  prodForm.addEventListener("input", function () { prodForm.dataset.dirty = "1"; });
+  prodForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var list = [];
+    prodForm.querySelectorAll("tr[data-prod]").forEach(function (tr) {
+      var f = function (n) { return tr.querySelector('[name="' + n + '"]').value.trim(); };
+      if (f("id")) list.push({ id: f("id"), name: f("name"), seats: f("seats"), sessions: f("sessions"), mbps: f("mbps") });
+    });
+    post("shop/products", { products: list }).then(function () { delete prodForm.dataset.dirty; toast("Produse salvate"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.body.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-resend]"); if (!el) return;
+    post("shop/resend", { order_id: Number(el.dataset.resend) }).then(function () { toast("Nota a fost trimisă"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); load(); });
+  });
   var lockForm = document.getElementById("lock-form");
   lockForm.addEventListener("input", function () { lockForm.dataset.dirty = "1"; });
   lockForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var body = {};
-    ["panel", "portal", "activation"].forEach(function (k) {
+    ["panel", "portal", "activation", "app"].forEach(function (k) {
       body[k] = { fails: Number(document.getElementById("lock-" + k + "-fails").value),
                   minutes: Number(document.getElementById("lock-" + k + "-minutes").value) };
     });

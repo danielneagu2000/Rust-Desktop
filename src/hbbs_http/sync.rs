@@ -259,6 +259,7 @@ async fn start_hbbs_sync_async() {
                         crate::license::set_disconnect_reason(
                             rsp.remove("disconnect_reason").as_ref().and_then(|r| r.as_str()).unwrap_or_default(),
                         );
+                        crate::license::set_lockout(rsp.remove("lockout").as_ref());
                         if let Some(conns)  = rsp.remove("disconnect") {
                                 if let Ok(conns) = serde_json::from_value::<Vec<i32>>(conns) {
                                     SENDER.lock().unwrap().send(conns).ok();

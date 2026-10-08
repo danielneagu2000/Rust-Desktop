@@ -156,6 +156,24 @@ pub fn disconnect_reason() -> String {
     }
 }
 
+/// Wrong-password lockout set in the panel: (attempts, minutes). (0, 0) keeps RustDesk's own rules.
+static LOCKOUT: std::sync::Mutex<(i32, i32)> = std::sync::Mutex::new((0, 0));
+
+pub fn set_lockout(v: Option<&serde_json::Value>) {
+    let get = |i: usize| {
+        v.and_then(|v| v.get(i))
+            .and_then(|n| n.as_i64())
+            .unwrap_or(0)
+            .clamp(0, 10080) as i32
+    };
+    *LOCKOUT.lock().unwrap() = (get(0), get(1));
+}
+
+pub fn lockout() -> Option<(i32, i32)> {
+    let (attempts, minutes) = *LOCKOUT.lock().unwrap();
+    (attempts > 0 && minutes > 0).then_some((attempts, minutes))
+}
+
 /// Upper bound of one file transfer block (BUF_SIZE in base::fs), charged per block sent.
 pub const FILE_BLOCK: usize = 128 * 1024;
 

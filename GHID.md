@@ -133,6 +133,13 @@ Ce arată:
 autentificarea în panou, în portalul clienților și pentru codurile de licență greșite introduse în
 aplicație, după câte încercări se blochează o adresă IP și pentru câte minute (maxim 7 zile).
 Implicit: panou și portal 10 încercări / 15 minute, coduri de licență 20 / 60 de minute.
+
+Tot acolo, **Parole greșite la conectare (pe calculatoare)** stabilește blocarea făcută de aplicație
+când cineva greșește parola de acces la un calculator: după câte parole greșite de pe aceeași
+adresă și pentru câte minute. După expirare, o nouă parolă greșită blochează din nou. Cu 0 rămân
+regulile aplicației: 6 greșeli într-un minut înseamnă 1 minut de blocare, iar 30 înseamnă blocare
+până la repornirea aplicației. Calculatoarele primesc setarea în câteva secunde; necesită
+versiunea 1.5.0-3 sau mai nouă a aplicației.
 Schimbarea se aplică imediat. Dedesubt vezi adresele blocate acum și le poți debloca.
 
 ### Panoul pe internet, cu autentificare în doi pași
@@ -221,6 +228,32 @@ secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât
 
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
+
+## Legătura cu shopul (licențe automate)
+
+La o comandă plătită în shop.rdndata.ro, panoul creează singur licența. Dacă același client
+(același e-mail) are deja o licență pentru produsul respectiv, o prelungește, iar codul rămâne
+același. Codul ajunge la client ca notă la comandă, pe care WooCommerce o trimite pe e-mail.
+
+Configurare, o singură dată:
+
+1. Panou → tab-ul **Shop** → **Salvează cheia**: lasă câmpul gol ca să se genereze o cheie sau
+   scrie una de cel puțin 24 de caractere. Copiază cheia afișată.
+2. WooCommerce → Setări → Avansat → **Webhook-uri** → Adaugă webhook:
+   - nume: RDN Remote; stare: **Activ**; subiect: **Comandă actualizată**;
+   - URL de livrare: adresa afișată în panou, `https://panou.rdndata.ro/shop/webhook`;
+   - secret: cheia de la pasul 1.
+3. WooCommerce → Setări → Avansat → **REST API** → Adaugă cheie, permisiune **Citire/Scriere**.
+   Pune în panou cheia client (`ck_...`) și secretul client (`cs_...`). Fără ele, licențele se
+   creează, dar codul îl trimiți tu (îl vezi în lista **Comenzi**).
+4. Verifică la **Produse** ce primește fiecare produs: Standard (ID 176) și Advanced (ID 183),
+   adică numărul de calculatoare, conexiunile simultane și banda. Perioada se ia din variația
+   comandată („Perioadă Abonament”), iar cantitatea înmulțește conexiunile simultane.
+
+Licența se creează doar când comanda e **În procesare** sau **Finalizată**. Pentru transfer
+bancar, asta se întâmplă când marchezi plata. O comandă rambursată sau anulată nu revocă
+automat licența: o vezi în listă și o revoci tu, dacă e cazul. Webhook-ul fără semnătura
+corectă e refuzat.
 
 ## Raport pe client
 

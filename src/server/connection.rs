@@ -4504,6 +4504,24 @@ impl Connection {
             .copied()
             .unwrap_or((0, 0, 0));
 
+        // Limits set in the RDN panel replace the two built-in rules: after `attempts` wrong
+        // passwords the address waits `minutes` from its last wrong one.
+        if let Some((attempts, minutes)) = crate::license::lockout() {
+            let res = !(failure.2 >= attempts && time - failure.0 < minutes);
+            if !res {
+                self.send_login_error("Too many wrong attempts").await;
+                self.post_alarm_audit(
+                    AlarmAuditType::ExceedThirtyAttempts,
+                    json!({
+                                "ip": self.ip,
+                                "id": self.lr.my_id.clone(),
+                                "name": self.lr.my_name.clone(),
+                    }),
+                );
+            }
+            return ((failure, time), res);
+        }
+
         let res = if failure.2 > 30 {
             self.send_login_error("Too many wrong attempts").await;
             self.post_alarm_audit(

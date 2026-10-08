@@ -33,6 +33,7 @@ import sqlite3
 import sys
 import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -70,7 +71,7 @@ PRIMARY_AUTH = {1: "Acceptat manual", 2: "Parolă unică", 3: "Parolă permanent
 TWO_FACTOR = {1: "2FA (TOTP)", 2: "Dispozitiv de încredere"}
 ALARMS = {
     0: "Respins: IP-ul nu e în whitelist",
-    1: "Blocat: peste 30 de parole greșite",
+    1: "Blocat: prea multe parole greșite",
     2: "Blocat 1 min: peste 6 parole greșite/minut",
     6: "Blocat: prea multe încercări din același prefix IPv6",
     7: "Login OS terminal: întârziere după eșecuri",
@@ -160,6 +161,11 @@ def init_db():
             activated REAL, last_seen REAL,
             alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1
         );
+        CREATE TABLE IF NOT EXISTS shop_orders (
+            order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, message TEXT,
+            note_sent INTEGER DEFAULT 0, error TEXT, created REAL, updated REAL
+        );
+        CREATE TABLE IF NOT EXISTS shop_licenses (code TEXT PRIMARY KEY, email TEXT, product TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS portal_users (
             id INTEGER PRIMARY KEY, code TEXT, email TEXT UNIQUE, name TEXT, pw_hash TEXT,
             role TEXT DEFAULT 'admin', created REAL, last_login REAL
@@ -620,6 +626,8 @@ def heartbeat(v, src_ip):
         (uuid, as_text(v.get("id"), 40), time.time(), src_ip, as_int(v.get("ver")), json.dumps(conns)),
     )
     out = {}
+    app_fails, app_seconds = lockout("app")
+    out["lockout"] = [app_fails, app_seconds // 60]
     pending = q("SELECT conn_id FROM pending_disconnect WHERE uuid=?", (uuid,))
     if pending:
         out["disconnect"] = [p["conn_id"] for p in pending]
@@ -730,20 +738,23 @@ AUTH_FAILS = {}
 AUTH_LOCK = threading.Lock()
 # Lockouts after wrong attempts, per address: (attempts, minutes). Changed from the panel
 # ("IP-uri blocate" tab) and kept in the settings table.
-LOCKOUT_DEFAULTS = {"panel": (10, 15), "portal": (10, 15), "activation": (20, 60)}
+# "app" is the wrong-password lockout on the computers themselves; (0, 0) keeps RustDesk's rules
+# (6 in a minute -> 1 minute, 30 -> until the app restarts).
+LOCKOUT_DEFAULTS = {"panel": (10, 15), "portal": (10, 15), "activation": (20, 60), "app": (0, 0)}
 LOCKOUT_MAX_MINUTES = 7 * 24 * 60
 
 
 def lockout(kind):
     """(max attempts, lock seconds) for the panel, the portal or license activation."""
     fails, minutes = LOCKOUT_DEFAULTS[kind]
+    low = 0 if kind == "app" else 1
     for r in q("SELECT key, value FROM settings WHERE key IN (?, ?)", (f"lock_{kind}_fails", f"lock_{kind}_minutes")):
         value = as_int(r["value"])
         if value is None:
             continue
-        if r["key"].endswith("_fails") and 1 <= value <= 1000:
+        if r["key"].endswith("_fails") and low <= value <= 1000:
             fails = value
-        elif r["key"].endswith("_minutes") and 1 <= value <= LOCKOUT_MAX_MINUTES:
+        elif r["key"].endswith("_minutes") and low <= value <= LOCKOUT_MAX_MINUTES:
             minutes = value
     return fails, minutes * 60
 
@@ -784,9 +795,12 @@ def lockout_action(action, v):
         for kind in LOCKOUT_DEFAULTS:
             cfg = v.get(kind) if isinstance(v.get(kind), dict) else {}
             fails, minutes = as_int(cfg.get("fails")), as_int(cfg.get("minutes"))
-            if fails is None or not 1 <= fails <= 1000:
+            if kind == "app" and (not fails or not minutes):
+                fails = minutes = 0  # the app's own rules
+            low = 0 if kind == "app" else 1
+            if fails is None or not low <= fails <= 1000:
                 return 400, {"error": "Numărul de încercări trebuie să fie între 1 și 1000"}
-            if minutes is None or not 1 <= minutes <= LOCKOUT_MAX_MINUTES:
+            if minutes is None or not low <= minutes <= LOCKOUT_MAX_MINUTES:
                 return 400, {"error": f"Durata blocării trebuie să fie între 1 și {LOCKOUT_MAX_MINUTES} minute (7 zile)"}
             rows += [(f"lock_{kind}_fails", str(fails)), (f"lock_{kind}_minutes", str(minutes))]
         for row in rows:
@@ -906,6 +920,7 @@ def state(search):
     for a in alarms:
         a["label"] = ALARMS.get(a["typ"], f"Alarmă {a['typ']}")
 
+    app_lock = lockout("app")[1]
     client_blocks = q(
         f"""SELECT a.ip, a.typ, MAX(a.ts) AS last, COUNT(*) AS n, GROUP_CONCAT(DISTINCT a.device_id) AS devices
             FROM alarms a WHERE a.typ IN ({",".join("?" * len(BLOCKING_ALARMS))}) AND a.ts > ? AND a.ip IS NOT NULL
@@ -914,8 +929,11 @@ def state(search):
     )
     for b in client_blocks:
         b["label"] = ALARMS.get(b["typ"])
-        # typ 2 lifts after a minute; typ 1/6 last until the client app restarts.
+        # typ 2 lifts after a minute; typ 1/6 last until the client app restarts, or for the
+        # minutes set in the panel.
         b["active"] = b["typ"] != 2 or now - b["last"] < 60
+        if b["typ"] == 1 and app_lock:
+            b["active"] = now - b["last"] < app_lock
 
     devices = q(
         """SELECT d.*, a.code AS lic_code, l.client AS lic_client, l.expires AS lic_expires,
@@ -972,6 +990,7 @@ def state(search):
         "client_blocks": client_blocks,
         "blocklist": sorted(blocked.values(), key=lambda r: -r["added"]),
         "lockouts": lockout_state(),
+        "shop": shop_state(),
         "devices": devices,
         "licenses": licenses,
         "licensing_ready": signing_seed() is not None,
@@ -1074,6 +1093,27 @@ class PanelHandler(BaseHTTPRequestHandler):
             ("Location", path[: -len("login")] or "/"),
             ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
         ])
+
+    def shop_webhook(self):
+        length = body_length(self.headers, SHOP_MAX_BODY)
+        if length is None:
+            return self.reply(413, {"error": "too large"})
+        body = self.rfile.read(length) if length else b""
+        secret = setting("shop_secret")
+        if len(secret) < SHOP_MIN_SECRET:
+            return self.reply(503, {"error": "shop not configured"})
+        expected = base64.b64encode(hmac.new(secret.encode(), body, hashlib.sha256).digest()).decode()
+        if not hmac.compare_digest(expected, self.headers.get("X-WC-Webhook-Signature", "")):
+            log(f"shop: webhook with a bad signature from {self.client_ip()}")
+            return self.reply(401, {"error": "bad signature"})
+        try:
+            order = json.loads(body)
+        except ValueError:
+            # WooCommerce's test delivery when the webhook is saved: "webhook_id=N".
+            return self.reply(200, {"ok": True})
+        if not isinstance(order, dict):
+            return self.reply(400, {"error": "bad json"})
+        return self.reply(200, {"ok": True, "result": shop_order(order)})
 
     # ------------------------------------------------------------ organization portal
 
@@ -1227,6 +1267,8 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.reply(200, INDEX_HTML, "text/html; charset=utf-8")
 
     def do_POST(self):
+        if urlparse(self.path).path.endswith("/shop/webhook"):
+            return self.shop_webhook()
         if self.portal():
             return
         if urlparse(self.path).path.endswith("/login"):
@@ -1282,6 +1324,8 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(*license_action(action[len("license/"):], v))
         if action.startswith("lockout/"):
             return self.reply(*lockout_action(action[len("lockout/"):], v))
+        if action.startswith("shop/"):
+            return self.reply(*shop_settings_action(action[len("shop/"):], v))
         if action == "backup/create":
             try:
                 path = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "manual")
@@ -1695,6 +1739,216 @@ def portal_login_page(error=""):
     if error:
         html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
     return html
+
+
+# ---------------------------------------------------------------- shop (WooCommerce)
+#
+# shop.rdndata.ro sends a webhook ("Order updated", signed with a secret of at least 24
+# characters) to /shop/webhook. A paid order creates a license per product, or extends the
+# license the same customer already has for that product (the code stays the same). With
+# WooCommerce REST API keys set, the code reaches the customer as a note on the order, which
+# WooCommerce e-mails; otherwise it waits in the panel's Shop tab.
+
+SHOP_LOCK = threading.Lock()
+SHOP_PAID = ("processing", "completed")
+SHOP_MIN_SECRET = 24
+SHOP_MAX_BODY = 1024 * 1024
+SHOP_DEFAULT_PRODUCTS = {
+    "176": {"name": "Standard", "seats": 500, "sessions": 1, "mbps": 0},
+    "183": {"name": "Advanced", "seats": 2000, "sessions": 5, "mbps": 0},
+}
+
+
+def setting(key, default=""):
+    rows = q("SELECT value FROM settings WHERE key = ?", (key,))
+    return rows[0]["value"] if rows else default
+
+
+def set_setting(key, value):
+    x("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", (key, value))
+
+
+def shop_products():
+    try:
+        products = json.loads(setting("shop_products", ""))
+        if isinstance(products, dict) and products:
+            return products
+    except ValueError:
+        pass
+    return SHOP_DEFAULT_PRODUCTS
+
+
+def server_host():
+    try:
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            if line.startswith("SERVER_HOST="):
+                return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
+
+
+def shop_state():
+    return {
+        "secret_set": len(setting("shop_secret")) >= SHOP_MIN_SECRET,
+        "url": setting("shop_url", "https://shop.rdndata.ro"),
+        "api_set": bool(setting("shop_ck") and setting("shop_cs")),
+        "products": shop_products(),
+        "orders": q("SELECT * FROM shop_orders ORDER BY updated DESC LIMIT 200"),
+    }
+
+
+def shop_settings_action(action, v):
+    if action == "secret":
+        secret = str(v.get("secret") or "").strip() or secrets.token_urlsafe(30)
+        if len(secret) < SHOP_MIN_SECRET or len(secret) > 200 or re.search(r"\s", secret):
+            return 400, {"error": f"Cheia trebuie să aibă cel puțin {SHOP_MIN_SECRET} de caractere, fără spații"}
+        set_setting("shop_secret", secret)
+        log("shop: webhook secret changed")
+        return 200, {"ok": True, "secret": secret}
+    if action == "api":
+        url = str(v.get("url") or "").strip().rstrip("/")
+        ck, cs = str(v.get("ck") or "").strip(), str(v.get("cs") or "").strip()
+        if not re.fullmatch(r"https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~/-]*)?", url):
+            return 400, {"error": "Adresa shopului trebuie să înceapă cu https://"}
+        if (ck or cs) and not (re.fullmatch(r"ck_[A-Za-z0-9]{20,100}", ck) and re.fullmatch(r"cs_[A-Za-z0-9]{20,100}", cs)):
+            return 400, {"error": "Cheile WooCommerce încep cu ck_ și cs_ (WooCommerce → Setări → Avansat → REST API)"}
+        set_setting("shop_url", url)
+        if ck:
+            set_setting("shop_ck", ck)
+            set_setting("shop_cs", cs)
+        elif v.get("clear"):
+            x("DELETE FROM settings WHERE key IN ('shop_ck', 'shop_cs')")
+        return 200, {"ok": True}
+    if action == "products":
+        products = {}
+        for row in v.get("products") or []:
+            pid = str(as_int(row.get("id")) or "")
+            seats, sessions = as_int(row.get("seats")), as_int(row.get("sessions"))
+            kbps = bandwidth_kbps(row.get("mbps"))
+            if not pid or not seats or not 1 <= seats <= 10000 or sessions is None or not 0 <= sessions <= 1000 or kbps is None:
+                return 400, {"error": "Verifică ID-ul produsului, calculatoarele (1–10000), conexiunile (0–1000) și banda"}
+            products[pid] = {"name": (as_text(row.get("name"), 40) or "").strip() or pid, "seats": seats,
+                             "sessions": sessions, "mbps": kbps / 1000}
+        if not products:
+            return 400, {"error": "Adaugă cel puțin un produs"}
+        set_setting("shop_products", json.dumps(products, ensure_ascii=False))
+        return 200, {"ok": True}
+    if action == "resend":
+        order = q("SELECT * FROM shop_orders WHERE order_id = ?", (as_int(v.get("order_id")),))
+        if not order or not order[0]["message"]:
+            return 404, {"error": "Comandă inexistentă"}
+        err = shop_send_note(order[0]["order_id"], order[0]["message"])
+        x("UPDATE shop_orders SET note_sent=?, error=?, updated=? WHERE order_id=?",
+          (0 if err else 1, err or "", time.time(), order[0]["order_id"]))
+        return (502, {"error": err}) if err else (200, {"ok": True})
+    return 404, {"error": "unknown action"}
+
+
+def shop_months(item):
+    texts = [str(m.get("value") or "") for m in item.get("meta_data") or [] if isinstance(m, dict)]
+    texts.append(str(item.get("name") or ""))
+    for t in texts:
+        m = re.search(r"(\d{1,2})\s*Lun", t, re.I)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def shop_send_note(order_id, text):
+    """Adds a customer note to the order (WooCommerce e-mails it); returns an error or None."""
+    ck, cs = setting("shop_ck"), setting("shop_cs")
+    if not (ck and cs):
+        return "Cheile REST API ale shopului nu sunt setate; trimite codul manual."
+    url = f"{setting('shop_url', 'https://shop.rdndata.ro')}/wp-json/wc/v3/orders/{int(order_id)}/notes"
+    req = urllib.request.Request(url, data=json.dumps({"note": text, "customer_note": True}).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "User-Agent": "rdn-panel",
+                                          "Authorization": "Basic " + base64.b64encode(f"{ck}:{cs}".encode()).decode()})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            r.read()
+        return None
+    except (OSError, ValueError) as e:
+        return f"Shopul nu a primit nota: {e}"[:300]
+
+
+def shop_order(order):
+    """Handles one order from the webhook; returns a short status for the log."""
+    order_id = as_int(order.get("id"))
+    status = as_text(order.get("status"), 30) or ""
+    if not order_id:
+        return "fără ID de comandă"
+    billing = order.get("billing") if isinstance(order.get("billing"), dict) else {}
+    email = (as_text(billing.get("email"), 254) or "").strip().lower()
+    name = " ".join(filter(None, [(as_text(billing.get("first_name"), 60) or "").strip(),
+                                   (as_text(billing.get("last_name"), 60) or "").strip()]))
+    client = (as_text(billing.get("company"), 100) or "").strip() or name or email or f"Comanda {order_id}"
+    now = time.time()
+    with SHOP_LOCK:
+        seen = q("SELECT * FROM shop_orders WHERE order_id = ?", (order_id,))
+        if seen and seen[0]["codes"]:
+            x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
+            if status in ("refunded", "cancelled") and seen[0]["status"] != status:
+                log(f"shop: order {order_id} is now {status}; its licenses {seen[0]['codes']} need a manual check")
+            return "deja procesată"
+        if not seen:
+            x("INSERT INTO shop_orders(order_id, status, email, client, created, updated) VALUES(?,?,?,?,?,?)",
+              (order_id, status, email, client, now, now))
+        else:
+            x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
+        if status not in SHOP_PAID:
+            return f"în așteptare ({status})"
+        products = shop_products()
+        codes, lines, errors = [], [], []
+        site = f"https://{server_host()}/" if server_host() else ""
+        for item in order.get("line_items") or []:
+            if not isinstance(item, dict):
+                continue
+            pid = str(as_int(item.get("product_id")) or "")
+            product = products.get(pid)
+            if not product:
+                continue
+            months, qty = shop_months(item), max(1, as_int(item.get("quantity")) or 1)
+            if months not in (1, 3, 6, 9, 12):
+                errors.append(f"perioadă necunoscută la {item.get('name')}")
+                continue
+            sessions = product["sessions"] * qty
+            prev = q("""SELECT l.* FROM shop_licenses s JOIN licenses l ON l.code = s.code
+                        WHERE s.email = ? AND s.product = ? AND l.revoked = 0 ORDER BY s.created DESC LIMIT 1""",
+                     (email, pid)) if email else []
+            if prev:
+                code = prev[0]["code"]
+                license_action("extend", {"code": code, "months": months})
+                if sessions and (prev[0]["sessions"] or 0) and sessions > prev[0]["sessions"]:
+                    x("UPDATE licenses SET sessions=? WHERE code=?", (sessions, code))
+                lines.append(f"Licența RDN Remote {product['name']} {code} a fost prelungită cu {months} "
+                             f"{'lună' if months == 1 else 'luni'}. Nu trebuie să faci nimic în aplicație.")
+            else:
+                st, out = license_action("create", {
+                    "client": client, "seats": product["seats"], "months": months, "sessions": sessions,
+                    "mbps": product.get("mbps") or 0, "note": f"Shop: comanda #{order_id}, {email}"})
+                if st != 200:
+                    errors.append(out.get("error", "eroare"))
+                    continue
+                code = out["code"]
+                x("INSERT INTO shop_licenses(code, email, product, created) VALUES(?,?,?,?)", (code, email, pid, now))
+                lines.append(f"Codul tău de licență RDN Remote {product['name']} ({months} {'lună' if months == 1 else 'luni'}): {code}")
+            codes.append(code)
+        if not codes:
+            x("UPDATE shop_orders SET error=? WHERE order_id=?", ("; ".join(errors) or "niciun produs RDN Remote", order_id))
+            return "; ".join(errors) or "niciun produs RDN Remote"
+        message = "Mulțumim pentru comandă!\n\n" + "\n".join(lines)
+        if any("Codul tău" in line for line in lines):
+            message += ("\n\nDescarcă aplicația" + (f" de la {site}" if site else "") +
+                        " și introdu codul la prima pornire. Perioada începe la prima activare.")
+        message += "\n\nSuport: office@rdndata.ro"
+        x("UPDATE shop_orders SET codes=?, message=?, error=? WHERE order_id=?",
+          (", ".join(codes), message, "; ".join(errors), order_id))
+    err = shop_send_note(order_id, message)
+    x("UPDATE shop_orders SET note_sent=?, error=? WHERE order_id=?",
+      (0 if err else 1, "; ".join(filter(None, errors + [err or ""])), order_id))
+    log(f"shop: order {order_id} -> {', '.join(codes)}{' (note not sent)' if err else ''}")
+    return "licențe: " + ", ".join(codes)
 
 
 # ---------------------------------------------------------------- backups
