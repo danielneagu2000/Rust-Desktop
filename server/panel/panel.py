@@ -7,7 +7,7 @@ Two HTTP listeners, standard library only:
   their API server resolves to this host (the default for clients built from this
   repo and for any client whose ID server is set to this host):
   /api/audit/conn, /api/audit/alarm, /api/audit/file, /api/heartbeat, /api/sysinfo.
-* Dashboard (default 127.0.0.1:21120), protected by HTTP Basic auth: connection
+* Dashboard (default 127.0.0.1:21120), protected by a login page (password + optional authenticator code): connection
   history with IPs, brute-force statistics, client-side alarms, online devices,
   and a server blocklist enforced by hbbr for relayed connections.
 
@@ -27,6 +27,7 @@ import json
 import os
 import re
 import socket
+import struct
 import sqlite3
 import sys
 import threading
@@ -40,6 +41,8 @@ import ed25519
 
 PANEL_USER = os.environ.get("PANEL_USER", "admin")
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "")
+# Base32 key of the authenticator app (install.sh generates it); empty = password only.
+PANEL_TOTP_SECRET = re.sub(r"[\s=]", "", os.environ.get("PANEL_TOTP_SECRET", "")).upper()
 PANEL_BIND = os.environ.get("PANEL_BIND", "127.0.0.1")
 PANEL_PORT = int(os.environ.get("PANEL_PORT", "21120"))
 API_BIND = os.environ.get("API_BIND", "0.0.0.0")
@@ -679,6 +682,59 @@ AUTH_FAILS = {}
 AUTH_LOCK = threading.Lock()
 AUTH_MAX_FAILS = 10
 AUTH_LOCK_SECONDS = 900
+SESSION_COOKIE = "rdn_panel"
+SESSION_TTL = 12 * 3600
+PANEL_SESSIONS = {}  # token -> expiry
+TOTP_LAST = [0]  # last accepted time step; a code works only once
+
+
+def totp_ok(code, now=None):
+    """RFC 6238 (SHA-1, 30 s, 6 digits), accepting one step of clock drift."""
+    code = re.sub(r"\s", "", str(code or ""))
+    if not re.fullmatch(r"\d{6}", code):
+        return False
+    try:
+        key = base64.b32decode(PANEL_TOTP_SECRET + "=" * (-len(PANEL_TOTP_SECRET) % 8))
+    except ValueError:
+        return False
+    step = int(now if now is not None else time.time()) // 30
+    for c in (step - 1, step, step + 1):
+        digest = hmac.new(key, struct.pack(">Q", c), "sha1").digest()
+        off = digest[-1] & 15
+        value = (struct.unpack(">I", digest[off:off + 4])[0] & 0x7FFFFFFF) % 1000000
+        if hmac.compare_digest(f"{value:06d}", code):
+            with AUTH_LOCK:
+                if c <= TOTP_LAST[0]:
+                    return False
+                TOTP_LAST[0] = c
+            return True
+    return False
+
+
+LOGIN_HTML = """<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panou securitate · autentificare</title><style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f7;color:#1d1f24;
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+form{background:#fff;border:1px solid #e3e5ea;border-radius:14px;padding:28px;width:min(360px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.06)}
+h1{font-size:20px;margin:0 0 4px}p{margin:0 0 18px;color:#646a75;font-size:13.5px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d5d8de;border-radius:9px;font:inherit}
+button{margin-top:18px;width:100%;padding:11px;border:0;border-radius:9px;background:#1d4ed8;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.err{background:#fde8e8;color:#9b1c1c;border-radius:8px;padding:8px 10px;font-size:13.5px;margin-bottom:6px}
+</style></head><body><form method="post" action="login" autocomplete="on">
+<h1>Panou securitate</h1><p>RDN Remote · autentificare</p><!--ERR-->
+<label for="u">Utilizator</label><input id="u" name="user" autocomplete="username" required autofocus>
+<label for="p">Parolă</label><input id="p" name="password" type="password" autocomplete="current-password" required>
+<!--TOTP--><button type="submit">Intră</button></form></body></html>"""
+TOTP_FIELD = """<label for="c">Cod din aplicația de autentificare</label>
+<input id="c" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required>"""
+
+
+def login_page(error=""):
+    html = LOGIN_HTML.replace("<!--TOTP-->", TOTP_FIELD if PANEL_TOTP_SECRET else "")
+    if error:
+        html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
+    return html
 
 
 def state(search):
@@ -820,7 +876,7 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; "
-            "connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "connect-src 'self'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
         )
         for k, v in headers:
             self.send_header(k, v)
@@ -828,37 +884,69 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def client_ip(self):
-        return self.client_address[0]
+        ip = self.client_address[0]
+        if ip in ("127.0.0.1", "::1"):
+            # Caddy (same host) sets X-Forwarded-For to the real client; the last entry is its own.
+            fwd = [p.strip() for p in self.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+            if fwd and valid_ip(fwd[-1]):
+                return valid_ip(fwd[-1])
+        return ip
+
+    def session_token(self):
+        for part in self.headers.get("Cookie", "").split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == SESSION_COOKIE and re.fullmatch(r"[A-Za-z0-9_-]{20,100}", value):
+                return value
+        return None
 
     def authorized(self):
+        token = self.session_token()
+        now = time.time()
+        with AUTH_LOCK:
+            expiry = PANEL_SESSIONS.get(token) if token else None
+        if expiry and expiry > now:
+            return True
+        if "/api/" in urlparse(self.path).path:
+            self.reply(401, {"error": "autentificare necesară"})
+        else:
+            self.reply(200, login_page(), "text/html; charset=utf-8")
+        return False
+
+    def login(self):
         ip = self.client_ip()
         now = time.time()
         with AUTH_LOCK:
             fails, until = AUTH_FAILS.get(ip, (0, 0))
-            if until > now:
-                self.reply(429, "Prea multe încercări greșite. Reîncearcă peste 15 minute.")
-                return False
-        header = self.headers.get("Authorization", "")
-        ok = False
-        if header.startswith("Basic "):
-            try:
-                user, _, pwd = base64.b64decode(header[6:]).decode().partition(":")
-                ok = hmac.compare_digest(user.encode(), PANEL_USER.encode()) & hmac.compare_digest(
-                    pwd.encode(), PANEL_PASSWORD.encode()
-                )
-            except (ValueError, UnicodeDecodeError):
-                ok = False
-        if ok:
-            with AUTH_LOCK:
-                AUTH_FAILS.pop(ip, None)
-            return True
-        if header:
+        if until > now:
+            return self.reply(429, login_page("Prea multe încercări greșite. Reîncearcă peste 15 minute."), "text/html; charset=utf-8")
+        length = body_length(self.headers, 4096)
+        if length is None:
+            return self.reply(413, "body prea mare")
+        form = parse_qs(self.rfile.read(length).decode("utf-8", "replace") if length else "")
+        user = (form.get("user") or [""])[0]
+        pwd = (form.get("password") or [""])[0]
+        ok = hmac.compare_digest(user.encode(), PANEL_USER.encode()) & hmac.compare_digest(pwd.encode(), PANEL_PASSWORD.encode())
+        if ok and PANEL_TOTP_SECRET:
+            ok = totp_ok((form.get("code") or [""])[0])
+        if not ok:
             with AUTH_LOCK:
                 fails += 1
                 AUTH_FAILS[ip] = (fails, now + AUTH_LOCK_SECONDS if fails >= AUTH_MAX_FAILS else 0)
             log(f"panel: failed login from {ip}")
-        self.reply(401, "Autentificare necesară", headers=[("WWW-Authenticate", 'Basic realm="Panou securitate", charset="UTF-8"')])
-        return False
+            return self.reply(200, login_page("Date de autentificare greșite."), "text/html; charset=utf-8")
+        token = secrets.token_urlsafe(32)
+        with AUTH_LOCK:
+            AUTH_FAILS.pop(ip, None)
+            for t in [t for t, e in PANEL_SESSIONS.items() if e <= now]:
+                del PANEL_SESSIONS[t]
+            PANEL_SESSIONS[token] = now + SESSION_TTL
+        log(f"panel: login from {ip}")
+        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+        path = urlparse(self.path).path
+        self.reply(303, "", headers=[
+            ("Location", path[: -len("login")] or "/"),
+            ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_TTL}{secure}"),
+        ])
 
     def do_GET(self):
         if not self.authorized():
@@ -891,12 +979,18 @@ class PanelHandler(BaseHTTPRequestHandler):
         self.reply(200, INDEX_HTML, "text/html; charset=utf-8")
 
     def do_POST(self):
+        if urlparse(self.path).path.endswith("/login"):
+            return self.login()
         if not self.authorized():
             return
         # Browsers cannot add this header cross-site without CORS, which we never grant.
         if self.headers.get("X-Panel") != "1":
             return self.reply(403, {"error": "missing header"})
         action = urlparse(self.path).path.rsplit("/api/", 1)[-1]
+        if action == "logout":
+            with AUTH_LOCK:
+                PANEL_SESSIONS.pop(self.session_token(), None)
+            return self.reply(200, {"ok": True}, headers=[("Set-Cookie", f"{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")])
         if action == "backup/restore":
             length = body_length(self.headers, MAX_RESTORE)
             if not length:

@@ -127,6 +127,20 @@ Ce arată:
 - **Dispozitive:** ce calculatoare sunt online, nume, utilizator, sistem, IP public, și butonul
   **Deconectează** pentru a închide imediat o sesiune activă.
 
+### Panoul pe internet, cu autentificare în doi pași
+
+Pe un VPS poți deschide panoul la o adresă proprie, de exemplu `https://panou.rdndata.ro`:
+
+1. În DNS adaugă un record **A**: `panou` → IP-ul serverului.
+2. Pe server: `cd /root/Rust-Desktop && git pull && PANEL_DOMAIN=panou.rdndata.ro ./server/install.sh remote.rdndata.ro`
+3. La final scriptul afișează un **cod QR** (sau cheia) pentru aplicația de autentificare de pe
+   telefon (Google Authenticator, Microsoft Authenticator, Authy). Scanează-l o singură dată.
+4. Intră la `https://panou.rdndata.ro` cu utilizatorul, parola și codul de 6 cifre din aplicație.
+
+Sesiunea ține 12 ore (butonul **Ieșire** o închide). După 10 încercări greșite de pe același IP,
+accesul de pe acel IP e blocat 15 minute. Cheia 2FA e în `server/.env` (`PANEL_TOTP_SECRET`) și
+în backup; dacă pierzi telefonul, o vezi acolo și o adaugi din nou în aplicație.
+
 Acces: implicit panoul ascultă doar local pe server (port 21120). Utilizatorul și parola sunt
 afișate de `install.sh` și salvate în `server/.env`.
 

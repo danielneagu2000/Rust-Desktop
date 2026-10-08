@@ -81,6 +81,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
   <div class="tools">
     <input type="search" id="q" placeholder="Caută IP, ID, nume…" autocomplete="off">
     <button id="refresh">Reîmprospătează</button>
+    <button id="logout" title="Ieșire din panou">Ieșire</button>
   </div>
 </header>
 <main>
@@ -378,7 +379,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     if (document.getElementById("backup").classList.contains("on")) loadBackups();
     var q = document.getElementById("q").value.trim();
     return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin" })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (d) { data = d; render(); })
       .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });
   }
@@ -386,8 +387,14 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     return fetch(base + "api/" + action, {
       method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json", "X-Panel": "1" }, body: JSON.stringify(body)
-    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); });
+    }).then(function (r) {
+      if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); }
+      return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; });
+    });
   }
+  document.getElementById("logout").addEventListener("click", function () {
+    post("logout", {}).then(function () { location.reload(); }, function () { location.reload(); });
+  });
 
   document.getElementById("tabs").addEventListener("click", function (e) {
     var t = e.target.closest("button[data-tab]"); if (!t) return;

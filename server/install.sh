@@ -7,6 +7,9 @@
 # Pe un mini PC acasă/la birou, ca panoul să fie accesibil din rețeaua locală:
 #   sudo PANEL_BIND=0.0.0.0 ./install.sh remote.firma-mea.ro
 #
+# Panoul pe internet, la https://panou.firma-mea.ro (parolă + cod 2FA din aplicația de pe telefon):
+#   sudo PANEL_DOMAIN=panou.firma-mea.ro ./install.sh remote.firma-mea.ro
+#
 # La final afișează cheia publică pe care o pui în branding/brand.env (RS_PUB_KEY)
 # și datele de acces la panoul de securitate.
 set -euo pipefail
@@ -36,6 +39,16 @@ if [[ -z "$PANEL_PASSWORD" ]]; then
   PANEL_PASSWORD="$(head -c 18 /dev/urandom | base64 | tr -d '/+=' | head -c 20)"
 fi
 PANEL_BIND="${PANEL_BIND:-$(env_get PANEL_BIND)}"; PANEL_BIND="${PANEL_BIND:-127.0.0.1}"
+# Panoul pe un subdomeniu (ex. PANEL_DOMAIN=panou.firma-mea.ro), cu HTTPS și cod 2FA.
+PANEL_DOMAIN="${PANEL_DOMAIN:-$(env_get PANEL_DOMAIN)}"
+if [[ -n "$PANEL_DOMAIN" && ! "$PANEL_DOMAIN" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+  echo "PANEL_DOMAIN invalid: $PANEL_DOMAIN (doar numele, ex. panou.firma-mea.ro)" >&2
+  exit 1
+fi
+PANEL_TOTP_SECRET="$(env_get PANEL_TOTP_SECRET)"
+if [[ -z "$PANEL_TOTP_SECRET" ]]; then
+  PANEL_TOTP_SECRET="$(head -c 20 /dev/urandom | base32 | tr -d '=')"
+fi
 
 . /etc/os-release
 if ! command -v docker >/dev/null 2>&1; then
@@ -75,6 +88,8 @@ SERVER_HOST=$HOST
 PANEL_USER=$PANEL_USER
 PANEL_PASSWORD=$PANEL_PASSWORD
 PANEL_BIND=$PANEL_BIND
+PANEL_DOMAIN=$PANEL_DOMAIN
+PANEL_TOTP_SECRET=$PANEL_TOTP_SECRET
 WEB_ADDRESS=$WEB_ADDRESS
 EOF
 [[ "$WEB" == 1 ]] && echo "COMPOSE_PROFILES=web" >> .env
@@ -105,6 +120,21 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
   fi
   firewall-cmd --reload
 fi
+
+mkdir -p caddy-sites
+if [[ -n "$PANEL_DOMAIN" && "$WEB" == 1 ]]; then
+  cat > caddy-sites/panel.caddy <<EOF
+$PANEL_DOMAIN {
+	reverse_proxy 127.0.0.1:21120
+	header Strict-Transport-Security "max-age=31536000"
+}
+EOF
+else
+  rm -f caddy-sites/panel.caddy
+fi
+
+command -v qrencode >/dev/null 2>&1 || { command -v dnf >/dev/null 2>&1 && dnf -y -q install qrencode >/dev/null 2>&1; } \
+  || { command -v apt-get >/dev/null 2>&1 && apt-get -qq install -y qrencode >/dev/null 2>&1; } || true
 
 echo "==> Pornesc serverul"
 docker compose pull --ignore-buildable
@@ -169,7 +199,9 @@ else
   Copiază conținutul server/web/ în site-ul tău din Virtualmin (vezi GHID.md)."
 fi
 
-if [[ "$PANEL_BIND" == "127.0.0.1" ]]; then
+if [[ -f caddy-sites/panel.caddy ]]; then
+  PANEL_HOW="https://$PANEL_DOMAIN/  (domeniul trebuie să arate spre acest server)"
+elif [[ "$PANEL_BIND" == "127.0.0.1" ]]; then
   PANEL_HOW="Din calculatorul tău:  ssh -L 21120:127.0.0.1:21120 root@$HOST
   apoi deschide în browser  http://localhost:21120/"
 else
@@ -193,6 +225,11 @@ Panoul de securitate:
   $PANEL_HOW
   utilizator: $PANEL_USER
   parolă:     $PANEL_PASSWORD      (salvată în server/.env)
+  cod 2FA:    adaugă în Google Authenticator / Microsoft Authenticator / Authy
+              cheia $PANEL_TOTP_SECRET (tip: bazat pe timp)
+              sau scanează: otpauth://totp/RDN%20Remote:$PANEL_USER?secret=$PANEL_TOTP_SECRET&issuer=RDN%20Remote
+
+$(command -v qrencode >/dev/null 2>&1 && qrencode -t ansiutf8 "otpauth://totp/RDN%20Remote:$PANEL_USER?secret=$PANEL_TOTP_SECRET&issuer=RDN%20Remote")
 
 IMPORTANT: descarcă periodic un backup din panou (tab-ul Backup) pe alt dispozitiv;
 conține cheia privată server/data/id_ed25519. Dacă o pierzi,

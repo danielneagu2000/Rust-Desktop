@@ -26,3 +26,7 @@
 
 	file_server
 }
+
+# Panoul de securitate pe un subdomeniu (PANEL_DOMAIN în server/.env), generat de install.sh în
+# caddy-sites/panel.caddy. Fără PANEL_DOMAIN nu există fișierul și panoul rămâne doar local.
+import /etc/caddy/sites/*.caddy

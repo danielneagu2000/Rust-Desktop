@@ -1,3 +1,4 @@
 data/
 .env
 web/files/
+caddy-sites/

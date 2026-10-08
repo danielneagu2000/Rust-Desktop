@@ -53,6 +53,7 @@ services:
       - PANEL_USER=${PANEL_USER:-admin}
       - PANEL_PASSWORD=${PANEL_PASSWORD:?setează PANEL_PASSWORD în server/.env}
       - PANEL_BIND=${PANEL_BIND:-127.0.0.1}
+      - PANEL_TOTP_SECRET=${PANEL_TOTP_SECRET:-}
       - RETENTION_DAYS=${RETENTION_DAYS:-180}
       - LICENSE_REQUIRED=${LICENSE_REQUIRED:-Y}
       - DATA_DIR=/data
@@ -76,6 +77,7 @@ services:
       - WEB_ADDRESS=${WEB_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - ./caddy-sites:/etc/caddy/sites:ro,z
       - ./web:/srv:ro,z
       - ./data/caddy:/data:z
     network_mode: host
