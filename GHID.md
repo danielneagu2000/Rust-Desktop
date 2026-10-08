@@ -255,7 +255,7 @@ Tot din tab-ul **Shop** schimbi tot ce ține de comenzi:
   - dacă se prelungește licența existentă a clientului;
   - ce înmulțește cantitatea: conexiunile, calculatoarele, perioada sau nimic;
   - trimiterea automată a codului și întârzierea ei în minute (0 = imediat, 300 = 5 ore);
-  - revocarea licențelor la rambursare sau anulare;
+  - anularea sau dezactivarea automată a codurilor la rambursare sau anulare (pornită implicit);
   - adresa site-ului din mesaj.
 - **Mesajul către client**: textul pentru licență nouă, pentru prelungire și semnătura, cu
   variabilele `{cod} {produs} {luni} {client} {comanda} {email} {site}`. Butonul
@@ -263,8 +263,30 @@ Tot din tab-ul **Shop** schimbi tot ce ține de comenzi:
 - **Produse**: pentru fiecare ID de produs din WooCommerce, câte calculatoare, conexiuni și ce
   bandă primește. Perioada se ia din variația comandată (de ex. „12 Luni”); **Perioada
   implicită** e folosită doar dacă variația nu are perioadă.
-- **Comenzi**: vezi fiecare comandă, codurile, când pleacă e-mailul și poți apăsa
-  **Trimite acum**. O trimitere eșuată se reîncearcă la 30 de minute.
+- **Comenzi**: fiecare comandă cu codurile ei și starea trimiterii („se trimite peste 4 ore
+  58 min”, „trimis”, „anulat”, „trimis · cod dezactivat”). Același lucru apare și sub client, în
+  tab-ul **Coduri de acces**. Acțiunile disponibile:
+  - **Trimite acum**: trimite mesajul imediat, fără să mai aștepte;
+  - **Reprogramează**: alegi peste câte minute pleacă;
+  - **Reîncearcă**: după o trimitere eșuată (altfel se reîncearcă singur la 30 de minute);
+  - **Copiază mesajul**: ca să-l trimiți pe altă cale;
+  - **Marchează trimis**: dacă l-ai trimis tu, nu mai pleacă automat;
+  - **Anulează**, înainte de trimitere: codul nu mai pleacă și nu mai poate fi folosit;
+  - **Dezactivează codul**, după trimitere: aplicațiile clientului se blochează la următoarea
+    verificare.
+
+Fluxul complet:
+
+1. Clientul plătește un pachet în shop.
+2. Panoul creează imediat codul, iar comanda apare cu „se trimite peste 5 ore”.
+3. După 5 ore, codul pleacă printr-o notă adăugată pe comandă. WooCommerce o trimite clientului
+   cu e-mailul „Notă client”, de pe adresa shopului.
+4. Dacă comanda e anulată sau rambursată în WooCommerce, se întâmplă automat următoarele:
+   - un cod netrimis se anulează și nu mai pleacă;
+   - un cod deja trimis se dezactivează;
+   - la o prelungire, lunile adăugate se retrag, iar licența rămâne activă.
+
+   Comportamentul se poate opri din **Reguli pentru comenzi**.
 
 Webhook-ul fără semnătura corectă e refuzat.
 

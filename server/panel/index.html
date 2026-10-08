@@ -95,7 +95,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     <button data-tab="blocked">IP-uri blocate</button>
     <button data-tab="alarms">Alarme</button>
     <button data-tab="devices">Dispozitive</button>
-    <button data-tab="licenses">Licențe</button>
+    <button data-tab="licenses">Coduri de acces</button>
     <button data-tab="reports">Rapoarte</button>
     <button data-tab="shop">Shop</button>
     <button data-tab="backup">Backup</button>
@@ -187,7 +187,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       <p id="lic-new" class="hint" style="display:none"></p>
     </div>
     <div class="card">
-      <h2>Licențe</h2>
+      <h2>Coduri de acces (licențe)</h2>
       <div class="scroll"><table><thead><tr><th>Cod</th><th>Client</th><th>Stare</th><th class="num">Calculatoare</th><th>Perioadă</th><th>Activată</th><th>Expiră</th><th>Prelungește</th><th class="num">Conexiuni</th><th>Bandă</th><th></th></tr></thead><tbody id="t-licenses"></tbody></table></div>
     </div>
   </section>
@@ -222,7 +222,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
             <option value="months">perioada</option><option value="none">nimic (se ignoră)</option></select></label>
         <label class="sw"><input type="checkbox" id="shop_send_note"> Trimite automat codul clientului (notă la comandă, pe e-mail)</label>
         <label>Trimite codul după (minute; 0 = imediat, 300 = 5 ore) <input type="number" id="shop_note_delay_minutes" min="0" max="10080" required style="width:110px"></label>
-        <label class="sw"><input type="checkbox" id="shop_revoke_refund"> La comandă rambursată sau anulată, revocă licențele create de ea</label>
+        <label class="sw"><input type="checkbox" id="shop_revoke_refund"> La comandă rambursată sau anulată: anulează codul netrimis, dezactivează codul trimis și retrage lunile adăugate la o prelungire</label>
         <label>Adresa site-ului din mesaj ({site}): <input type="text" id="shop_site_url" placeholder="implicit: https://domeniul-serverului/" style="width:320px"></label>
         <div><button class="primary" type="submit">Salvează regulile</button></div>
       </form>
@@ -247,7 +247,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     </div>
     <div class="card">
       <h2>Comenzi</h2>
-      <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Stare</th><th>Licențe</th><th>Cod trimis</th><th>Actualizată</th><th></th></tr></thead><tbody id="t-shop-orders"></tbody></table></div>
+      <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Stare comandă</th><th>Coduri</th><th>Trimitere</th><th>Acțiuni</th></tr></thead><tbody id="t-shop-orders"></tbody></table></div>
     </div>
   </section>
 
@@ -334,6 +334,20 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
     return blocked
       ? '<button class="small" data-unblock="' + esc(v) + '">Deblochează</button>'
       : '<button class="small danger" data-block="' + esc(v) + '">Blochează</button>';
+  }
+  var ORDER_STATUS = { processing: "În procesare", completed: "Finalizată", "on-hold": "În așteptare", pending: "Neplătită",
+    cancelled: "Anulată", refunded: "Rambursată", failed: "Eșuată" };
+  function until(ts) {
+    var s = Math.max(0, Math.round(ts - data.now)), h = Math.floor(s / 3600), m = Math.ceil(s % 3600 / 60);
+    if (m === 60) { h += 1; m = 0; }
+    return s < 60 ? "în mai puțin de un minut" : "peste " + (h ? h + (h === 1 ? " oră" : " ore") + (m ? " " : "") : "") + (m ? m + " min" : "");
+  }
+  function sendPill(o) {
+    if (o.cancelled === 1) return pill("anulat", "bad");
+    if (o.cancelled === 2) return pill("trimis · cod dezactivat", "bad");
+    if (o.note_sent) return pill("trimis", "ok");
+    if (o.note_due) return pill((o.error ? "eșuat · reîncerc " : "se trimite ") + until(o.note_due), o.error ? "warn" : "mute");
+    return pill(o.error ? "netrimis (eșuat)" : "netrimis", "warn");
   }
   function day(ts) { return new Date(ts * 1000).toLocaleDateString("ro-RO"); }
   function statusPill(st) {
@@ -427,13 +441,22 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       }).join("");
     }
     rows("t-shop-orders", sh.orders, function (o) {
-      return '<tr><td class="mono">#' + o.order_id + "</td><td>" + esc(o.client || "") + '<div class="sub">' + esc(o.email || "") + "</div></td><td>" +
-        esc(({ processing: "În procesare", completed: "Finalizată", "on-hold": "În așteptare", pending: "Neplătită",
-        cancelled: "Anulată", refunded: "Rambursată", failed: "Eșuată" })[o.status] || o.status || "") + '</td><td class="mono">' + esc(o.codes || "—") + (o.error ? '<div class="sub" style="color:var(--bad);white-space:normal;max-width:320px">' + esc(o.error) + "</div>" : "") +
-        "</td><td>" + (o.codes ? (o.note_sent ? pill("da", "ok") : o.note_due ? pill("programat " + when(o.note_due), "mute") : pill("nu", "warn")) : "—") +
-        "</td><td>" + esc(when(o.updated)) + "</td><td>" +
-        (o.codes && !o.note_sent ? '<button class="small" data-resend="' + o.order_id + '">Trimite acum</button>' : "") + "</td></tr>";
-    }, 7);
+      var id = o.order_id, btn = function (act, label, cls) {
+        return '<button class="small' + (cls ? " " + cls : "") + '" data-shop="' + act + '" data-order="' + id + '">' + label + "</button>";
+      };
+      var acts = [];
+      if (o.codes && !o.cancelled && !o.note_sent) {
+        acts.push(o.error && !o.note_due ? btn("resend", "Reîncearcă") : btn("resend", o.error ? "Reîncearcă" : "Trimite acum"));
+        acts.push(btn("reschedule", "Reprogramează"), btn("mark_sent", "Marchează trimis"), btn("cancel", "Anulează", "danger"));
+      }
+      if (o.codes && !o.cancelled && o.note_sent) acts.push(btn("deactivate", "Dezactivează codul", "danger"));
+      if (o.message) acts.unshift(btn("copy", "Copiază mesajul"));
+      return '<tr><td class="mono">#' + id + "</td><td>" + esc(o.client || "") + '<div class="sub">' + esc(o.email || "") + "</div></td><td>" +
+        esc(ORDER_STATUS[o.status] || o.status || "") + '</td><td class="mono">' + esc(o.codes || "—") +
+        (o.error ? '<div class="sub" style="color:' + (o.cancelled || o.error === "Trimis manual" ? "var(--muted)" : "var(--bad)") +
+          ';white-space:normal;max-width:320px">' + esc(o.error) + "</div>" : "") +
+        "</td><td>" + (o.codes ? sendPill(o) : "—") + '</td><td style="white-space:normal;min-width:220px">' + acts.join(" ") + "</td></tr>";
+    }, 6);
     var cf = data.config;
     ["settings-form", "shop-rules-form", "shop-notes-form"].forEach(function (fid) {
       var form = document.getElementById(fid);
@@ -501,6 +524,7 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       }).join(" ");
       return '<tr><td><span class="mono">' + esc(l.code) + '</span><br><button class="small" data-copy="' + esc(l.code) + '" style="margin-top:4px">Copiază</button></td><td style="white-space:normal">' +
         esc(l.client) + (l.note ? '<div class="lbl" style="color:var(--muted);font-size:12px">' + esc(l.note) + "</div>" : "") +
+        (data.shop_codes[l.code] ? '<div style="margin-top:3px;white-space:nowrap">' + sendPill(data.shop_codes[l.code]) + "</div>" : "") +
         "</td><td>" + statusPill(l.status) + '</td><td class="num" title="' + devs.replace(/<br>/g, "\n").replace(/"/g, "") + '">' + used + " / " + l.seats +
         (devs ? '<div style="text-align:left;font-size:12px;color:var(--muted);margin-top:4px">' + devs + "</div>" : "") +
         "</td><td>" + (l.months ? l.months + (l.months === 1 ? " lună" : " luni") : "nelimitată") +
@@ -734,8 +758,25 @@ form.add { display: flex; gap: 8px; padding: 12px 16px; flex-wrap: wrap; border-
       .catch(function (err) { toast("Eroare: " + err.message); });
   });
   document.body.addEventListener("click", function (e) {
-    var el = e.target.closest("[data-resend]"); if (!el) return;
-    post("shop/resend", { order_id: Number(el.dataset.resend) }).then(function () { toast("Nota a fost trimisă"); load(); })
+    var el = e.target.closest("[data-shop]"); if (!el) return;
+    var act = el.dataset.shop, oid = Number(el.dataset.order), body = { order_id: oid };
+    var o = data.shop.orders.filter(function (r) { return r.order_id === oid; })[0] || {};
+    var done = { resend: "Codul a fost trimis clientului", reschedule: "Trimitere reprogramată", mark_sent: "Marcat ca trimis",
+                 cancel: "Cod anulat; nu se mai trimite", deactivate: "Cod dezactivat; aplicațiile se blochează la următoarea verificare" };
+    if (act === "copy") {
+      (navigator.clipboard ? navigator.clipboard.writeText(o.message) : Promise.reject(new Error("clipboard indisponibil")))
+        .then(function () { toast("Mesaj copiat"); }).catch(function () { prompt("Copiază mesajul:", o.message); });
+      return;
+    }
+    if (act === "reschedule") {
+      var m = prompt("Peste câte minute să plece codul către client? (0 = la următorul minut, 300 = 5 ore)", "300");
+      if (m === null) return;
+      body.minutes = Number(m.trim());
+    }
+    if (act === "mark_sent" && !confirm("Marchezi comanda #" + oid + " ca trimisă? Codul nu mai pleacă automat.")) return;
+    if (act === "cancel" && !confirm("Anulezi codul comenzii #" + oid + "? Nu se mai trimite, iar codul nu mai poate fi folosit.")) return;
+    if (act === "deactivate" && !confirm("Dezactivezi codul comenzii #" + oid + "? Clientul l-a primit deja; aplicațiile lui se blochează.")) return;
+    post("shop/" + act, body).then(function () { toast(done[act]); load(); })
       .catch(function (err) { toast("Eroare: " + err.message); load(); });
   });
   var lockForm = document.getElementById("lock-form");

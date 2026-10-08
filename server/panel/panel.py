@@ -162,8 +162,8 @@ def init_db():
             alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS shop_orders (
-            order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, new_codes TEXT, message TEXT,
-            note_sent INTEGER DEFAULT 0, note_due REAL, error TEXT, created REAL, updated REAL
+            order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, new_codes TEXT, extended TEXT, message TEXT,
+            note_sent INTEGER DEFAULT 0, note_due REAL, cancelled INTEGER DEFAULT 0, error TEXT, created REAL, updated REAL
         );
         CREATE TABLE IF NOT EXISTS shop_licenses (code TEXT PRIMARY KEY, email TEXT, product TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS portal_users (
@@ -990,6 +990,7 @@ def state(search):
         "blocklist": sorted(blocked.values(), key=lambda r: -r["added"]),
         "lockouts": lockout_state(),
         "shop": shop_state(),
+        "shop_codes": shop_codes(),
         "config": config_state(),
         "devices": devices,
         "licenses": licenses,
@@ -1791,7 +1792,7 @@ CONFIG = {
     "shop_quantity": ("choice", "sessions", ("sessions", "seats", "months", "none")),
     "shop_send_note": ("bool", 1),
     "shop_note_delay_minutes": ("int", 300, 0, 10080),
-    "shop_revoke_refund": ("bool", 0),
+    "shop_revoke_refund": ("bool", 1),
     "shop_site_url": ("text", "", 0, 200),
     "shop_note_new": ("text", SHOP_NOTE_NEW, 1, 3000),
     "shop_note_renew": ("text", SHOP_NOTE_RENEW, 1, 3000),
@@ -1896,6 +1897,16 @@ def shop_state():
     }
 
 
+def shop_codes():
+    """code -> how its shop order stands, for the Licenses tab."""
+    out = {}
+    for o in q("SELECT order_id, codes, note_sent, note_due, cancelled, error FROM shop_orders WHERE codes IS NOT NULL AND codes != ''"):
+        for code in o["codes"].split(", "):
+            out[code] = {"order_id": o["order_id"], "note_sent": o["note_sent"], "note_due": o["note_due"],
+                         "cancelled": o["cancelled"], "error": o["error"]}
+    return out
+
+
 def shop_settings_action(action, v):
     if action == "secret":
         secret = str(v.get("secret") or "").strip() or secrets.token_urlsafe(30)
@@ -1935,10 +1946,32 @@ def shop_settings_action(action, v):
             return 400, {"error": "Adaugă cel puțin un produs"}
         set_setting("shop_products", json.dumps(products, ensure_ascii=False))
         return 200, {"ok": True}
+    order = q("SELECT * FROM shop_orders WHERE order_id = ?", (as_int(v.get("order_id")),))
+    if action in ("resend", "reschedule", "mark_sent", "cancel", "deactivate") and (not order or not order[0]["codes"]):
+        return 404, {"error": "Comandă inexistentă sau fără coduri"}
+    if action != "resend" and action in ("reschedule", "mark_sent", "cancel", "deactivate") and order[0]["cancelled"]:
+        return 409, {"error": "Codurile acestei comenzi sunt deja anulate"}
+    if action == "reschedule":
+        minutes = as_int(v.get("minutes"))
+        if order[0]["note_sent"]:
+            return 409, {"error": "Codul a fost deja trimis"}
+        if minutes is None or not 0 <= minutes <= 10080:
+            return 400, {"error": "Alege între 0 și 10080 de minute"}
+        x("UPDATE shop_orders SET note_due=?, error='', updated=? WHERE order_id=?",
+          (time.time() + minutes * 60, time.time(), order[0]["order_id"]))
+        return 200, {"ok": True}
+    if action == "mark_sent":
+        x("UPDATE shop_orders SET note_sent=1, note_due=NULL, error='Trimis manual', updated=? WHERE order_id=?",
+          (time.time(), order[0]["order_id"]))
+        return 200, {"ok": True}
+    if action in ("cancel", "deactivate"):
+        if (action == "cancel") == bool(order[0]["note_sent"]):
+            return 409, {"error": "Codul a fost deja trimis: folosește Dezactivează" if action == "cancel"
+                         else "Codul nu a fost trimis încă: folosește Anulează"}
+        return 200, {"ok": True, "result": shop_revoke_order(order[0], "anulat din panou")}
     if action == "resend":
-        order = q("SELECT * FROM shop_orders WHERE order_id = ?", (as_int(v.get("order_id")),))
-        if not order or not order[0]["message"]:
-            return 404, {"error": "Comandă inexistentă"}
+        if order[0]["cancelled"]:
+            return 409, {"error": "Codurile acestei comenzi sunt anulate"}
         err = shop_send_note(order[0]["order_id"], order[0]["message"])
         x("UPDATE shop_orders SET note_sent=?, note_due=?, error=?, updated=? WHERE order_id=?",
           (0 if err else 1, order[0]["note_due"] if err else None, err or "", time.time(), order[0]["order_id"]))
@@ -2019,7 +2052,7 @@ def shop_order(order):
             return f"în așteptare ({status})"
         products, quantity_mode = shop_products(), conf("shop_quantity")
         site = conf("shop_site_url") or (f"https://{server_host()}/" if server_host() else "")
-        codes, new_codes, notes, errors = [], [], [], []
+        codes, new_codes, extended, notes, errors = [], [], {}, [], []
         for item in order.get("line_items") or []:
             if not isinstance(item, dict):
                 continue
@@ -2045,6 +2078,7 @@ def shop_order(order):
             if prev:
                 code, template = prev[0]["code"], conf("shop_note_renew")
                 shop_extend(code, months)
+                extended[code] = extended.get(code, 0) + months
                 if sessions and (prev[0]["sessions"] or 0) and sessions > prev[0]["sessions"]:
                     x("UPDATE licenses SET sessions=? WHERE code=?", (sessions, code))
                 if seats > (prev[0]["seats"] or 0):
@@ -2067,8 +2101,8 @@ def shop_order(order):
             x("UPDATE shop_orders SET error=? WHERE order_id=?", ("; ".join(errors) or "niciun produs RDN Remote", order_id))
             return "; ".join(errors) or "niciun produs RDN Remote"
         message = "\n\n".join(notes + ([conf("shop_note_footer")] if conf("shop_note_footer") else []))
-        x("UPDATE shop_orders SET codes=?, new_codes=?, message=?, error=? WHERE order_id=?",
-          (", ".join(codes), ", ".join(new_codes), message, "; ".join(errors), order_id))
+        x("UPDATE shop_orders SET codes=?, new_codes=?, extended=?, message=?, error=? WHERE order_id=?",
+          (", ".join(codes), ", ".join(new_codes), json.dumps(extended), message, "; ".join(errors), order_id))
     delay = conf("shop_note_delay_minutes") * 60
     if conf("shop_send_note") and delay:
         x("UPDATE shop_orders SET note_due=? WHERE order_id=?", (time.time() + delay, order_id))
@@ -2086,7 +2120,8 @@ def shop_send_due(now=None):
     now = now or time.time()
     if not conf("shop_send_note"):
         return
-    for row in q("SELECT order_id, message FROM shop_orders WHERE note_sent=0 AND note_due IS NOT NULL AND note_due <= ?", (now,)):
+    for row in q("""SELECT order_id, message FROM shop_orders
+                    WHERE note_sent=0 AND cancelled=0 AND note_due IS NOT NULL AND note_due <= ?""", (now,)):
         err = shop_send_note(row["order_id"], row["message"])
         if err:
             x("UPDATE shop_orders SET error=?, note_due=? WHERE order_id=?", (err, now + 1800, row["order_id"]))
@@ -2105,17 +2140,45 @@ def shop_sender():
 
 
 def shop_cancelled(row, status):
+    if row["cancelled"]:
+        return "deja anulată"
     if not conf("shop_revoke_refund"):
         log(f"shop: order {row['order_id']} is now {status}; its licenses {row['codes']} need a manual check")
+        x("UPDATE shop_orders SET error=? WHERE order_id=?", (f"Comanda e {status}; verifică licențele manual", row["order_id"]))
         return "anulată; verifică manual"
+    return shop_revoke_order(row, f"comanda e {'rambursată' if status == 'refunded' else 'anulată'} în shop")
+
+
+def shop_revoke_order(row, reason):
+    """Withdraws what an order gave: its new codes are revoked (the apps lock at their next check)
+    and the months it added to an existing license are taken back. A code not yet sent is
+    "cancelled", one already sent "deactivated"."""
     revoked = [c for c in (row["new_codes"] or "").split(", ") if c]
     for code in revoked:
         x("UPDATE licenses SET revoked=1 WHERE code=?", (code,))
-    extended = [c for c in row["codes"].split(", ") if c and c not in revoked]
-    note = f"Comanda e {status}: " + (f"revocate {', '.join(revoked)}" if revoked else "nimic revocat") + \
-        (f"; prelungirea pentru {', '.join(extended)} trebuie scăzută manual" if extended else "")
-    x("UPDATE shop_orders SET error=? WHERE order_id=?", (note, row["order_id"]))
-    log(f"shop: order {row['order_id']} {status}; revoked {revoked or 'none'}")
+    try:
+        extended = json.loads(row["extended"] or "{}")
+    except ValueError:
+        extended = {}
+    for code, months in extended.items():
+        lic = q("SELECT * FROM licenses WHERE code=?", (code,))
+        if not lic:
+            continue
+        if lic[0]["starts"] is None:
+            x("UPDATE licenses SET months=? WHERE code=?", (max(1, (lic[0]["months"] or 0) - int(months)), code))
+        elif lic[0]["expires"] is not None:
+            x("UPDATE licenses SET expires=? WHERE code=?", (add_months(lic[0]["expires"], -int(months)), code))
+    kind = 2 if row["note_sent"] else 1
+    word = "dezactivat" if kind == 2 else "anulat"
+    parts = []
+    if revoked:
+        parts.append(f"{word} {', '.join(revoked)}")
+    if extended:
+        parts.append("prelungire retrasă pentru " + ", ".join(extended))
+    note = f"{reason[:1].upper()}{reason[1:]}: " + ("; ".join(parts) or "nimic de retras")
+    x("UPDATE shop_orders SET cancelled=?, note_due=NULL, error=?, updated=? WHERE order_id=?",
+      (kind, note, time.time(), row["order_id"]))
+    log(f"shop: order {row['order_id']} {word}: {', '.join(revoked) or '-'}; extensions {extended or '-'}")
     return note
 
 
