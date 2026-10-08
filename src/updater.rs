@@ -181,7 +181,7 @@ fn check_update(manually: bool) -> ResultType<()> {
         return Ok(());
     }
     #[cfg(target_os = "windows")]
-    let update_msi = crate::platform::is_msi_installed()? && !crate::is_custom_client();
+    let update_msi = crate::platform::is_msi_installed()?;
     if !(manually || config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE)) {
         return Ok(());
     }
@@ -376,8 +376,8 @@ pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
     let tag = segments.next()?;
     let filename = segments.next()?;
 
-    if owner != "rustdesk"
-        || repo != "rustdesk"
+    if owner != "danielneagu2000"
+        || repo != "Rust-Desktop"
         || releases != "releases"
         || download != "download"
         || tag.is_empty()
@@ -538,10 +538,6 @@ pub fn check_update_as_root() -> ResultType<bool> {
     // Allow-auto-update setting
     if !config::Config::get_bool_option(keys::OPTION_ALLOW_AUTO_UPDATE) {
         log::info!("[root-update] Auto update is disabled, skipping.");
-        return Ok(false);
-    }
-    if crate::is_custom_client() {
-        log::info!("[root-update] Custom client detected, skipping stock update.");
         return Ok(false);
     }
     // Clean up only old temp dirs from previous failed updates. The detached

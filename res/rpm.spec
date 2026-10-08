@@ -4,7 +4,7 @@ Release:    0
 Summary:    RPM package
 License:    GPL-3.0
 URL:        https://rustdesk.com
-Vendor:     rustdesk <info@rustdesk.com>
+Vendor:     RDN Network Data <office@rdndata.ro>
 Requires:   gtk3 libxcb libXfixes alsa-lib libva2 gstreamer1-plugins-base
 Recommends: libayatana-appindicator-gtk3 libxdo
 

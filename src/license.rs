@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::time::{Duration, Instant};
 
 /// Set by branding/apply.py (LICENSE_REQUIRED in branding/brand.env).
-pub const REQUIRED: bool = false;
+pub const REQUIRED: bool = true;
 pub const OPTION_TOKEN: &str = "license-token";
 /// Leading bytes of every signed token (server/panel/panel.py TOKEN_PREFIX). The server key
 /// also signs hbbs' protobuf messages; a zero first byte can never start one of those.
