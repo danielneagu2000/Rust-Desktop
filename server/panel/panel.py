@@ -344,7 +344,7 @@ try:  # libsodium (constant time) when the image provides it; see panel/Dockerfi
         return nacl.signing.SigningKey(seed).sign(msg).signature
 except ImportError:
     _sign = ed25519.sign
-PERIODS = (0, 1, 3, 6, 12)
+PERIODS = (0, 1, 3, 6, 9, 12)
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _SIGNING_SEED = None
 _TOKEN_CACHE = {}
@@ -914,7 +914,7 @@ def license_action(action, v):
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
-        if months not in (1, 3, 6, 12):
+        if months not in (1, 3, 6, 9, 12):
             return 400, {"error": "Perioadă invalidă"}
         if lic["starts"] is None:
             if lic["months"]:
