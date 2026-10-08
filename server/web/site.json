@@ -72,11 +72,11 @@
       },
       {
         "text": "Autentificare",
-        "url": "https://shop.rdndata.ro/"
+        "url": "https://shop.rdndata.ro/my-account/"
       },
       {
         "text": "Coșul meu",
-        "url": "https://shop.rdndata.ro/"
+        "url": "https://shop.rdndata.ro/cart/"
       }
     ],
     "offices": [
