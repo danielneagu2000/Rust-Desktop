@@ -3,21 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RDN Remote – program de control la distanță pentru firme | RDN Network Data</title>
-<meta name="description" content="RDN Remote: control la distanță rapid și sigur pentru calculatoare și telefoane, pe server propriu în România. Conexiuni criptate, de la 10 €/lună. Descarcă gratuit.">
+<title>Program control la distanță și remote desktop | RDN Remote</title>
+<meta name="description" content="Program de control la distanță și remote desktop pentru firme, alternativă la TeamViewer și AnyDesk, cu server în România. Conexiuni criptate, de la 10 €/lună.">
 <link rel="canonical" href="https://remote.rdndata.ro/">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="ro_RO">
 <meta property="og:site_name" content="RDN Network Data">
 <meta property="og:url" content="https://remote.rdndata.ro/">
-<meta property="og:title" content="RDN Remote – control la distanță pentru firme, pe server din România">
+<meta property="og:title" content="RDN Remote – program de control la distanță și remote desktop, cu server în România">
 <meta property="og:description" content="Asistență IT și acces la distanță pe Windows, macOS, Linux și Android. Conexiuni criptate, fără limită de viteză impusă, de la 10 €/lună.">
 <meta property="og:image" content="https://remote.rdndata.ro/assets/logo.png">
-<meta name="theme-color" content="#5c0303">
+<meta name="theme-color" content="#0a0708" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbf6f6" media="(prefers-color-scheme: light)">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
-<link rel="stylesheet" href="/site.css?v=1">
-<link rel="stylesheet" href="/rdn.css?v=3">
+<link rel="stylesheet" href="/fonts.css?v=1">
+<link rel="stylesheet" href="/fut.css?v=1">
 <link rel="stylesheet" href="/footer.css">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <script type="application/ld+json">
@@ -47,7 +48,11 @@
         { "@type": "Question", "name": "Pe ce sisteme funcționează?", "acceptedAnswer": { "@type": "Answer", "text": "Pe Windows, macOS, Linux și Android. De pe iPhone și iPad poți controla alte dispozitive, dar acestea nu pot fi controlate, din cauza unei limitări impuse de Apple." } },
         { "@type": "Question", "name": "Cum activez licența?", "acceptedAnswer": { "@type": "Answer", "text": "După comandă primești un cod de licență. Instalezi aplicația, introduci codul la prima pornire și poți începe imediat. Fiecare dispozitiv pe care instalezi aplicația ocupă un loc din licență." } },
         { "@type": "Question", "name": "Ce este portalul de management al organizației?", "acceptedAnswer": { "@type": "Answer", "text": "Este o pagină web, la remote.rdndata.ro/portal, în care administratorii firmei văd toate dispozitivele licenței, cine e online și cine e conectat acum, istoricul sesiunilor și rapoartele lunare. Tot de acolo stabilesc ce dispozitive pot controla alte calculatoare, care calculatoare acceptă conexiuni din afara firmei, închid o sesiune, eliberează un loc de licență și adaugă colegi cu drept de administrare sau doar de vizualizare. Portalul este inclus în pachetul Advanced." } },
-        { "@type": "Question", "name": "Există limită de viteză?", "acceptedAnswer": { "@type": "Answer", "text": "Nu impunem o limită de viteză: calitatea imaginii depinde de conexiunea la internet a dispozitivelor. La cerere, putem limita banda folosită de fiecare client." } }
+        { "@type": "Question", "name": "Există limită de viteză?", "acceptedAnswer": { "@type": "Answer", "text": "Nu impunem o limită de viteză: calitatea imaginii depinde de conexiunea la internet a dispozitivelor. La cerere, putem limita banda folosită de fiecare client." } },
+        {"@type": "Question", "name": "Cum mă conectez la un calculator de la distanță?", "acceptedAnswer": {"@type": "Answer", "text": "Instalezi RDN Remote pe ambele dispozitive. Pe calculatorul la care te conectezi apar un ID și o parolă unică; le introduci în aplicația ta și apeși „Conectează-te”. Pentru calculatoarele tale poți seta o parolă permanentă, ca să intri și când nu e nimeni la ele."}},
+        {"@type": "Question", "name": "Pot controla calculatorul de pe telefon?", "acceptedAnswer": {"@type": "Answer", "text": "Da. Cu aplicația pentru Android vezi ecranul calculatorului și îl controlezi prin atingere, de oriunde ai internet. Pentru iPhone și iPad, aplicația este disponibilă la cerere."}},
+        {"@type": "Question", "name": "Ce este accesul nesupravegheat?", "acceptedAnswer": {"@type": "Answer", "text": "Este conectarea la un calculator la care nu stă nimeni, de exemplu un server sau calculatorul de la birou. Setezi o parolă permanentă pe acel calculator și te conectezi oricând cu ID-ul lui."}},
+        {"@type": "Question", "name": "Este RDN Remote gratuit?", "acceptedAnswer": {"@type": "Answer", "text": "Aplicația se descarcă gratuit, dar funcționează cu o licență: 10 € pe lună pentru pachetul Standard și 50 € pe lună pentru Advanced, pe 1, 3, 6, 9 sau 12 luni."}}
       ]
     }
   ]
@@ -56,90 +61,165 @@
 </head>
 <body>
 
+<div class="sky" aria-hidden="true"></div>
 <header class="top">
-  <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><span class="brand-text"><b>RDN REMOTE</b><span>remote.rdndata.ro</span></span></a>
-    <nav class="nav" id="nav" aria-label="Meniu principal">
-      <a href="/functii/">Funcții</a>
-      <a href="/preturi/">Prețuri</a>
-      <a href="/descarcare/">Descărcare</a>
-      <a href="/cum-functioneaza/">Cum funcționează</a>
-      <a href="/siguranta/">Siguranță</a>
-      <a href="/intrebari/">Întrebări</a>
-      <a class="nav-client" href="/portal/">Portal client</a>
-    </nav>
-    <div class="top-cta">
-      <a class="btn" href="/descarcare/">Descarcă</a>
+  <div class="wrap">
+    <div class="top-in">
+      <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><b>RDN REMOTE</b></a>
+      <nav class="nav" id="nav" aria-label="Meniu principal">
+        <a href="/functii/">Funcții</a>
+        <a href="/preturi/">Prețuri</a>
+        <a href="/descarcare/">Descărcare</a>
+        <a href="/cum-functioneaza/">Cum funcționează</a>
+        <a href="/siguranta/">Siguranță</a>
+        <a href="/intrebari/">Întrebări</a>
+        <a class="nav-client" href="/portal/">Portal client</a>
+      </nav>
+      <div class="top-cta"><a class="btn sm" href="/descarcare/">Descarcă</a></div>
       <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Deschide meniul"><span></span></button>
     </div>
   </div>
 </header>
 
-<div class="wrap">
-
-  <main id="top">
-    <div class="hero">
-      <div class="hero-copy">
-        <span class="label">Control la distanță pentru firme</span>
-        <h1>Control la distanță pe server propriu, în România. <em>Rapid și sigur.</em></h1>
-        <p class="lead"><strong>RDN Remote</strong> îți dă acces la calculatoarele și telefoanele tale de oriunde: asistență IT pentru clienți, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile sunt criptate și trec prin serverele RDN Network Data, nu prin servere străine.</p>
-        <div class="cta-row">
-          <a class="btn disabled" id="cta" href="/descarcare/"><span id="cta-text">Se încarcă…</span></a>
-          <a class="btn ghost" href="/preturi/">Vezi prețurile</a>
+<main>
+  <div class="hero">
+    <div class="floor" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <span class="tag">Remote desktop pentru firme</span>
+          <h1>Program de control la distanță, pe server propriu în România. <span class="grad">Rapid și sigur.</span></h1>
+          <p class="lead"><strong>RDN Remote</strong> îți dă acces la calculatoarele și telefoanele tale de oriunde: asistență IT pentru clienți, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile sunt criptate și trec prin serverele RDN Network Data, nu prin servere străine.</p>
+          <div class="cta-row">
+            <a class="btn disabled" id="cta" href="/descarcare/"><span id="cta-text">Se încarcă…</span></a>
+            <a class="btn glass" href="/preturi/">Vezi prețurile</a>
+          </div>
+          <p class="cta-meta" id="cta-meta"></p>
         </div>
-        <ul class="chips" aria-label="Pe scurt">
-          <li>Criptare end-to-end</li>
-          <li>Fără limită de viteză impusă</li>
-          <li>Windows, macOS, Linux, Android</li>
-          <li>Suport în limba română</li>
-        </ul>
-        <p class="note" id="cta-meta"></p>
+        <div class="stage">
+          <img class="orb" src="/img/3d-nodes.webp" width="760" height="714" alt="">
+          <div class="screen"><picture><source media="(prefers-color-scheme: light)" srcset="/img/app-main-light.webp"><img src="/img/app-main-dark.webp" width="1118" height="698" alt="Fereastra principală a aplicației RDN Remote: ID-ul dispozitivului, parola unică și câmpul pentru conectare"></picture></div>
+          <div class="chip c1"><i></i><div><b>Criptare end-to-end</b><span>serverul nu vede imaginea</span></div></div>
+          <div class="chip c2"><i></i><div><b>Server în România</b><span>RDN Network Data</span></div></div>
+        </div>
       </div>
-
-      <figure class="demo" aria-label="Exemplu: o sesiune RDN Remote, de la conectare la lucru">
-        <div class="demo-head"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span>sesiune · rdn remote</span><span id="demo-state">în sesiune</span></div>
-        <div class="demo-row">
-          <small>Calculatorul la care te conectezi</small>
-          <code class="swap" id="demo-code">ecran · fișiere · chat · terminal</code>
-        </div>
-        <div class="demo-row">
-          <small id="demo-explain">Serverul doar pune dispozitivele în legătură. Nu vede imaginea, tastatura sau fișierele.</small>
-        </div>
-        <div class="demo-foot">
-          <span>criptare: <b>end-to-end</b></span>
-          <span>server: <b>România</b></span>
-          <span>conexiune: <b id="demo-link">directă</b></span>
-        </div>
-      </figure>
+      <ul class="facts" aria-label="Pe scurt">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Criptare end-to-end</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Fără limită de viteză impusă</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="10" rx="2"/><rect x="16" y="9" width="6" height="11" rx="1.5"/><path d="M6 18h6"/></svg>Windows, macOS, Linux, Android</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Suport în limba română</li>
+      </ul>
+      <dl class="stats">
+        <div><dt>4</dt><dd>sisteme de operare: Windows, macOS, Linux, Android</dd></div>
+        <div><dt>2.000</dt><dd>dispozitive cu acces nesupravegheat, în Advanced</dd></div>
+        <div><dt>180</dt><dd>de zile păstrăm jurnalul fiecărei sesiuni</dd></div>
+        <div><dt>10 €</dt><dd>pe lună, pachetul Standard, fără costuri ascunse</dd></div>
+      </dl>
     </div>
+  </div>
 
-    <section id="functii">
-      <div class="sec-head">
-        <span class="label">Funcții</span>
-        <h2>Tot ce îți trebuie pentru asistență IT la distanță.</h2>
+  <section id="aplicatia">
+    <div class="wrap">
+      <div class="head">
+        <span class="tag">Aplicația</span>
+        <h2>Așa arată programul de remote desktop <span class="grad">RDN Remote.</span></h2>
+      </div>
+      <div class="showcase">
+        <figure class="shot big"><picture><source media="(prefers-color-scheme: light)" srcset="/img/app-main-light.webp"><img src="/img/app-main-dark.webp" width="1118" height="698" alt="Program de control la distanță RDN Remote: ecranul principal cu ID-ul dispozitivului și parola unică"></picture></figure>
+        <div class="side">
+        <figure><div class="shot r"><picture><source media="(prefers-color-scheme: light)" srcset="/img/app-sec-light.webp"><img src="/img/app-sec-dark.webp" width="1118" height="698" alt="Remote desktop RDN Remote: permisiunile pentru conexiunile la distanță"></picture></div><figcaption><b>01</b>Alegi ce poate face cel care se conectează: tastatură și mouse, fișiere, terminal, înregistrare.</figcaption></figure>
+        <figure><div class="shot r"><picture><source media="(prefers-color-scheme: light)" srcset="/img/app-lic-light.webp"><img src="/img/app-lic-dark.webp" width="1118" height="698" alt="Activarea licenței în RDN Remote"></picture></div><figcaption><b>02</b>Introduci codul de licență la prima pornire și poți începe imediat.</figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pentru-cine">
+    <div class="wrap">
+      <div class="head">
+        <span class="tag">Pentru cine</span>
+        <h2>Acces la distanță pentru <span class="grad">orice firmă.</span></h2>
+      </div>
+      <div class="uses">
+        <article class="use glass-card"><span class="num">01</span><h3>Firme de IT și service</h3><p>Oferi suport tehnic la distanță clienților: te conectezi în câteva secunde, rezolvi problema și închizi sesiunea.</p></article>
+        <article class="use glass-card"><span class="num">02</span><h3>Birouri și contabilitate</h3><p>Ajuți colegii cu programele de facturare sau de contabilitate fără să te deplasezi la birou.</p></article>
+        <article class="use glass-card"><span class="num">03</span><h3>Lucru de acasă</h3><p>Accesezi calculatorul de la birou de acasă, cu fișierele și programele tale, printr-o conexiune criptată.</p></article>
+        <article class="use glass-card"><span class="num">04</span><h3>Servere și stații de lucru</h3><p>Administrezi serverele și calculatoarele firmei la distanță, cu acces nesupravegheat și parolă permanentă.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="functii">
+    <div class="wrap feats-wrap">
+      <div class="head">
+        <span class="tag">Funcții</span>
+        <h2>Tot ce îți trebuie pentru <span class="grad">asistență IT la distanță.</span></h2>
         <p class="lead">O alternativă românească la AnyDesk și TeamViewer, găzduită pe infrastructura proprie RDN Network Data.</p>
       </div>
-      <div class="traps">
-        <div class="trap"><span class="label">Control</span><div><h3>Control complet de la distanță</h3><p>Vezi ecranul și lucrezi cu mouse-ul și tastatura ca și cum ai fi în fața calculatorului, inclusiv pe mai multe monitoare.</p></div></div>
-        <div class="trap"><span class="label">Fișiere</span><div><h3>Transfer de fișiere</h3><p>Copiezi fișiere și foldere între calculatoare, în ambele sensuri, direct din sesiune.</p></div></div>
-        <div class="trap"><span class="label">Oricând</span><div><h3>Acces nesupravegheat</h3><p>Te conectezi oricând la serverele și calculatoarele tale, cu o parolă permanentă, fără să fie cineva la ele.</p></div></div>
-        <div class="trap"><span class="label">Telefon</span><div><h3>De pe telefon</h3><p>Controlezi calculatorul de pe Android, iPhone sau iPad, iar telefoanele Android pot fi asistate de la distanță.</p></div></div>
-        <div class="trap"><span class="label">Viteză</span><div><h3>Rapid, fără limită impusă</h3><p>Conexiune directă între dispozitive ori de câte ori se poate. Nu limităm viteza: imaginea e cât de fluidă permite internetul tău.</p></div></div>
-        <div class="trap"><span class="label">Suport</span><div><h3>Chat și suport în română</h3><p>Discuți cu persoana asistată direct în sesiune, iar echipa RDN Network Data te ajută în limba română.</p></div></div>
+      <div class="feats">
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><h3>Control complet de la distanță</h3><p>Vezi ecranul și lucrezi cu mouse-ul și tastatura ca și cum ai fi în fața calculatorului, inclusiv pe mai multe monitoare.</p></article>
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6M13 11l2 2-2 2"/></svg></span><h3>Transfer de fișiere</h3><p>Copiezi fișiere și foldere între calculatoare, în ambele sensuri, direct din sesiune.</p></article>
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/></svg></span><h3>Acces nesupravegheat</h3><p>Te conectezi oricând la serverele și calculatoarele tale, cu o parolă permanentă, fără să fie cineva la ele.</p></article>
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></span><h3>De pe telefon</h3><p>Controlezi calculatorul de pe Android, iPhone sau iPad, iar telefoanele Android pot fi asistate de la distanță.</p></article>
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><h3>Rapid, fără limită impusă</h3><p>Conexiune directă între dispozitive ori de câte ori se poate. Nu limităm viteza: imaginea e cât de fluidă permite internetul tău.</p></article>
+        <article class="feat glass-card"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8 11h8M8 14h5"/></svg></span><h3>Chat și suport în română</h3><p>Discuți cu persoana asistată direct în sesiune, iar echipa RDN Network Data te ajută în limba română.</p></article>
       </div>
-    </section>
+      <ul class="more" aria-label="Alte funcții">
+        <li>Terminal la distanță</li><li>Clipboard comun</li><li>Transmiterea sunetului</li><li>Repornire la distanță</li>
+        <li>Înregistrarea sesiunilor</li><li>Tunel TCP</li><li>Mod privat</li><li>Mai multe monitoare</li>
+        <li>Parolă unică sau permanentă</li><li>Autentificare în doi pași</li>
+      </ul>
+    </div>
+  </section>
 
-    <section id="preturi">
-      <div class="sec-head">
-        <span class="label">Prețuri</span>
-        <h2>Alege pachetul potrivit pentru firma ta.</h2>
+  <section id="alternativa">
+    <div class="wrap alt-grid">
+      <div class="alt-art"><img src="/img/3d-globe.webp" width="759" height="760" alt="" aria-hidden="true"></div>
+      <div>
+        <div class="head" style="margin-bottom:20px">
+          <span class="tag">Alternativă la TeamViewer și AnyDesk</span>
+          <h2>Remote desktop românesc, <span class="grad">cu server propriu.</span></h2>
+          <p class="lead">Dacă folosești TeamViewer sau AnyDesk, RDN Remote îți oferă aceleași lucruri de bază: control de la distanță, transfer de fișiere și acces nesupravegheat. Diferența e unde trec datele și cine îți răspunde.</p>
+        </div>
+        <ul class="ticks">
+          <li><span><b>Server în România</b>, administrat de RDN Network Data, nu de o companie din afara țării.</span></li>
+          <li><span><b>Date în Spațiul Economic European</b>, conform GDPR, cu jurnal păstrat 180 de zile.</span></li>
+          <li><span><b>Suport în limba română</b>, de la echipa care administrează serverul.</span></li>
+          <li><span><b>Preț fix în euro</b>, de la 10 € pe lună, pe 1, 3, 6, 9 sau 12 luni.</span></li>
+          <li><span><b>Open source</b>: construit pe RustDesk (AGPL-3.0), cu codul sursă public.</span></li>
+        </ul>
+        <div class="cta-row"><a class="btn" href="/descarcare/">Descarcă RDN Remote</a><a class="btn glass" href="/preturi/">Vezi prețurile</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cum">
+    <div class="wrap">
+      <div class="head center">
+        <span class="tag">Cum funcționează</span>
+        <h2>Conectat în mai puțin de <span class="grad">un minut.</span></h2>
+      </div>
+      <ol class="steps">
+        <li><h3>Comanzi licența</h3><p>Alegi pachetul pe shop.rdndata.ro și primești codul de licență pe e-mail.</p></li>
+        <li><h3>Instalezi aplicația</h3><p>Descarci RDN Remote și introduci codul la prima pornire. Pe Mac permiți „Înregistrare ecran” și „Accesibilitate”.</p></li>
+        <li><h3>Te conectezi</h3><p>Introduci ID-ul dispozitivului și parola unică afișată acolo, sau parola permanentă setată de tine.</p></li>
+        <li><h3>Lucrezi ca la birou</h3><p>Controlezi ecranul, muți fișiere și discuți prin chat. La final parola unică expiră.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="preturi">
+    <div class="wrap">
+      <div class="head center">
+        <span class="tag">Prețuri</span>
+        <h2>Alege pachetul potrivit <span class="grad">pentru firma ta.</span></h2>
         <p class="lead">Abonament pe 1, 3, 6, 9 sau 12 luni, fără costuri ascunse. Comanzi din magazinul RDN Network Data și primești codul de licență pe e-mail.</p>
       </div>
-      <div class="plans two">
-        <article class="plan">
-          <span class="tag">Standard</span>
-          <h3>Pentru freelanceri și firme mici</h3>
-          <p class="price">10 €<small>pe lună, de la 1 lună la 12 luni</small></p>
+      <div class="plans">
+        <article class="plan glass-card">
+          <div class="name"><b>Standard</b><span class="pill">Firme mici</span></div>
+          <p class="for">Pentru freelanceri și firme mici</p>
+          <div class="price"><b>10 €</b><span>pe lună, de la 1 lună la 12 luni</span></div>
           <ul>
             <li>1 conexiune simultană, până la 20 la cerere</li>
             <li>500 de dispozitive cu acces nesupravegheat</li>
@@ -148,12 +228,12 @@
             <li>Mod privat și mai multe monitoare</li>
             <li>Actualizări automate cât ține abonamentul</li>
           </ul>
-          <a class="btn" href="https://shop.rdndata.ro/?post_type=product&amp;p=176">Comandă Standard</a>
+          <a class="btn glass block" href="https://shop.rdndata.ro/?post_type=product&amp;p=176">Comandă Standard</a>
         </article>
-        <article class="plan pop">
-          <span class="tag">Advanced · recomandat pentru firme</span>
-          <h3>Pentru echipe IT și companii</h3>
-          <p class="price">50 €<small>pe lună, de la 1 lună la 12 luni</small></p>
+        <article class="plan pro glass-card">
+          <div class="name"><b>Advanced</b><span class="pill">Recomandat pentru firme</span></div>
+          <p class="for">Pentru echipe IT și companii</p>
+          <div class="price"><b>50 €</b><span>pe lună, de la 1 lună la 12 luni</span></div>
           <ul>
             <li>Portal de management al organizației, cu oricâți administratori</li>
             <li>2.000 de dispozitive cu acces nesupravegheat</li>
@@ -162,66 +242,62 @@
             <li>Conexiuni simultane și bandă stabilite după nevoile echipei</li>
             <li>Echipă de suport dedicată, plus tot din Standard</li>
           </ul>
-          <a class="btn" href="https://shop.rdndata.ro/?post_type=product&amp;p=183">Comandă Advanced</a>
+          <a class="btn block" href="https://shop.rdndata.ro/?post_type=product&amp;p=183">Comandă Advanced</a>
         </article>
       </div>
-      <div class="price-wrap seo-text">
+      <p class="vat"><b>Prețuri finale:</b> RDN Network Data nu este plătitoare de TVA. Plata se face pe shop.rdndata.ro. Ai nevoie de altceva? <a href="/contact/">Contactează-ne</a> pentru o ofertă personalizată.</p>
+
+      <div class="portal glass-card">
         <div>
-          <h3>Program de control la distanță pentru firme din România</h3>
-          <p>RDN Remote este un program de remote desktop pentru asistență IT și acces de la distanță la calculatoare, servere și telefoane. Te conectezi cu ID-ul dispozitivului și o parolă, vezi ecranul, lucrezi cu mouse-ul și tastatura, muți fișiere și discuți prin chat cu persoana pe care o ajuți, fără configurări de rețea sau porturi deschise la client.</p>
+          <span class="tag">Inclus în Advanced</span>
+          <h3>Portalul organizației</h3>
+          <dl>
+            <div><dt>Toate dispozitivele firmei</dt><dd>Vezi cine e online, cine e conectat acum și pe ce calculator.</dd></div>
+            <div><dt>Drepturi pe fiecare dispozitiv</dt><dd>Alegi cine poate controla alte calculatoare și care acceptă conexiuni din afara firmei.</dd></div>
+            <div><dt>Istoric și rapoarte</dt><dd>Sesiunile din ultimele 30 de zile și rapoarte lunare, descărcabile pentru Excel.</dd></div>
+            <div><dt>Colegi</dt><dd>Adaugi administratori sau conturi doar de vizualizare.</dd></div>
+          </dl>
+          <a class="btn" href="/portal/">Intră în portal</a>
+        </div>
+        <div class="art"><img src="/img/3d-nodes.webp" width="760" height="714" alt="" aria-hidden="true"></div>
+      </div>
+
+      <div class="about">
+        <div class="glass-card"><h3>Program de control la distanță pentru firme din România</h3><p>RDN Remote este un program de remote desktop pentru asistență IT și acces de la distanță la calculatoare, servere și telefoane. Te conectezi cu ID-ul dispozitivului și o parolă, vezi ecranul, lucrezi cu mouse-ul și tastatura, muți fișiere și discuți prin chat cu persoana pe care o ajuți, fără configurări de rețea sau porturi deschise la client.</p></div>
+        <div class="glass-card"><h3>Alternativă la AnyDesk și TeamViewer, cu server propriu</h3><p>Conexiunile trec prin serverul nostru din România, administrat de RDN Network Data, nu prin servere din afara țării. Sesiunile sunt criptate end-to-end, iar serverul doar pune dispozitivele în legătură: nu vede imaginea, tastatura sau fișierele. Datele rămân în Spațiul Economic European, conform GDPR.</p></div>
+        <div class="glass-card"><h3>Licență lunară, fără instalare complicată</h3><p>Plătești abonamentul pe shop.rdndata.ro, pe 1, 3, 6, 9 sau 12 luni, și primești codul de licență pe e-mail. Instalezi aplicația pe Windows, macOS, Linux sau Android, introduci codul și ești gata. Pentru echipe IT, pachetul Advanced adaugă portalul organizației, cu drepturi pe fiecare dispozitiv și rapoarte lunare.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="descarcari">
+    <div class="wrap">
+      <div class="dl-grid">
+        <div>
+          <div class="head" style="margin-bottom:24px">
+            <span class="tag">Descărcare</span>
+            <h2>Descarcă <span class="grad">RDN Remote.</span></h2>
+            <p class="lead" id="dl-sub">Alege sistemul tău de operare.</p>
+          </div>
+          <div class="dl-art"><img src="/img/3d-server.webp" width="760" height="589" alt="" aria-hidden="true"></div>
         </div>
         <div>
-          <h3>Alternativă la AnyDesk și TeamViewer, cu server propriu</h3>
-          <p>Conexiunile trec prin serverul nostru din România, administrat de RDN Network Data, nu prin servere din afara țării. Sesiunile sunt criptate end-to-end, iar serverul doar pune dispozitivele în legătură: nu vede imaginea, tastatura sau fișierele. Datele rămân în Spațiul Economic European, conform GDPR.</p>
-        </div>
-        <div>
-          <h3>Licență lunară, fără instalare complicată</h3>
-          <p>Plătești abonamentul pe shop.rdndata.ro, pe 1, 3, 6, 9 sau 12 luni, și primești codul de licență pe e-mail. Instalezi aplicația pe Windows, macOS, Linux sau Android, introduci codul și ești gata. Pentru echipe IT, pachetul Advanced adaugă portalul organizației, cu drepturi pe fiecare dispozitiv și rapoarte lunare.</p>
+          <div class="os-grid" id="grid"></div>
+          <p class="dl-note">iPhone și iPad: aplicația poate controla alte dispozitive (iOS nu permite controlul de la distanță al telefonului). Disponibilă la cerere.</p>
+          <details class="sums" id="sums" hidden><summary>Verificare integritate (SHA-256)</summary><table id="sums-t"></table></details>
         </div>
       </div>
-      <p class="note"><b>Prețuri finale:</b> RDN Network Data nu este plătitoare de TVA. Plata se face pe shop.rdndata.ro. Ai nevoie de altceva? <a href="/contact/">Contactează-ne</a> pentru o ofertă personalizată.</p>
-      <div class="code-info price-wrap">
-        <h3>Portalul organizației, inclus în Advanced</h3>
-        <ul class="code-rules">
-          <li><b>Toate dispozitivele firmei</b><span>Vezi cine e online, cine e conectat acum și pe ce calculator.</span></li>
-          <li><b>Drepturi pe fiecare dispozitiv</b><span>Alegi cine poate controla alte calculatoare și care acceptă conexiuni din afara firmei.</span></li>
-          <li><b>Istoric și rapoarte</b><span>Sesiunile din ultimele 30 de zile și rapoarte lunare, descărcabile pentru Excel.</span></li>
-          <li><b>Colegi</b><span>Adaugi administratori sau conturi doar de vizualizare.</span></li>
-        </ul>
-        <div class="code-cta"><p>Ai deja cont?</p><a class="btn" href="/portal/">Intră în portal</a></div>
-      </div>
-    </section>
+    </div>
+  </section>
 
-    <section id="descarcari">
-      <div class="sec-head">
-        <span class="label">Descărcare</span>
-        <h2>Descarcă RDN Remote.</h2>
-        <p class="lead" id="dl-sub">Alege sistemul tău de operare.</p>
-      </div>
-      <div class="modules os4" id="grid"></div>
-      <p class="note">iPhone și iPad: aplicația poate controla alte dispozitive (iOS nu permite controlul de la distanță al telefonului). Disponibilă la cerere.</p>
-      <details class="sums" id="sums" hidden><summary>Verificare integritate (SHA-256)</summary><table id="sums-t"></table></details>
-    </section>
-
-    <section id="cum" class="dark">
-      <div class="sec-head">
-        <span class="label">Cum funcționează</span>
-        <h2>Conectat în mai puțin de un minut.</h2>
-      </div>
-      <ol class="route four">
-        <li><b>Comanzi licența</b><span>Alegi pachetul pe shop.rdndata.ro și primești codul de licență pe e-mail.</span></li>
-        <li><b>Instalezi aplicația</b><span>Descarci RDN Remote și introduci codul la prima pornire. Pe Mac permiți „Înregistrare ecran” și „Accesibilitate”.</span></li>
-        <li><b>Te conectezi</b><span>Introduci ID-ul dispozitivului și parola unică afișată acolo, sau parola permanentă setată de tine.</span></li>
-        <li><b>Lucrezi ca la birou</b><span>Controlezi ecranul, muți fișiere și discuți prin chat. La final parola unică expiră.</span></li>
-      </ol>
-    </section>
-
-    <section id="siguranta">
-      <div class="specs-grid">
+  <section id="siguranta">
+    <div class="wrap">
+      <div class="sec-grid">
+        <div class="sec-art"><img src="/img/3d-lock.webp" width="760" height="760" alt="" aria-hidden="true"></div>
         <div>
-          <div class="sec-head">
-            <span class="label">Siguranță</span>
-            <h2>Datele tale rămân ale tale.</h2>
+          <div class="head" style="margin-bottom:0">
+            <span class="tag">Siguranță</span>
+            <h2>Datele tale rămân <span class="grad">ale tale.</span></h2>
             <p class="lead">Construit pe tehnologia open-source RustDesk și găzduit pe infrastructura proprie RDN Network Data.</p>
           </div>
           <ul class="checks">
@@ -231,28 +307,26 @@
             <li class="warn">Nu da niciodată ID-ul și parola cuiva care te sună nesolicitat. RDN Network Data nu îți cere acces fără ca tu să ne fi contactat.</li>
           </ul>
         </div>
-        <div>
-          <table class="specs" aria-label="Detalii tehnice">
-            <tbody>
-              <tr><th scope="row">Criptare</th><td>end-to-end, între cele două dispozitive</td></tr>
-              <tr><th scope="row">Server</th><td>RDN Network Data, în România</td></tr>
-              <tr><th scope="row">Conexiune</th><td>directă între dispozitive când se poate, altfel prin serverul nostru</td></tr>
-              <tr><th scope="row">Parole greșite</th><td>blocare automată, cu limite stabilite de noi</td></tr>
-              <tr><th scope="row">Licență</th><td>semnată digital și verificată de aplicație</td></tr>
-              <tr><th scope="row">Jurnal</th><td>fiecare sesiune, păstrat 180 de zile</td></tr>
-              <tr><th scope="row">Sisteme</th><td>Windows, macOS, Linux, Android; iPhone și iPad doar pentru a controla</td></tr>
-              <tr><th scope="row">Tehnologie</th><td>RustDesk, open source (AGPL-3.0)</td></tr>
-            </tbody>
-          </table>
-          <p class="note">Actualizările aplicației se descarcă doar din versiunile publicate de noi și se instalează singure pe Windows și macOS.</p>
-        </div>
       </div>
-    </section>
+      <dl class="specs" aria-label="Detalii tehnice">
+        <div class="glass-card"><dt>Criptare</dt><dd>end-to-end, între cele două dispozitive</dd></div>
+        <div class="glass-card"><dt>Server</dt><dd>RDN Network Data, în România</dd></div>
+        <div class="glass-card"><dt>Conexiune</dt><dd>directă între dispozitive când se poate, altfel prin serverul nostru</dd></div>
+        <div class="glass-card"><dt>Parole greșite</dt><dd>blocare automată, cu limite stabilite de noi</dd></div>
+        <div class="glass-card"><dt>Licență</dt><dd>semnată digital și verificată de aplicație</dd></div>
+        <div class="glass-card"><dt>Jurnal</dt><dd>fiecare sesiune, păstrat 180 de zile</dd></div>
+        <div class="glass-card"><dt>Sisteme</dt><dd>Windows, macOS, Linux, Android; iPhone și iPad doar pentru a controla</dd></div>
+        <div class="glass-card"><dt>Tehnologie</dt><dd>RustDesk, open source (AGPL-3.0)</dd></div>
+      </dl>
+      <p class="specs-note">Actualizările aplicației se descarcă doar din versiunile publicate de noi și se instalează singure pe Windows și macOS.</p>
+    </div>
+  </section>
 
-    <section id="intrebari">
-      <div class="sec-head">
-        <span class="label">Întrebări frecvente</span>
-        <h2>Ce trebuie să știi despre RDN Remote.</h2>
+  <section id="intrebari">
+    <div class="wrap">
+      <div class="head center">
+        <span class="tag">Întrebări frecvente</span>
+        <h2>Ce trebuie să știi despre <span class="grad">RDN Remote.</span></h2>
       </div>
       <div class="faq">
         <details class="qa"><summary><h3>Ce este RDN Remote?</h3></summary><p>RDN Remote este un program de control la distanță prin care te conectezi la calculatoare și telefoane de oriunde, pentru asistență IT, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile trec prin serverele RDN Network Data din România.</p></details>
@@ -262,29 +336,33 @@
         <details class="qa"><summary><h3>Cum activez licența?</h3></summary><p>După comandă primești un cod de licență. Instalezi aplicația, introduci codul la prima pornire și poți începe imediat. Fiecare dispozitiv pe care instalezi aplicația ocupă un loc din licență.</p></details>
         <details class="qa"><summary><h3>Ce este portalul de management al organizației?</h3></summary><p>Este o pagină web, la remote.rdndata.ro/portal, în care administratorii firmei văd toate dispozitivele licenței, cine e online și cine e conectat acum, istoricul sesiunilor și rapoartele lunare. Tot de acolo stabilesc ce dispozitive pot controla alte calculatoare, care calculatoare acceptă conexiuni din afara firmei, închid o sesiune, eliberează un loc de licență și adaugă colegi cu drept de administrare sau doar de vizualizare. Portalul este inclus în pachetul Advanced.</p></details>
         <details class="qa"><summary><h3>Există limită de viteză?</h3></summary><p>Nu impunem o limită de viteză: calitatea imaginii depinde de conexiunea la internet a dispozitivelor. La cerere, putem limita banda folosită de fiecare client.</p></details>
+        <details class="qa"><summary><h3>Cum mă conectez la un calculator de la distanță?</h3></summary><p>Instalezi RDN Remote pe ambele dispozitive. Pe calculatorul la care te conectezi apar un ID și o parolă unică; le introduci în aplicația ta și apeși „Conectează-te”. Pentru calculatoarele tale poți seta o parolă permanentă, ca să intri și când nu e nimeni la ele.</p></details>
+        <details class="qa"><summary><h3>Pot controla calculatorul de pe telefon?</h3></summary><p>Da. Cu aplicația pentru Android vezi ecranul calculatorului și îl controlezi prin atingere, de oriunde ai internet. Pentru iPhone și iPad, aplicația este disponibilă la cerere.</p></details>
+        <details class="qa"><summary><h3>Ce este accesul nesupravegheat?</h3></summary><p>Este conectarea la un calculator la care nu stă nimeni, de exemplu un server sau calculatorul de la birou. Setezi o parolă permanentă pe acel calculator și te conectezi oricând cu ID-ul lui.</p></details>
+        <details class="qa"><summary><h3>Este RDN Remote gratuit?</h3></summary><p>Aplicația se descarcă gratuit, dar funcționează cu o licență: 10 € pe lună pentru pachetul Standard și 50 € pe lună pentru Advanced, pe 1, 3, 6, 9 sau 12 luni.</p></details>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section id="contact">
-      <div class="contact">
-        <div class="sec-head">
-          <span class="label">Contact</span>
-          <h2>Ai nevoie de ajutor sau de o ofertă?</h2>
-          <p class="lead" id="hours">Echipa RDN Network Data îți răspunde în limba română. Scrie-ne pe WhatsApp, pe e-mail sau sună-ne.</p>
+  <section id="contact">
+    <div class="wrap">
+      <div class="contact-box glass-card">
+        <div>
+          <span class="tag">Contact</span>
+          <h2 style="margin-top:14px">Ai nevoie de ajutor sau de o ofertă?</h2>
+          <p id="hours">Echipa RDN Network Data îți răspunde în limba română. Scrie-ne pe WhatsApp, pe e-mail sau sună-ne.</p>
         </div>
-        <div class="contact-box">
-          <a class="contact-line" id="c-mail" href="mailto:office@rdndata.ro"><span class="label">Email</span><span>office@rdndata.ro</span></a>
-          <a class="contact-line" id="c-tel" href="tel:+40723122097"><span class="label">Telefon</span><span>0723 122 097</span></a>
-          <a class="contact-line wa-line" href="https://wa.me/40723122097?text=Bun%C4%83%20ziua%21%20Am%20o%20%C3%AEntrebare%20despre%20RDN%20Remote." target="_blank" rel="noopener"><span class="label">WhatsApp</span><span class="wa-num"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>0723 122 097</span></a>
+        <div class="contact-links">
+          <a class="contact-line" id="c-mail" href="mailto:office@rdndata.ro"><small>Email</small><span>office@rdndata.ro</span></a>
+          <a class="contact-line" id="c-tel" href="tel:+40723122097"><small>Telefon</small><span>0723 122 097</span></a>
+          <a class="contact-line wa" href="https://wa.me/40723122097?text=Bun%C4%83%20ziua%21%20Am%20o%20%C3%AEntrebare%20despre%20RDN%20Remote." target="_blank" rel="noopener"><small>WhatsApp</small><span>0723 122 097</span></a>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </section>
+</main>
 
-  <a class="to-top off" id="toTop" href="/" aria-label="Înapoi sus, la începutul paginii"><img src="/assets/logo.png" width="600" height="392" alt=""></a>
-  <a class="wa-float" href="https://wa.me/40723122097?text=Bun%C4%83%20ziua%21%20Am%20o%20%C3%AEntrebare%20despre%20RDN%20Remote." target="_blank" rel="noopener" aria-label="Scrie-ne pe WhatsApp"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg><span>WhatsApp</span></a>
-
-</div>
+<a class="wa-float" href="https://wa.me/40723122097?text=Bun%C4%83%20ziua%21%20Am%20o%20%C3%AEntrebare%20despre%20RDN%20Remote." target="_blank" rel="noopener" aria-label="Scrie-ne pe WhatsApp"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg><span>WhatsApp</span></a>
 
 <footer class="rdn-footer" id="site-footer"></footer>
 
@@ -302,7 +380,6 @@
   var NAMES = { windows: "Windows", macos: "macOS", linux: "Linux", android: "Android" };
   var ORDER = ["windows", "macos", "linux", "android"];
   var PRIMARY = { windows: "win-x64", macos: "mac-arm64", linux: "deb-x64", android: "apk-universal" };
-
   function esc(v) {
     return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -319,22 +396,19 @@
     if (/linux|x11/i.test(p + ua)) return "linux";
     return "";
   }
-
   function render(m, site) {
     var os = detect(), items = (m && m.items) || [], byKey = {};
     items.forEach(function (it) { byKey[it.key] = it; });
-
     var order = ORDER.filter(function (p) { return p === os; }).concat(ORDER.filter(function (p) { return p !== os; }));
     document.getElementById("grid").innerHTML = order.map(function (p) {
       var list = items.filter(function (it) { return it.platform === p; });
       var rows = list.length ? list.map(function (it) {
         return '<div class="file"><span class="l">' + esc(it.label) + '<span class="s">' + esc(mb(it.size)) + "</span></span>" +
-          '<a class="cell-btn" href="' + esc(abs(it.file)) + '" download>Descarcă</a></div>';
+          '<a class="btn sm" href="' + esc(abs(it.file)) + '" download>Descarcă</a></div>';
       }).join("") : '<div class="none">În curând</div>';
-      return '<article class="mod os' + (p === os ? " current" : "") + '">' + (p === os ? '<span class="tag">Sistemul tău</span>' : "") +
-        "<h3>" + ICONS[p] + NAMES[p] + "</h3><div>" + rows + "</div></article>";
+      return '<article class="os glass-card' + (p === os ? " current" : "") + '">' + (p === os ? '<span class="badge">Sistemul tău</span>' : "") +
+        '<div class="os-h"><span class="os-ico">' + ICONS[p] + "</span><h3>" + NAMES[p] + "</h3></div>" + rows + "</article>";
     }).join("");
-
     var cta = document.getElementById("cta"), text = document.getElementById("cta-text"), meta = document.getElementById("cta-meta");
     var main = byKey[PRIMARY[os]] || (os === "macos" && byKey["mac-x64"]);
     if (main) {
@@ -353,21 +427,18 @@
     }
     if (m && m.version) document.getElementById("dl-sub").textContent =
       "Versiunea " + m.version + (m.published ? ", publicată pe " + new Date(m.published * 1000).toLocaleDateString("ro-RO") : "") + ". Alege sistemul tău de operare.";
-
     if (items.length) {
       document.getElementById("sums").hidden = false;
       document.getElementById("sums-t").innerHTML = items.map(function (it) {
         return "<tr><td>" + esc(it.file.split("/").pop()) + "</td><td><code>" + esc(it.sha256) + "</code></td></tr>";
       }).join("");
     }
-
     if (site) {
       if (site.email) { var e = document.getElementById("c-mail"); e.href = "mailto:" + site.email; e.lastElementChild.textContent = site.email; }
       if (site.phone) { var t = document.getElementById("c-tel"); t.href = "tel:" + site.phone.replace(/[^+\d]/g, ""); t.lastElementChild.textContent = site.phone; }
       if (site.hours) document.getElementById("hours").textContent = site.hours;
     }
   }
-
   function get(url) {
     return fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
   }
