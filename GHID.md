@@ -150,10 +150,13 @@ Pe un VPS poți deschide panoul la o adresă proprie, de exemplu `https://panou.
 2. Pe server: `cd /root/Rust-Desktop && git pull && PANEL_DOMAIN=panou.rdndata.ro ./server/install.sh remote.rdndata.ro`
 3. La final scriptul afișează un **cod QR** (sau cheia) pentru aplicația de autentificare de pe
    telefon (Google Authenticator, Microsoft Authenticator, Authy). Scanează-l o singură dată.
-4. Intră la `https://panou.rdndata.ro` cu utilizatorul, parola și codul de 6 cifre din aplicație.
+4. Intră la `https://panou.rdndata.ro`: întâi utilizatorul și parola, apoi, pe pagina următoare,
+   codul de 6 cifre din aplicație. Pagina pentru cod e valabilă 5 minute; după aceea o iei de la
+   capăt.
 
-Sesiunea ține 12 ore (butonul **Ieșire** o închide). După 10 încercări greșite de pe același IP,
-accesul de pe acel IP e blocat 15 minute. Cheia 2FA e în `server/.env` (`PANEL_TOTP_SECRET`) și
+Sesiunea ține 12 ore (butonul **Ieșire** o închide; durata se schimbă din tab-ul **Setări**).
+După 10 încercări greșite de pe același IP (parolă sau cod), accesul de pe acel IP e blocat
+15 minute (valorile se schimbă din tab-ul **IP-uri blocate**). Cheia 2FA e în `server/.env` (`PANEL_TOTP_SECRET`) și
 în backup; dacă pierzi telefonul, o vezi acolo și o adaugi din nou în aplicație.
 
 Acces: implicit panoul ascultă doar local pe server (port 21120). Utilizatorul și parola sunt

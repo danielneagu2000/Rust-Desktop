@@ -877,12 +877,37 @@ LOGIN_HTML = login_template(
     USER_LABEL="Utilizator",
     USER_ATTRS='autocomplete="username"',
 )
-TOTP_FIELD = """<label for="c">Cod din aplicația de autentificare</label>
-<input id="c" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required>"""
+LOGIN_TOTP_HTML = login_template(
+    TITLE="Verificare în doi pași · RDN Remote",
+    HEADING="Panoul de administrare <span>RDN Remote</span>",
+    LEAD="Licențe, dispozitive, conexiuni, comenzi din shop și securitatea serverului, într-un singur loc.",
+    POINTS=["Autentificare în doi pași", "Server propriu, în România", "Conexiuni criptate de la un capăt la altul"],
+    FORM_TITLE="Verificare în doi pași",
+    FORM_SUB="Deschide Google Authenticator pe telefon și introdu codul pentru RDN Remote.",
+    USER_LABEL="",
+    USER_ATTRS="",
+)
+TOTP_FIELD = """<label for="c">Codul de 6 cifre</label>
+<input id="c" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required autofocus
+ style="font-size:22px;letter-spacing:.35em;text-align:center">
+<p style="margin:12px 0 0;font-size:13px">Codul se schimbă la 30 de secunde. <a href="./">Înapoi la utilizator și parolă</a></p>"""
+PENDING_COOKIE = "rdn_panel_2fa"
+PENDING_TTL = 300
+PENDING_2FA = {}  # token -> expiry: user and password were right, the code is still due
+
+
+def totp_page(error=""):
+    html = LOGIN_TOTP_HTML
+    start, end = html.index("<!--FIELDS-->"), html.index("<!--/FIELDS-->")
+    html = html[:start] + TOTP_FIELD + html[end:]
+    html = html.replace(">Intră în cont</button>", ">Verifică și intră</button>")
+    if error:
+        html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
+    return html
 
 
 def login_page(error=""):
-    html = LOGIN_HTML.replace("<!--TOTP-->", TOTP_FIELD if PANEL_TOTP_SECRET else "")
+    html = LOGIN_HTML.replace("<!--TOTP-->", "")
     if error:
         html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
     return html
@@ -1073,44 +1098,81 @@ class PanelHandler(BaseHTTPRequestHandler):
             self.reply(200, login_page(), "text/html; charset=utf-8")
         return False
 
+    def cookie(self, name):
+        for part in self.headers.get("Cookie", "").split(";"):
+            key, _, value = part.strip().partition("=")
+            if key == name and re.fullmatch(r"[A-Za-z0-9_-]{20,100}", value):
+                return value
+        return None
+
     def login(self):
+        """Step 1: user and password. Step 2 (when 2FA is set up): the code, on its own page."""
         ip = self.client_ip()
         now = time.time()
+        html = "text/html; charset=utf-8"
         max_fails, lock_seconds = lockout("panel")
         with AUTH_LOCK:
             fails, until = AUTH_FAILS.get(ip, (0, 0))
         if until > now:
-            return self.reply(429, login_page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}."),
-                              "text/html; charset=utf-8")
+            return self.reply(429, login_page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}."), html)
         length = body_length(self.headers, 4096)
         if length is None:
             return self.reply(413, "body prea mare")
         form = parse_qs(self.rfile.read(length).decode("utf-8", "replace") if length else "")
+        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+
+        def failed(page, message):
+            with AUTH_LOCK:
+                AUTH_FAILS[ip] = (fails + 1, now + lock_seconds if fails + 1 >= max_fails else 0)
+            log(f"panel: failed login from {ip}")
+            return self.reply(200, page(message), html)
+
+        if "code" in form:
+            pending = self.cookie(PENDING_COOKIE)
+            with AUTH_LOCK:
+                expiry = PENDING_2FA.get(pending, 0) if pending else 0
+            if expiry <= now:
+                return self.reply(200, login_page("Verificarea a expirat. Autentifică-te din nou."), html)
+            if not totp_ok((form.get("code") or [""])[0]):
+                return failed(totp_page, "Cod greșit sau expirat. Introdu codul afișat acum în aplicație.")
+            with AUTH_LOCK:
+                PENDING_2FA.pop(pending, None)
+            return self.start_session(ip, now, secure, clear_pending=True)
+
         user = (form.get("user") or [""])[0]
         pwd = (form.get("password") or [""])[0]
         ok = hmac.compare_digest(user.encode(), PANEL_USER.encode()) & hmac.compare_digest(pwd.encode(), PANEL_PASSWORD.encode())
-        if ok and PANEL_TOTP_SECRET:
-            ok = totp_ok((form.get("code") or [""])[0])
         if not ok:
-            with AUTH_LOCK:
-                fails += 1
-                AUTH_FAILS[ip] = (fails, now + lock_seconds if fails >= max_fails else 0)
-            log(f"panel: failed login from {ip}")
-            return self.reply(200, login_page("Date de autentificare greșite."), "text/html; charset=utf-8")
+            return failed(login_page, "Utilizator sau parolă greșită.")
+        if not PANEL_TOTP_SECRET:
+            return self.start_session(ip, now, secure)
         token = secrets.token_urlsafe(32)
+        with AUTH_LOCK:
+            for t in [t for t, e in PENDING_2FA.items() if e <= now]:
+                del PENDING_2FA[t]
+            PENDING_2FA[token] = now + PENDING_TTL
+        return self.reply(200, totp_page(), html, headers=[
+            ("Set-Cookie", f"{PENDING_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={PENDING_TTL}{secure}")])
+
+    def start_session(self, ip, now, secure, clear_pending=False):
+        token = secrets.token_urlsafe(32)
+        ttl = conf("panel_session_hours") * 3600
         with AUTH_LOCK:
             AUTH_FAILS.pop(ip, None)
             for t in [t for t, e in PANEL_SESSIONS.items() if e <= now]:
                 del PANEL_SESSIONS[t]
-            ttl = conf("panel_session_hours") * 3600
             PANEL_SESSIONS[token] = now + ttl
         log(f"panel: login from {ip}")
-        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
         path = urlparse(self.path).path
-        self.reply(303, "", headers=[
+        headers = [
             ("Location", path[: -len("login")] or "/"),
             ("Set-Cookie", f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={ttl}{secure}"),
-        ])
+        ]
+        if clear_pending:
+            headers.append(("Set-Cookie", f"{PENDING_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"))
+        self.reply(303, "", headers=headers)
+
+    # ------------------------------------------------------------ shop webhook
 
     def shop_webhook(self):
         length = body_length(self.headers, SHOP_MAX_BODY)

@@ -43,7 +43,8 @@ button:active { transform: translateY(1px); }
 .err { background: #fde8eb; color: #9b1c1c; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; margin-bottom: 4px; }
 .foot { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px;
   color: var(--muted); font-size: 12.5px; }
-.foot a { color: inherit; }
+form a { color: var(--brand); font-weight: 600; }
+.foot a { color: inherit; font-weight: 400; }
 @media (max-width: 900px) {
   body { flex-direction: column; }
   .side { padding: 28px 22px 24px; flex: none; }
@@ -101,11 +102,13 @@ button:active { transform: translateY(1px); }
     <h2>{{FORM_TITLE}}</h2>
     <p>{{FORM_SUB}}</p>
     <!--ERR-->
+    <!--FIELDS-->
     <label for="u">{{USER_LABEL}}</label>
     <input id="u" name="user" {{USER_ATTRS}} required autofocus>
     <label for="p">Parolă</label>
     <input id="p" name="password" type="password" autocomplete="current-password" required>
     <!--TOTP-->
+    <!--/FIELDS-->
     <button type="submit">Intră în cont</button>
     <div class="foot"><span>© RDN Network Data</span><a href="https://remote.rdndata.ro/" rel="noopener">remote.rdndata.ro</a></div>
   </form>
