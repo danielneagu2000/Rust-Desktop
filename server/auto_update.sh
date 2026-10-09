@@ -57,16 +57,69 @@ if ! git_ diff --quiet || ! git_ diff --cached --quiet; then
   exit 1
 fi
 
+if ! healthy; then
+  echo "Atenție: serverul nu răspundea corect nici înainte de actualizare." >&2
+fi
 echo "Actualizez serverul de la ${CURRENT:0:12} la $TAG"
 git_ checkout --quiet --detach "$TARGET"
-docker compose pull --quiet --ignore-buildable
-docker compose up -d --build --remove-orphans
-# panel.py, pagina web și Caddyfile sunt montate din repo; le reîncarc explicit.
-docker compose restart panel >/dev/null
-if docker ps --format '{{.Names}}' | grep -qx rustdesk-web; then
-  docker compose restart web >/dev/null
+if apply && wait_healthy; then
+  echo "Server actualizat la $TAG."
+  exit 0
 fi
-echo "Server actualizat la $TAG."
+# Nu lăsa site-ul, panoul sau serverul RustDesk căzute: revino la codul de dinainte.
+echo "După actualizarea la $TAG serverul nu răspunde corect; revin la ${CURRENT:0:12}." >&2
+git_ checkout --quiet --detach "$CURRENT"
+if apply && wait_healthy; then
+  echo "Revenit la ${CURRENT:0:12}; actualizarea la $TAG trebuie verificată (journalctl -u rdn-update)." >&2
+else
+  echo "Nici după revenire serverul nu răspunde corect; verifică: docker compose ps, docker compose logs --tail=50" >&2
+fi
+exit 1
+}
+
+# Aduce containerele la codul din repo. Caddy își reîncarcă configurația fără să se oprească
+# (o configurație greșită e refuzată și rămâne cea veche); panoul repornește în ~1 secundă.
+apply() {
+  docker compose pull --quiet --ignore-buildable || true
+  docker compose up -d --build --remove-orphans
+  docker compose restart panel >/dev/null
+  if docker ps --format '{{.Names}}' | grep -qx rustdesk-web; then
+    docker compose exec -T web caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
+      || docker compose restart web >/dev/null
+  fi
+}
+
+# 0 când rulează serverul RustDesk (hbbs, hbbr), panoul răspunde și, dacă e pornit, și site-ul.
+healthy() {
+  local ok=0 name web
+  for name in hbbs hbbr rustdesk-panel; do
+    if [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" != true ]]; then
+      echo "  $name nu rulează" >&2
+      ok=1
+    fi
+  done
+  curl -fsS -o /dev/null --max-time 10 http://127.0.0.1:21120/ 2>/dev/null || { echo "  panoul nu răspunde" >&2; ok=1; }
+  if grep -qx 'COMPOSE_PROFILES=web' .env 2>/dev/null; then
+    web="$(sed -n 's/^WEB_ADDRESS=//p' .env | tail -n 1)"
+    if [[ -z "$web" || "$web" == :* ]]; then
+      curl -fsS -o /dev/null --max-time 15 "http://127.0.0.1${web:-:80}/" 2>/dev/null || { echo "  site-ul nu răspunde" >&2; ok=1; }
+    else
+      curl -fsS -o /dev/null --max-time 15 --resolve "$web:443:127.0.0.1" "https://$web/" 2>/dev/null \
+        || { echo "  site-ul https://$web/ nu răspunde" >&2; ok=1; }
+    fi
+  fi
+  return $ok
+}
+
+wait_healthy() {
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    if healthy 2>/dev/null; then
+      return 0
+    fi
+    sleep 5
+  done
+  healthy
 }
 
 main "$@"

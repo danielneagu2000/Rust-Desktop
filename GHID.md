@@ -473,6 +473,12 @@ După ce un release e final, totul merge singur, fără intervenția ta:
 Forțezi verificarea pe server cu `sudo systemctl start rdn-update` (jurnal:
 `journalctl -u rdn-update`).
 
+Actualizarea nu oprește serviciile: Caddy își reîncarcă configurația din mers (o configurație
+greșită e refuzată și rămâne cea veche), iar panoul repornește în aproximativ o secundă. După
+actualizare, scriptul verifică timp de un minut că rulează serverul RustDesk (hbbs, hbbr), că
+răspund panoul și site-ul. Dacă ceva nu merge, **revine singur la versiunea de dinainte** și
+scrie motivul în jurnal.
+
 Siguranță: aplicația întreabă serverul tău care e ultima versiune, dar **descarcă doar din
 release-urile acestui repo de pe GitHub** (lista permisă e compilată în aplicație), deci
 nici un server compromis nu o poate face să instaleze altceva.
