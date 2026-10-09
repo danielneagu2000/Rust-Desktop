@@ -1352,6 +1352,18 @@ def bandwidth_kbps(mbps):
     return int(round(value * 1000))
 
 
+def license_delete(code):
+    """Removes a code that is no longer used, with its seats and portal accounts. Computers
+    that still have it lock at their next check, as with a revoked code."""
+    for u in q("SELECT id FROM portal_users WHERE code=?", (code,)):
+        portal_logout_user(u["id"])
+    x("DELETE FROM portal_users WHERE code=?", (code,))
+    x("DELETE FROM activations WHERE code=?", (code,))
+    x("DELETE FROM shop_licenses WHERE code=?", (code,))
+    x("DELETE FROM licenses WHERE code=?", (code,))
+    log(f"licenses: {code} deleted")
+
+
 def license_action(action, v):
     code = as_text(v.get("code"), 40) or ""
     if action == "create":
@@ -1432,6 +1444,18 @@ def license_action(action, v):
         x("UPDATE licenses SET sessions=? WHERE code=?", (sessions, code))
         log(f"licenses: {code} simultaneous sessions {sessions or 'unlimited'}")
         return 200, {"ok": True}
+    if action == "delete":
+        if not rows:
+            return 404, {"error": "Licență inexistentă"}
+        if license_status(rows[0]) not in ("revocată", "expirată"):
+            return 409, {"error": "Poți șterge doar coduri revocate sau expirate. Revocă întâi codul."}
+        license_delete(code)
+        return 200, {"ok": True}
+    if action == "purge":
+        gone = [r_["code"] for r_ in q("SELECT * FROM licenses") if license_status(r_) in ("revocată", "expirată")]
+        for c in gone:
+            license_delete(c)
+        return 200, {"ok": True, "deleted": len(gone)}
     if action == "release":
         uuid = as_text(v.get("uuid"), 100)
         x("DELETE FROM activations WHERE uuid=?", (uuid,))

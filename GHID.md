@@ -229,6 +229,13 @@ secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
 
+### Ștergerea codurilor nefolosite
+
+În tab-ul **Coduri de acces**, un cod **revocat** sau **expirat** are butonul **Șterge**.
+Butonul **Șterge codurile nefolosite** din capul listei le șterge pe toate odată. Odată cu codul
+dispar și calculatoarele activate cu el și conturile lui din portal; ștergerea nu se poate anula.
+Un cod activ sau neactivat nu se poate șterge direct: îl revoci întâi, apoi îl ștergi.
+
 ## Legătura cu shopul (licențe automate)
 
 La o comandă plătită în shop.rdndata.ro, panoul creează singur licența. Dacă același client
