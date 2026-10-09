@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /files/
+Disallow: /portal/
+Disallow: /shop/
 
 Sitemap: https://remote.rdndata.ro/sitemap.xml
