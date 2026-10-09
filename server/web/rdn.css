@@ -35,3 +35,9 @@
 
 /* Avertismentul despre înșelătorii, în lista de siguranță */
 .checks li.warn::before { content: "!"; background: #fff1d6; color: #9a5b00; }
+
+/* Textul despre serviciu de sub pachete */
+.price-wrap.seo-text { margin-top: 32px; padding: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; overflow: visible; }
+.seo-text h3 { font: 700 1.3rem/1.2 var(--display); margin: 0 0 10px; }
+.seo-text p { margin: 0; color: var(--ink-2); font-size: 0.97rem; }
+@media (max-width: 900px) { .price-wrap.seo-text { grid-template-columns: 1fr; padding: 24px; gap: 22px; } }
