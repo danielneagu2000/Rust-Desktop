@@ -64,16 +64,20 @@
      și schimbăm adresa din bară. Linkurile vechi cu „#sectiune” duc la adresa nouă. */
   (function () {
     var IDS = ["functii", "preturi", "descarcari", "cum", "siguranta", "intrebari", "contact"];
-    var SLUGS = ["functii", "preturi", "descarcare", "cum-functioneaza", "siguranta", "intrebari", "contact"];
-    var TITLES = ["Funcții", "Prețuri", "Descărcare", "Cum funcționează", "Siguranță", "Întrebări frecvente", "Contact"];
+    var EN = /^\/en(\/|$)/.test(location.pathname), BASE = EN ? "/en/" : "/";
+    var SLUGS = EN ? ["features", "pricing", "download", "how-it-works", "security", "faq", "contact"]
+                   : ["functii", "preturi", "descarcare", "cum-functioneaza", "siguranta", "intrebari", "contact"];
+    var TITLES = EN ? ["Features", "Pricing", "Download", "How it works", "Security", "FAQ", "Contact"]
+                    : ["Funcții", "Prețuri", "Descărcare", "Cum funcționează", "Siguranță", "Întrebări frecvente", "Contact"];
     var baseTitle = document.title;
     function idFromPath(path) {
-      var k = SLUGS.indexOf(path.replace(/^\/+|\/+$/g, ""));
+      if (EN !== /^\/en\//.test(path)) return "";
+      var k = SLUGS.indexOf(path.slice(BASE.length - 1).replace(/^\/+|\/+$/g, ""));
       return k < 0 ? "" : IDS[k];
     }
     function pathFor(id) {
       var k = IDS.indexOf(id);
-      return k < 0 ? null : "/" + SLUGS[k] + "/";
+      return k < 0 ? null : BASE + SLUGS[k] + "/";
     }
     function go(id, smooth) {
       var el = id && document.getElementById(id);
@@ -97,7 +101,7 @@
       var a = e.target.closest("a[href]");
       if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       if (a.target || a.origin !== location.origin || a.hasAttribute("download")) return;
-      var id = idFromPath(a.pathname), home = a.pathname === "/" && !a.hash;
+      var id = idFromPath(a.pathname), home = a.pathname === BASE && !a.hash;
       if (!id && !home) return;
       e.preventDefault();
       if (a.pathname !== location.pathname) history.pushState(null, "", a.pathname);

@@ -385,3 +385,4 @@ section { padding: 56px 0; }
 .shot.big { margin-top: 30px; }
 @media (max-width: 1100px) { .nav { background: #120c0d; } }
 @media (max-width: 1100px) and (prefers-color-scheme: light) { .nav { background: #fff; } }
+.nav .lang { display: inline-flex; align-items: center; font: 600 0.8rem/1.2 var(--mono); letter-spacing: .08em; color: var(--ink); box-shadow: 0 0 0 1px var(--line) inset; margin-left: 4px; }
