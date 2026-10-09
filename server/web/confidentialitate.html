@@ -8,57 +8,58 @@
 <link rel="canonical" href="https://remote.rdndata.ro/confidentialitate.html">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="assets/favicon.png">
-<meta name="theme-color" content="#5c0303">
-<link rel="stylesheet" href="/site.css?v=1">
-<link rel="stylesheet" href="/rdn.css?v=3">
+<meta name="theme-color" content="#0a0708" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="/fonts.css?v=1">
+<link rel="stylesheet" href="/fut.css?v=1">
 <link rel="stylesheet" href="footer.css">
 <style>
-.doc { max-width: 820px; margin-inline: auto; }
-.doc-head { padding: 64px 0 36px; display: grid; gap: 16px; }
-.doc-head .label { display: inline-flex; align-items: center; gap: 12px; }
-.doc-head .label::before { content: ""; width: 32px; height: 2px; background: currentColor; border-radius: 2px; }
-.doc-head h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); color: var(--head); }
-.doc-head h1::after { content: ""; display: block; width: 72px; height: 4px; margin-top: 16px; background: var(--accent); border-radius: 4px; }
-.doc-head p { margin: 0; color: var(--ink-2); }
-main.doc { padding-bottom: 72px; }
-main.doc a { color: var(--accent); }
-main.doc h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 44px 0 12px; }
-main.doc h3 { font-size: 1.3rem; font-weight: 700; font-stretch: 90%; margin: 24px 0 8px; }
-main.doc p { margin: 0 0 14px; }
-main.doc ul { padding-left: 22px; } main.doc li { margin: 4px 0; }
-.box { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 18px 22px; box-shadow: var(--shadow); margin-bottom: 18px; }
+.doc { max-width: 860px; margin-inline: auto; padding-inline: 24px; }
+.doc-head { padding: 130px 24px 26px; display: grid; gap: 14px; }
+.doc-head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 800; }
+.doc-head p { color: var(--ink-2); }
+main.doc { padding-bottom: 60px; }
+main.doc a { color: var(--neon-soft); }
+main.doc h2 { font-size: clamp(1.4rem, 2.6vw, 1.8rem); margin: 36px 0 12px; }
+main.doc h3 { font-size: 1.15rem; margin: 22px 0 8px; }
+main.doc p { margin: 0 0 14px; color: var(--ink-2); }
+main.doc ul { padding-left: 22px; color: var(--ink-2); } main.doc li { margin: 4px 0; }
+main.doc strong { color: var(--ink); }
+.box { padding: 18px 22px; margin-bottom: 18px; }
 .box dl { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; }
-.box dt { color: var(--ink-2); font: 500 0.85rem/1.9 var(--mono); } .box dd { margin: 0; }
+.box dt { color: var(--ink-3); font: 600 0.75rem/2.1 var(--mono); text-transform: uppercase; letter-spacing: .08em; } .box dd { margin: 0; }
 .todo { background: #fff3cd; color: #7a5300; padding: 0 6px; border-radius: 4px; }
-.scroll { overflow-x: auto; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); margin: 12px 0; }
+.scroll { overflow-x: auto; margin: 12px 0; }
 .scroll table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
-.scroll th, .scroll td { text-align: left; border-bottom: 1px solid var(--rule); padding: 11px 14px; vertical-align: top; }
+.scroll th, .scroll td { text-align: left; border-bottom: 1px solid var(--line); padding: 11px 14px; vertical-align: top; }
+.scroll td { color: var(--ink-2); }
 .scroll tr:last-child td { border-bottom: 0; }
-.scroll th { color: var(--ink-2); font: 600 0.75rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: .06em; background: var(--tint); }
-@media (max-width: 640px) { .box dl { grid-template-columns: 1fr; gap: 0; } .box dd { margin-bottom: 8px; } .doc-head { padding-top: 40px; } }
+.scroll th { color: var(--neon-soft); font: 600 0.72rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+@media (max-width: 640px) { .doc { padding-inline: 16px; } .doc-head { padding: 104px 16px 20px; } .box dl { grid-template-columns: 1fr; gap: 0; } .box dd { margin-bottom: 8px; } }
 </style>
 </head>
 <body>
+<div class="sky" aria-hidden="true"></div>
 <header class="top">
-  <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><span class="brand-text"><b>RDN REMOTE</b><span>remote.rdndata.ro</span></span></a>
-    <nav class="nav" id="nav" aria-label="Meniu principal">
-      <a href="/functii/">Funcții</a>
-      <a href="/preturi/">Prețuri</a>
-      <a href="/descarcare/">Descărcare</a>
-      <a href="/siguranta/">Siguranță</a>
-      <a href="/intrebari/">Întrebări</a>
-      <a class="nav-client" href="/portal/">Portal client</a>
-    </nav>
-    <div class="top-cta">
-      <a class="btn" href="/descarcare/">Descarcă</a>
+  <div class="wrap">
+    <div class="top-in">
+      <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><b>RDN REMOTE</b></a>
+      <nav class="nav" id="nav" aria-label="Meniu principal">
+        <a href="/functii/">Funcții</a>
+        <a href="/preturi/">Prețuri</a>
+        <a href="/descarcare/">Descărcare</a>
+        <a href="/siguranta/">Siguranță</a>
+        <a href="/intrebari/">Întrebări</a>
+        <a class="nav-client" href="/portal/">Portal client</a>
+      </nav>
+      <div class="top-cta"><a class="btn sm" href="/descarcare/">Descarcă</a></div>
       <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Deschide meniul"><span></span></button>
     </div>
   </div>
 </header>
 
 <div class="doc doc-head">
-  <span class="label">Date personale · GDPR</span>
+  <span class="tag">Date personale · GDPR</span>
   <h1>Politica de confidențialitate</h1>
   <p>Pentru aplicația <strong>RDN Remote</strong> și serviciul de asistență la distanță. Ultima actualizare: <span data-f="privacy_updated_ro"></span>.</p>
 </div>
@@ -67,7 +68,7 @@ main.doc ul { padding-left: 22px; } main.doc li { margin: 4px 0; }
   <p>Această politică explică ce date personale prelucrăm atunci când folosești aplicația RDN Remote sau acest site, de ce le prelucrăm, cât timp le păstrăm și ce drepturi ai, conform Regulamentului (UE) 2016/679 (GDPR).</p>
 
   <h2>1. Cine suntem</h2>
-  <div class="box"><dl>
+  <div class="box glass-card"><dl>
     <dt>Operator</dt><dd data-f="company"></dd>
     <dt>Date de identificare</dt><dd>Denumirea completă, CUI, numărul de înregistrare și sediul firmei sunt publicate în magazinul nostru: <a href="https://shop.rdndata.ro/" rel="noopener">shop.rdndata.ro</a>.</dd>
     <dt>E-mail</dt><dd data-f="email"></dd>
@@ -97,7 +98,7 @@ main.doc ul { padding-left: 22px; } main.doc li { margin: 4px 0; }
   <p>Site-ul nu folosește cookie-uri, instrumente de analiză sau publicitate și nu încarcă resurse de la terți. Serverul web nu păstrează jurnale cu vizitatorii. Adresa IP este folosită doar tehnic, pentru a livra pagina și fișierele descărcate.</p>
 
   <h2>3. De ce și pe ce temei</h2>
-  <div class="scroll"><table>
+  <div class="scroll glass-card"><table>
     <tr><th>Scop</th><th>Temei legal (GDPR)</th></tr>
     <tr><td>Funcționarea aplicației și furnizarea serviciului de asistență la distanță cerut de tine</td><td>Executarea contractului sau a demersurilor făcute la cererea ta (art. 6 alin. 1 lit. b)</td></tr>
     <tr><td>Securitatea serviciului: detectarea și blocarea accesului neautorizat și a încercărilor de spargere a parolelor, investigarea incidentelor</td><td>Interesul nostru legitim și al clienților noștri de a proteja calculatoarele (art. 6 alin. 1 lit. f)</td></tr>
