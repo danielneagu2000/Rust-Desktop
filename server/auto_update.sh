@@ -77,15 +77,16 @@ fi
 exit 1
 }
 
-# Aduce containerele la codul din repo. Caddy își reîncarcă configurația fără să se oprească
-# (o configurație greșită e refuzată și rămâne cea veche); panoul repornește în ~1 secundă.
+# Aduce containerele la codul din repo. Paginile site-ului se văd imediat (folderul web e montat);
+# Caddy repornește doar dacă s-a schimbat Caddyfile: e montat ca fișier, iar git îl înlocuiește,
+# deci containerul pornit vede tot fișierul vechi până la repornire. Panoul repornește în ~1 secundă.
 apply() {
   docker compose pull --quiet --ignore-buildable || true
   docker compose up -d --build --remove-orphans
   docker compose restart panel >/dev/null
-  if docker ps --format '{{.Names}}' | grep -qx rustdesk-web; then
-    docker compose exec -T web caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
-      || docker compose restart web >/dev/null
+  if docker ps --format '{{.Names}}' | grep -qx rustdesk-web \
+     && ! git_ diff --quiet "$CURRENT" "$TARGET" -- server/Caddyfile; then
+    docker compose restart web >/dev/null
   fi
 }
 

@@ -476,8 +476,10 @@ După ce un release e final, totul merge singur, fără intervenția ta:
 Forțezi verificarea pe server cu `sudo systemctl start rdn-update` (jurnal:
 `journalctl -u rdn-update`).
 
-Actualizarea nu oprește serviciile: Caddy își reîncarcă configurația din mers (o configurație
-greșită e refuzată și rămâne cea veche), iar panoul repornește în aproximativ o secundă. După
+Actualizarea oprește serviciile cât mai puțin: paginile site-ului se schimbă din mers, panoul
+repornește în aproximativ o secundă, iar serverul web (Caddy) repornește, câteva secunde, doar
+când s-a schimbat `server/Caddyfile`. Dacă modifici manual `Caddyfile` pe server (după un
+`git pull`), rulează `docker compose restart web`: o simplă reîncărcare nu vede fișierul nou. După
 actualizare, scriptul verifică timp de un minut că rulează serverul RustDesk (hbbs, hbbr), că
 răspund panoul și site-ul. Dacă ceva nu merge, **revine singur la versiunea de dinainte** și
 scrie motivul în jurnal.
