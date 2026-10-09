@@ -8,47 +8,62 @@
 <link rel="canonical" href="https://remote.rdndata.ro/confidentialitate.html">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="assets/favicon.png">
+<meta name="theme-color" content="#5c0303">
+<link rel="stylesheet" href="/site.css?v=1">
+<link rel="stylesheet" href="/rdn.css?v=1">
 <link rel="stylesheet" href="footer.css">
 <style>
-:root { --ink: #1d0a0d; --text: #2b2326; --muted: #6b5f63; --line: #eadfe1; --soft: #faf5f6; --brand: #b3122b; color-scheme: light; }
-* { box-sizing: border-box; }
-body { margin: 0; background: #fff; color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-a { color: var(--brand); }
-.wrap { max-width: 820px; margin: 0 auto; padding: 0 24px; }
-header.top { border-bottom: 1px solid var(--line); }
-header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; max-width: 1120px; }
-header.top img { height: 44px; display: block; }
-header.top a.back { font-size: 15px; text-decoration: none; }
-.hero { background: linear-gradient(135deg, #1d0508 0%, #3a0b12 45%, #6d0f1c 100%); color: #fff; padding: 44px 0 40px; }
-.hero h1 { margin: 0 0 6px; font-size: 34px; line-height: 1.15; }
-.hero p { margin: 0; color: #f1dde0; }
-main { padding: 36px 0 56px; }
-h2 { font-size: 21px; color: var(--ink); margin: 34px 0 10px; }
-h3 { font-size: 17px; color: var(--ink); margin: 20px 0 6px; }
-ul { padding-left: 22px; } li { margin: 4px 0; }
-.box { background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; }
-.box dl { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 6px 14px; }
-.box dt { color: var(--muted); } .box dd { margin: 0; }
+.doc { max-width: 820px; margin-inline: auto; }
+.doc-head { padding: 64px 0 36px; display: grid; gap: 16px; }
+.doc-head .label { display: inline-flex; align-items: center; gap: 12px; }
+.doc-head .label::before { content: ""; width: 32px; height: 2px; background: currentColor; border-radius: 2px; }
+.doc-head h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); color: var(--head); }
+.doc-head h1::after { content: ""; display: block; width: 72px; height: 4px; margin-top: 16px; background: var(--accent); border-radius: 4px; }
+.doc-head p { margin: 0; color: var(--ink-2); }
+main.doc { padding-bottom: 72px; }
+main.doc a { color: var(--accent); }
+main.doc h2 { font-size: clamp(1.5rem, 3vw, 2rem); margin: 44px 0 12px; }
+main.doc h3 { font-size: 1.3rem; font-weight: 700; font-stretch: 90%; margin: 24px 0 8px; }
+main.doc p { margin: 0 0 14px; }
+main.doc ul { padding-left: 22px; } main.doc li { margin: 4px 0; }
+.box { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); padding: 18px 22px; box-shadow: var(--shadow); margin-bottom: 18px; }
+.box dl { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; }
+.box dt { color: var(--ink-2); font: 500 0.85rem/1.9 var(--mono); } .box dd { margin: 0; }
 .todo { background: #fff3cd; color: #7a5300; padding: 0 6px; border-radius: 4px; }
-table { border-collapse: collapse; width: 100%; font-size: 15px; margin: 10px 0; }
-th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 9px 10px; vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: 13px; }
-.scroll { overflow-x: auto; }
-@media (max-width: 640px) { .wrap { padding: 0 16px; } .hero h1 { font-size: 27px; } .box dl { grid-template-columns: 1fr; gap: 0 0; } .box dd { margin-bottom: 8px; } }
+.scroll { overflow-x: auto; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); margin: 12px 0; }
+.scroll table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+.scroll th, .scroll td { text-align: left; border-bottom: 1px solid var(--rule); padding: 11px 14px; vertical-align: top; }
+.scroll tr:last-child td { border-bottom: 0; }
+.scroll th { color: var(--ink-2); font: 600 0.75rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: .06em; background: var(--tint); }
+@media (max-width: 640px) { .box dl { grid-template-columns: 1fr; gap: 0; } .box dd { margin-bottom: 8px; } .doc-head { padding-top: 40px; } }
 </style>
 </head>
 <body>
-<header class="top"><div class="wrap">
-  <a href="./"><img src="assets/logo.png" alt="RDN Network Data"></a>
-  <a class="back" href="/descarcare/">← Înapoi la descărcări</a>
-</div></header>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><span class="brand-text"><b>RDN REMOTE</b><span>remote.rdndata.ro</span></span></a>
+    <nav class="nav" id="nav" aria-label="Meniu principal">
+      <a href="/functii/">Funcții</a>
+      <a href="/preturi/">Prețuri</a>
+      <a href="/descarcare/">Descărcare</a>
+      <a href="/siguranta/">Siguranță</a>
+      <a href="/intrebari/">Întrebări</a>
+      <a class="nav-client" href="/portal/">Portal client</a>
+    </nav>
+    <div class="top-cta">
+      <a class="btn" href="/descarcare/">Descarcă</a>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Deschide meniul"><span></span></button>
+    </div>
+  </div>
+</header>
 
-<section class="hero"><div class="wrap">
+<div class="doc doc-head">
+  <span class="label">Date personale · GDPR</span>
   <h1>Politica de confidențialitate</h1>
   <p>Pentru aplicația <strong>RDN Remote</strong> și serviciul de asistență la distanță. Ultima actualizare: <span data-f="privacy_updated_ro"></span>.</p>
-</div></section>
+</div>
 
-<main><div class="wrap">
+<main class="doc">
   <p>Această politică explică ce date personale prelucrăm atunci când folosești aplicația RDN Remote sau acest site, de ce le prelucrăm, cât timp le păstrăm și ce drepturi ai, conform Regulamentului (UE) 2016/679 (GDPR).</p>
 
   <h2>1. Cine suntem</h2>
@@ -119,10 +134,25 @@ th { color: var(--muted); font-weight: 600; font-size: 13px; }
 
   <h2>9. Modificări</h2>
   <p>Putem actualiza această politică atunci când se schimbă serviciul sau legislația. Versiunea în vigoare este întotdeauna cea de pe această pagină, cu data ultimei actualizări de mai sus.</p>
-</div></main>
+</main>
 
 <footer class="rdn-footer" id="site-footer"></footer>
 <script src="footer.js" defer></script>
+<script>
+(function () {
+  var btn = document.getElementById("menuBtn"), nav = document.getElementById("nav"), head = document.querySelector(".top");
+  function set(open) {
+    nav.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.setAttribute("aria-label", open ? "Închide meniul" : "Deschide meniul");
+  }
+  btn.addEventListener("click", function () { set(!nav.classList.contains("open")); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+  function scrolled() { head.classList.toggle("scrolled", window.scrollY > 8); }
+  scrolled();
+  window.addEventListener("scroll", scrolled, { passive: true });
+})();
+</script>
 
 <script>
 (function () {
