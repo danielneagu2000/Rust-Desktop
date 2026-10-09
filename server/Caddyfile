@@ -12,6 +12,9 @@
 
 	# Portalul organizațiilor (clienți) e servit de panou cu antetele lui de securitate.
 	@portal path /portal /portal/*
+	# Secțiunile paginii au adrese proprii (/descarcare/, /preturi/...); toate servesc index.html.
+	@sections path_regexp ^/(functii|preturi|descarcare|cum-functioneaza|siguranta|intrebari|contact)/?$
+	rewrite @sections /index.html
 	@site not path /portal /portal/*
 
 	header @site {

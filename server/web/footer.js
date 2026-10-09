@@ -47,7 +47,7 @@
     if (f.facebook_url) badges.push('<a class="ft-fb" href="' + href(f.facebook_url) + '" rel="noopener">' + FB + "Facebook</a>");
 
     var legal = (f.legal || []).map(link);
-    legal.push('<a href="confidentialitate.html">Confidențialitate RDN Remote</a>');
+    legal.push('<a href="/confidentialitate.html">Confidențialitate RDN Remote</a>');
     legal.push('<span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0)</span>');
     legal.push('<a href="' + href(s.source_url || "https://github.com/danielneagu2000/Rust-Desktop") + '" rel="noopener">Cod sursă</a>');
 
@@ -63,7 +63,7 @@
           '<span class="sep">|</span><span>All Rights Reserved</span><span class="sep">|</span>' +
           "<span>Powered by <b>" + esc(company) + "</b></span>" +
           (legal.length ? '<span class="sep"></span>' + legal.join('<span class="sep">·</span>') : "") +
-        '</div><a class="ft-logo" href="' + href(f.home_url || "/") + '" aria-label="' + esc(company) + '"><img src="assets/logo.png" alt=""></a></div>' +
+        '</div><a class="ft-logo" href="' + href(f.home_url || "/") + '" aria-label="' + esc(company) + '"><img src="/assets/logo.png" alt=""></a></div>' +
       "</div></div>";
 
     var now = document.getElementById("ft-now");
@@ -74,7 +74,7 @@
     setInterval(tick, 1000);
   }
 
-  fetch("site.json", { cache: "no-store" })
+  fetch("/site.json", { cache: "no-store" })
     .then(function (r) { return r.ok ? r.json() : {}; })
     .catch(function () { return {}; })
     .then(render);

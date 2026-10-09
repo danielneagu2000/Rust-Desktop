@@ -14,10 +14,10 @@
 <meta property="og:description" content="Asistență IT și acces la distanță pe Windows, macOS, Linux și Android. Conexiuni criptate, fără limită de viteză impusă, de la 10 €/lună.">
 <meta property="og:image" content="https://remote.rdndata.ro/assets/logo.png">
 <meta name="theme-color" content="#b3121f">
-<link rel="icon" href="favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="stylesheet" href="footer.css">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<link rel="stylesheet" href="/footer.css">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -270,18 +270,18 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a class="logo" href="https://www.rdndata.ro/"><img src="assets/logo.png" alt="RDN Network Data" width="73" height="48"></a>
+  <a class="logo" href="https://www.rdndata.ro/"><img src="/assets/logo.png" alt="RDN Network Data" width="73" height="48"></a>
   <button class="menu-btn" id="menu-btn" aria-label="Meniu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <nav class="cond" id="nav">
     <a href="https://www.rdndata.ro/">Acasă</a>
-    <a href="#functii">Funcții</a>
-    <a href="#preturi">Prețuri</a>
-    <a href="#descarcari">Descărcare</a>
-    <a href="#siguranta">Siguranță</a>
-    <a href="#intrebari">Întrebări</a>
-    <a href="#contact" id="nav-contact">Contact</a>
+    <a href="/functii/">Funcții</a>
+    <a href="/preturi/">Prețuri</a>
+    <a href="/descarcare/">Descărcare</a>
+    <a href="/siguranta/">Siguranță</a>
+    <a href="/intrebari/">Întrebări</a>
+    <a href="/contact/" id="nav-contact">Contact</a>
   </nav>
-  <a class="btn-red hdr" href="#preturi">Prețuri</a>
+  <a class="btn-red hdr" href="/preturi/">Prețuri</a>
 </div></header>
 
 <main>
@@ -291,11 +291,11 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
     <h1 class="cond">Control la distanță <em>rapid și sigur</em> pentru firma ta</h1>
     <p class="lead"><strong>RDN Remote</strong> îți dă acces la calculatoarele și telefoanele tale de oriunde: asistență IT pentru clienți, lucru de acasă sau administrarea calculatoarelor din firmă. Conexiunile sunt criptate și trec prin serverele RDN Network Data, nu prin servere străine.</p>
     <div class="ctas">
-      <a class="btn-red disabled" id="cta" href="#descarcari">
+      <a class="btn-red disabled" id="cta" href="/descarcare/">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         <span id="cta-text">Se încarcă…</span>
       </a>
-      <a class="btn-ghost" href="#preturi">Vezi prețurile</a>
+      <a class="btn-ghost" href="/preturi/">Vezi prețurile</a>
     </div>
     <div class="meta" id="cta-meta"></div>
     <ul class="chips">
@@ -380,7 +380,7 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
       <div class="pf"><a class="btn-red" href="https://shop.rdndata.ro/?post_type=product&amp;p=183">Comandă</a></div>
     </div>
   </div>
-  <p class="plans-note"><strong>Prețuri finale:</strong> RDN Network Data nu este plătitoare de TVA. Ai nevoie de altceva? <a href="#contact">Contactează-ne</a> pentru o ofertă personalizată.</p>
+  <p class="plans-note"><strong>Prețuri finale:</strong> RDN Network Data nu este plătitoare de TVA. Ai nevoie de altceva? <a href="/contact/">Contactează-ne</a> pentru o ofertă personalizată.</p>
 </div></section>
 
 <section class="block soft" id="descarcari"><div class="wrap">
@@ -446,7 +446,7 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
 </main>
 
 <footer class="rdn-footer" id="site-footer"></footer>
-<script src="footer.js" defer></script>
+<script src="/footer.js" defer></script>
 
 <script>
 (function () {
@@ -466,6 +466,7 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+  function abs(f) { return /^(https?:)?\//.test(f) ? f : "/" + f; }
   function mb(n) { return n ? (n / 1048576).toFixed(n > 104857600 ? 0 : 1).replace(".", ",") + " MB" : ""; }
   function detect() {
     var ua = navigator.userAgent || "", p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
@@ -486,7 +487,7 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
       var list = items.filter(function (it) { return it.platform === p; });
       var rows = list.length ? list.map(function (it) {
         return '<div class="file"><span class="l">' + esc(it.label) + '<span class="s">' + esc(mb(it.size)) + "</span></span>" +
-          '<a class="btn" href="' + esc(it.file) + '" download>Descarcă</a></div>';
+          '<a class="btn" href="' + esc(abs(it.file)) + '" download>Descarcă</a></div>';
       }).join("") : '<div class="none">În curând</div>';
       return '<div class="os' + (p === os ? " current" : "") + '"><div class="head">' + ICONS[p] + "<h3>" + NAMES[p] + "</h3>" +
         (p === os ? '<span class="tag">SISTEMUL TĂU</span>' : "") + "</div>" + rows + "</div>";
@@ -495,10 +496,10 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
     var cta = document.getElementById("cta"), text = document.getElementById("cta-text"), meta = document.getElementById("cta-meta");
     var main = byKey[PRIMARY[os]] || (os === "macos" && byKey["mac-x64"]);
     if (main) {
-      cta.href = main.file; cta.setAttribute("download", ""); cta.classList.remove("disabled");
+      cta.href = abs(main.file); cta.setAttribute("download", ""); cta.classList.remove("disabled");
       text.textContent = "Descarcă pentru " + NAMES[os];
       var extra = os === "macos" && byKey["mac-x64"] && main.key === "mac-arm64"
-        ? ' · Mac cu Intel? <a href="' + esc(byKey["mac-x64"].file) + '" download>descarcă aici</a>' : "";
+        ? ' · Mac cu Intel? <a href="' + esc(abs(byKey["mac-x64"].file)) + '" download>descarcă aici</a>' : "";
       meta.innerHTML = esc(main.label) + " · " + esc(mb(main.size)) + " · versiunea " + esc(m.version) + extra;
     } else if (items.length) {
       cta.classList.remove("disabled"); cta.removeAttribute("download"); cta.href = "#descarcari";
@@ -535,7 +536,7 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
   function get(url) {
     return fetch(url, { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
   }
-  Promise.all([get("files/downloads.json"), get("site.json")]).then(function (r) { render(r[0], r[1]); });
+  Promise.all([get("/files/downloads.json"), get("/site.json")]).then(function (r) { render(r[0], r[1]); });
 })();
 </script>
 <script>
@@ -547,25 +548,50 @@ details.sums td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-
     btn.setAttribute("aria-expanded", open ? "true" : "false");
   });
   nav.addEventListener("click", function (e) { if (e.target.closest("a")) { nav.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); } });
-  // In-page links scroll without leaving "#sectiune" in the address bar.
-  function clean() { if (location.hash) history.replaceState(null, "", location.pathname + location.search); }
+  // Each section has its own address (/descarcare/, /preturi/, ...): the server answers them
+  // with this page, and links between sections scroll smoothly and update the address.
+  var SECTIONS = { "functii": "functii", "preturi": "preturi", "descarcare": "descarcari", "cum-functioneaza": "cum",
+                   "siguranta": "siguranta", "intrebari": "intrebari", "contact": "contact" };
+  var TITLES = { functii: "Funcții", preturi: "Prețuri", descarcari: "Descărcare", cum: "Cum funcționează",
+                 siguranta: "Siguranță", intrebari: "Întrebări frecvente", contact: "Contact" };
+  var baseTitle = document.title;
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  var HASHES = {};
+  Object.keys(SECTIONS).forEach(function (slug) { HASHES[SECTIONS[slug]] = slug; });
+  function sectionOf(path) {
+    var m = /^\/([a-z-]+)\/?$/.exec(path);
+    return m && SECTIONS[m[1]] ? SECTIONS[m[1]] : null;
+  }
+  function show(id, smooth) {
+    var el = id && document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    else if (smooth) window.scrollTo({ top: 0, behavior: "smooth" });
+    document.title = id && TITLES[id] ? TITLES[id] + " · RDN Remote" : baseTitle;
+  }
   document.addEventListener("click", function (e) {
-    var a = e.target.closest('a[href^="#"]');
-    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
-    var target = document.getElementById(a.getAttribute("href").slice(1));
-    if (!target) return;
+    var a = e.target.closest("a[href]");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || a.origin !== location.origin) return;
+    var id = sectionOf(a.pathname);
+    if (!id) return;
     e.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-    clean();
+    var path = "/" + HASHES[id] + "/";
+    if (location.pathname !== path) history.pushState({ id: id }, "", path);
+    show(id, true);
   });
-  if (location.hash && document.getElementById(location.hash.slice(1))) {
-    window.addEventListener("load", function () { document.getElementById(location.hash.slice(1)).scrollIntoView(); clean(); });
-  } else {
-    clean();
+  window.addEventListener("popstate", function () { show(sectionOf(location.pathname), true); });
+  // Old links with "#sectiune" lead to the section's address.
+  var start = sectionOf(location.pathname) || (location.hash && HASHES[location.hash.slice(1)] ? location.hash.slice(1) : null);
+  if (start) {
+    var clean = "/" + HASHES[start] + "/";
+    if (location.pathname + location.hash !== clean) history.replaceState({ id: start }, "", clean + location.search);
+    window.addEventListener("load", function () { show(start, false); });
+    document.title = TITLES[start] + " · RDN Remote";
+  } else if (location.hash) {
+    history.replaceState(null, "", location.pathname + location.search);
   }
   if (!("IntersectionObserver" in window)) return;
   var links = {};
-  nav.querySelectorAll('a[href^="#"]').forEach(function (a) { links[a.getAttribute("href").slice(1)] = a; });
+  nav.querySelectorAll("a[href]").forEach(function (a) { var id = sectionOf(a.pathname); if (id && a.origin === location.origin) links[id] = a; });
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (en) {
       if (!en.isIntersecting || !links[en.target.id]) return;
