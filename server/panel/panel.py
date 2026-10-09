@@ -846,21 +846,37 @@ def totp_ok(code, now=None):
     return False
 
 
-LOGIN_HTML = """<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panou securitate · autentificare</title><style>
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f7;color:#1d1f24;
-font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
-form{background:#fff;border:1px solid #e3e5ea;border-radius:14px;padding:28px;width:min(360px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.06)}
-h1{font-size:20px;margin:0 0 4px}p{margin:0 0 18px;color:#646a75;font-size:13.5px}
-label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
-input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d5d8de;border-radius:9px;font:inherit}
-button{margin-top:18px;width:100%;padding:11px;border:0;border-radius:9px;background:#1d4ed8;color:#fff;font:inherit;font-weight:700;cursor:pointer}
-.err{background:#fde8e8;color:#9b1c1c;border-radius:8px;padding:8px 10px;font-size:13.5px;margin-bottom:6px}
-</style></head><body><form method="post" action="login" autocomplete="on">
-<h1>Panou securitate</h1><p>RDN Remote · autentificare</p><!--ERR-->
-<label for="u">Utilizator</label><input id="u" name="user" autocomplete="username" required autofocus>
-<label for="p">Parolă</label><input id="p" name="password" type="password" autocomplete="current-password" required>
-<!--TOTP--><button type="submit">Intră</button></form></body></html>"""
+def brand_logo():
+    try:
+        return "data:image/png;base64," + base64.b64encode(Path(__file__).with_name("logo.png").read_bytes()).decode()
+    except OSError:
+        return ""
+
+
+LOGO_URI = brand_logo()
+CHECK_ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+              'stroke-linejoin="round"><circle cx="12" cy="12" r="10" opacity=".35"/><path d="m7.5 12.5 3 3 6-6.5"/></svg>')
+
+
+def login_template(**v):
+    html = Path(__file__).with_name("login.html").read_text(encoding="utf-8")
+    v["POINTS"] = "".join(f"<li>{CHECK_ICON}{p}</li>" for p in v["POINTS"])
+    v["LOGO"] = LOGO_URI
+    for key, value in v.items():
+        html = html.replace("{{" + key + "}}", value)
+    return html
+
+
+LOGIN_HTML = login_template(
+    TITLE="Panou de administrare · RDN Remote",
+    HEADING="Panoul de administrare <span>RDN Remote</span>",
+    LEAD="Licențe, dispozitive, conexiuni, comenzi din shop și securitatea serverului, într-un singur loc.",
+    POINTS=["Autentificare în doi pași", "Server propriu, în România", "Conexiuni criptate de la un capăt la altul"],
+    FORM_TITLE="Autentificare",
+    FORM_SUB="Acces rezervat echipei RDN Network Data.",
+    USER_LABEL="Utilizator",
+    USER_ATTRS='autocomplete="username"',
+)
 TOTP_FIELD = """<label for="c">Cod din aplicația de autentificare</label>
 <input id="c" name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required>"""
 
@@ -1757,11 +1773,16 @@ def portal_logout_user(uid):
             del PORTAL_SESSIONS[t]
 
 
-PORTAL_LOGIN_HTML = LOGIN_HTML.replace("Panou securitate · autentificare", "Portal RDN Remote · autentificare").replace(
-    "<h1>Panou securitate</h1><p>RDN Remote · autentificare</p>",
-    "<h1>Portal RDN Remote</h1><p>Administrarea dispozitivelor organizației tale</p>").replace(
-    '<label for="u">Utilizator</label><input id="u" name="user" autocomplete="username" required autofocus>',
-    '<label for="u">E-mail</label><input id="u" name="user" type="email" autocomplete="username" required autofocus>')
+PORTAL_LOGIN_HTML = login_template(
+    TITLE="Portalul organizației · RDN Remote",
+    HEADING="Portalul <span>organizației tale</span>",
+    LEAD="Vezi și administrează dispozitivele firmei, sesiunile de lucru la distanță și rapoartele lunare.",
+    POINTS=["Drepturi de control pe fiecare dispozitiv", "Istoric și rapoarte lunare pentru Excel", "Conturi pentru colegi: administrator sau vizualizare"],
+    FORM_TITLE="Intră în portal",
+    FORM_SUB="Folosește e-mailul și parola primite de la RDN Network Data.",
+    USER_LABEL="E-mail",
+    USER_ATTRS='type="email" autocomplete="username"',
+)
 
 
 def portal_login_page(error=""):
@@ -2304,8 +2325,8 @@ def main():
     serve(PanelHandler, PANEL_BIND, PANEL_PORT, "dashboard")
 
 
-INDEX_HTML = (Path(__file__).with_name("index.html")).read_text(encoding="utf-8")
-PORTAL_HTML = (Path(__file__).with_name("portal.html")).read_text(encoding="utf-8")
+INDEX_HTML = (Path(__file__).with_name("index.html")).read_text(encoding="utf-8").replace("{{LOGO}}", LOGO_URI)
+PORTAL_HTML = (Path(__file__).with_name("portal.html")).read_text(encoding="utf-8").replace("{{LOGO}}", LOGO_URI)
 
 if __name__ == "__main__":
     main()

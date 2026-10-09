@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{TITLE}}</title>
+<style>
+:root { --brand: #b3121f; --brand-2: #d61f2c; --dark: #1c0609; --ink: #1d1416; --muted: #6b5f63; --line: #e7e1e3; --bg: #f6f4f5; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+.side { flex: 1 1 52%; position: relative; overflow: hidden; color: #fff; padding: 48px 56px; display: flex; flex-direction: column;
+  background: radial-gradient(1200px 600px at 110% -10%, rgba(214,31,44,.55), transparent 60%),
+              radial-gradient(900px 500px at -20% 120%, rgba(179,18,31,.45), transparent 60%),
+              linear-gradient(150deg, #2a0a0e 0%, #12030a 100%); }
+.side::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .08;
+  background-image: linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+  background-size: 44px 44px; mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent); }
+.brand { display: inline-flex; align-items: center; background: #fff; border-radius: 14px; padding: 10px 16px; align-self: flex-start;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25); position: relative; z-index: 1; }
+.brand img { height: 60px; width: auto; display: block; }
+.side h1 { font-size: clamp(28px, 3vw, 40px); line-height: 1.15; margin: 36px 0 12px; letter-spacing: -.01em; position: relative; z-index: 1; }
+.side h1 span { color: #ff5a68; }
+.lead { color: rgba(255,255,255,.78); max-width: 520px; margin: 0; font-size: 16.5px; position: relative; z-index: 1; }
+.art { margin: 28px 0 8px; max-width: 520px; width: 100%; position: relative; z-index: 1; }
+.points { list-style: none; padding: 0; margin: auto 0 0; display: grid; gap: 10px; position: relative; z-index: 1; }
+.points li { display: flex; gap: 10px; align-items: center; color: rgba(255,255,255,.88); }
+.points svg { width: 20px; height: 20px; flex: none; color: #ff5a68; }
+.main { flex: 1 1 48%; display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+form { width: min(400px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 34px 32px 28px;
+  box-shadow: 0 24px 60px rgba(28,6,9,.10); }
+.mlogo { display: none; height: 40px; margin-bottom: 18px; }
+form h2 { font-size: 22px; margin: 0 0 4px; }
+form p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+input { width: 100%; padding: 12px 14px; border: 1px solid #d9d1d3; border-radius: 11px; font: inherit; background: #fbfafa; transition: border-color .15s, box-shadow .15s; }
+input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px rgba(179,18,31,.12); background: #fff; }
+button { margin-top: 22px; width: 100%; padding: 13px; border: 0; border-radius: 11px; color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+  background: linear-gradient(135deg, var(--brand-2), var(--brand)); box-shadow: 0 10px 24px rgba(179,18,31,.28); transition: transform .1s, box-shadow .15s; }
+button:hover { box-shadow: 0 12px 28px rgba(179,18,31,.38); }
+button:active { transform: translateY(1px); }
+.err { background: #fde8eb; color: #9b1c1c; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; margin-bottom: 4px; }
+.foot { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px;
+  color: var(--muted); font-size: 12.5px; }
+.foot a { color: inherit; }
+@media (max-width: 900px) {
+  body { flex-direction: column; }
+  .side { padding: 28px 22px 24px; flex: none; }
+  .side h1 { margin-top: 22px; font-size: 26px; }
+  .art, .points { display: none; }
+  .main { padding: 24px 16px 40px; align-items: flex-start; }
+  form { padding: 26px 22px 22px; }
+}
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><img src="{{LOGO}}" alt="RDN Network Data"></div>
+  <h1>{{HEADING}}</h1>
+  <p class="lead">{{LEAD}}</p>
+  <svg class="art" viewBox="0 0 520 250" role="img" aria-label="Calculatoare și telefoane conectate securizat">
+    <defs>
+      <linearGradient id="gr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d5c"/><stop offset="1" stop-color="#b3121f"/></linearGradient>
+      <linearGradient id="sc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a1016"/><stop offset="1" stop-color="#220810"/></linearGradient>
+    </defs>
+    <g stroke="rgba(255,255,255,.35)" stroke-width="2" fill="none" stroke-dasharray="5 6">
+      <path d="M150 112 C 210 60, 290 60, 340 92"/>
+      <path d="M150 140 C 220 200, 330 210, 410 172"/>
+      <path d="M360 118 L 410 150"/>
+    </g>
+    <!-- laptop -->
+    <rect x="22" y="58" width="150" height="98" rx="10" fill="url(#sc)" stroke="rgba(255,255,255,.55)" stroke-width="2"/>
+    <rect x="34" y="70" width="126" height="74" rx="4" fill="#160509"/>
+    <rect x="44" y="82" width="62" height="8" rx="4" fill="url(#gr)"/>
+    <rect x="44" y="98" width="98" height="6" rx="3" fill="rgba(255,255,255,.25)"/>
+    <rect x="44" y="110" width="80" height="6" rx="3" fill="rgba(255,255,255,.18)"/>
+    <rect x="44" y="122" width="90" height="6" rx="3" fill="rgba(255,255,255,.18)"/>
+    <path d="M8 160 H186 L176 172 H18 Z" fill="rgba(255,255,255,.75)"/>
+    <!-- server node -->
+    <circle cx="350" cy="104" r="34" fill="url(#gr)"/>
+    <circle cx="350" cy="104" r="46" fill="none" stroke="rgba(255,77,92,.35)" stroke-width="2"/>
+    <rect x="336" y="98" width="28" height="22" rx="4" fill="#fff"/>
+    <path d="M341 98 v-6 a9 9 0 0 1 18 0 v6" fill="none" stroke="#fff" stroke-width="3.5"/>
+    <circle cx="350" cy="108" r="3.2" fill="#b3121f"/>
+    <!-- phone -->
+    <rect x="404" y="128" width="58" height="104" rx="12" fill="url(#sc)" stroke="rgba(255,255,255,.55)" stroke-width="2"/>
+    <rect x="412" y="142" width="42" height="74" rx="4" fill="#160509"/>
+    <rect x="418" y="150" width="30" height="6" rx="3" fill="url(#gr)"/>
+    <rect x="418" y="162" width="24" height="5" rx="2.5" fill="rgba(255,255,255,.25)"/>
+    <rect x="418" y="172" width="28" height="5" rx="2.5" fill="rgba(255,255,255,.18)"/>
+    <!-- network nodes, as in the logo -->
+    <g fill="url(#gr)"><circle cx="268" cy="40" r="9"/><circle cx="452" cy="56" r="11"/><circle cx="492" cy="96" r="6"/><circle cx="250" cy="200" r="7"/></g>
+    <g stroke="rgba(255,255,255,.4)" stroke-width="2"><path d="M268 40 L 326 82"/><path d="M452 56 L 384 92"/><path d="M452 56 L 492 96"/><path d="M250 200 L 300 150"/></g>
+  </svg>
+  <ul class="points">{{POINTS}}</ul>
+</aside>
+<main class="main">
+  <form method="post" action="login" autocomplete="on">
+    <img class="mlogo" src="{{LOGO}}" alt="">
+    <h2>{{FORM_TITLE}}</h2>
+    <p>{{FORM_SUB}}</p>
+    <!--ERR-->
+    <label for="u">{{USER_LABEL}}</label>
+    <input id="u" name="user" {{USER_ATTRS}} required autofocus>
+    <label for="p">Parolă</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" required>
+    <!--TOTP-->
+    <button type="submit">Intră în cont</button>
+    <div class="foot"><span>© RDN Network Data</span><a href="https://remote.rdndata.ro/" rel="noopener">remote.rdndata.ro</a></div>
+  </form>
+</main>
+</body>
+</html>
