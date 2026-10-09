@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 
 /// License banner for builds with licensing enabled (src/license.rs). It stays
@@ -56,14 +57,14 @@ class _LicenseBannerState extends State<LicenseBanner> {
     final String text;
     final Color color;
     if (valid) {
-      title = 'Licența expiră în curând';
-      text = 'Licența expiră pe ${_date(expires)}. Contactează RDN Network Data '
-          'pentru prelungire.';
+      title = translate('License expires soon');
+      text = translate(
+          'License expires on {${_date(expires)}}. Contact RDN Network Data to renew.');
       color = Colors.orange.shade800;
     } else {
-      title = 'Licență necesară';
-      text = 'Aplicația funcționează doar cu un cod de licență valid. '
-          'Introdu codul primit de la RDN Network Data.';
+      title = translate('License required');
+      text = translate(
+          'The app only works with a valid license code. Enter the code you received from RDN Network Data.');
       color = Colors.red.shade700;
     }
     return Container(
@@ -94,7 +95,7 @@ class _LicenseBannerState extends State<LicenseBanner> {
               await showLicenseDialog(context);
               _refresh();
             },
-            child: Text(valid ? 'Introdu un cod nou' : 'Activează licența',
+            child: Text(translate(valid ? 'Enter a new code' : 'Activate license'),
                 style: const TextStyle(color: Colors.white)),
           ),
         ],
@@ -140,19 +141,20 @@ Future<void> showLicenseDialog(BuildContext context) async {
         }
         setState(() {
           busy = false;
-          error = (r['error'] ?? 'Activarea a eșuat').toString();
+          error = translate((r['error'] ?? 'Activation failed').toString());
         });
       }
 
       return AlertDialog(
-        title: const Text('Activează licența'),
+        title: Text(translate('Activate license')),
         content: SizedBox(
           width: 380,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Introdu codul de licență primit de la RDN Network Data.'),
+              Text(translate(
+                  'Enter the license code you received from RDN Network Data.')),
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
@@ -174,7 +176,7 @@ Future<void> showLicenseDialog(BuildContext context) async {
         actions: [
           TextButton(
             onPressed: busy ? null : () => Navigator.of(ctx).pop(),
-            child: const Text('Renunță'),
+            child: Text(translate('Cancel')),
           ),
           ElevatedButton(
             onPressed: busy ? null : submit,
@@ -183,7 +185,7 @@ Future<void> showLicenseDialog(BuildContext context) async {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Activează'),
+                : Text(translate('Activate')),
           ),
         ],
       );

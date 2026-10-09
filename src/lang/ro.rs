@@ -780,6 +780,19 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("RustDesk could not load a GStreamer component needed for screen capture ({})", "RustDesk nu a putut încărca o componentă GStreamer necesară pentru capturarea ecranului ({})"),
         ("Relay fallback delay in seconds", "Întârziere înainte de trecerea la releu în secunde"),
         ("relay-fallback-delay-tip", "Cât timp așteaptă o conexiune prin releu deja stabilită conexiunea directă WebRTC înainte de a fi folosită în locul ei. Măriți valoarea pentru a acorda mai mult timp unei conexiuni directe lente; micșorați-o pentru a trece mai repede la releu în rețelele în care o conexiune directă nu este posibilă. Lăsați gol pentru valoarea implicită de 2.5 secunde."),
-        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "")
+        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", ""),
+        ("License required", "Licență necesară"),
+        ("License expires soon", "Licența expiră în curând"),
+        ("License expires on {}. Contact RDN Network Data to renew.", "Licența expiră pe {}. Contactează RDN Network Data pentru prelungire."),
+        ("The app only works with a valid license code. Enter the code you received from RDN Network Data.", "Aplicația funcționează doar cu un cod de licență valid. Introdu codul primit de la RDN Network Data."),
+        ("Enter a new code", "Introdu un cod nou"),
+        ("Activate license", "Activează licența"),
+        ("Enter the license code you received from RDN Network Data.", "Introdu codul de licență primit de la RDN Network Data."),
+        ("Activate", "Activează"),
+        ("Activation failed", "Activarea a eșuat"),
+        ("The RDN Remote license is missing or has expired. Activate a license code in the app.", "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație."),
+        ("The license server is not configured", "Serverul de licențe nu este configurat"),
+        ("Invalid response from the license server", "Răspuns invalid de la serverul de licențe"),
+        ("The license received is not valid for this computer", "Licența primită nu este validă pentru acest calculator")
     ].iter().cloned().collect();
 }

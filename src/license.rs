@@ -18,7 +18,7 @@ pub const OPTION_TOKEN: &str = "license-token";
 /// also signs hbbs' protobuf messages; a zero first byte can never start one of those.
 const TOKEN_PREFIX: &[u8] = b"\x00RDN-LICENSE-1\x00";
 pub const BLOCKED_MSG: &str =
-    "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație.";
+    "The RDN Remote license is missing or has expired. Activate a license code in the app.";
 
 #[derive(Deserialize)]
 struct Claims {
@@ -109,6 +109,19 @@ fn device_id() -> String {
     return crate::ipc::get_id();
 }
 
+/// The language the app is shown in, so the license server can answer in it.
+fn ui_lang() -> String {
+    let lang = hbb_common::config::LocalConfig::get_option("lang");
+    if !lang.is_empty() {
+        return lang;
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let locale = sys_locale::get_locale().unwrap_or_default();
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let locale = String::new();
+    locale
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn activate_(code: &str) -> ResultType<()> {
     let api = crate::common::get_api_server(
@@ -116,24 +129,25 @@ async fn activate_(code: &str) -> ResultType<()> {
         crate::ui_interface::get_option("custom-rendezvous-server"),
     );
     if api.is_empty() {
-        hbb_common::bail!("Serverul de licențe nu este configurat");
+        hbb_common::bail!("The license server is not configured");
     }
     let body = serde_json::json!({
         "code": code,
         "uuid": crate::encode64(hbb_common::get_uuid()),
         "id": device_id(),
         "hostname": crate::common::hostname(),
+        "lang": ui_lang(),
     });
     let resp = crate::post_request(format!("{api}/api/license/activate"), body.to_string(), "")
         .await?;
     let v: serde_json::Value = serde_json::from_str(&resp)
-        .map_err(|_| hbb_common::anyhow::anyhow!("Răspuns invalid de la serverul de licențe"))?;
+        .map_err(|_| hbb_common::anyhow::anyhow!("Invalid response from the license server"))?;
     if let Some(err) = v.get("error").and_then(|e| e.as_str()) {
         hbb_common::bail!("{err}");
     }
     let token = v.get("license").and_then(|t| t.as_str()).unwrap_or_default();
     if verify(token).is_none() {
-        hbb_common::bail!("Licența primită nu este validă pentru acest calculator");
+        hbb_common::bail!("The license received is not valid for this computer");
     }
     crate::ui_interface::set_option(OPTION_TOKEN.to_owned(), token.to_owned());
     Ok(())

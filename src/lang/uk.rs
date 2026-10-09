@@ -781,5 +781,18 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Relay fallback delay in seconds", "Затримка перед переходом на ретранслятор у секундах"),
         ("relay-fallback-delay-tip", "Скільки часу вже встановлене з'єднання через ретранслятор чекає на пряме з'єднання WebRTC, перш ніж буде використане замість нього. Збільште, щоб дати повільному прямому з'єднанню більше часу; зменште, щоб швидше переходити на ретранслятор у мережах, де пряме з'єднання неможливе. Залиште порожнім для типового значення 2.5 секунди."),
         ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "Щоб розпочати голосовий виклик, увімкніть «Захоплення аудіо» на сторінці «Демонстрація екрана»."),
+        ("License required", ""),
+        ("License expires soon", ""),
+        ("License expires on {}. Contact RDN Network Data to renew.", ""),
+        ("The app only works with a valid license code. Enter the code you received from RDN Network Data.", ""),
+        ("Enter a new code", ""),
+        ("Activate license", ""),
+        ("Enter the license code you received from RDN Network Data.", ""),
+        ("Activate", ""),
+        ("Activation failed", ""),
+        ("The RDN Remote license is missing or has expired. Activate a license code in the app.", ""),
+        ("The license server is not configured", ""),
+        ("Invalid response from the license server", ""),
+        ("The license received is not valid for this computer", "")
     ].iter().cloned().collect();
 }

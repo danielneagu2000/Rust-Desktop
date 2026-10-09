@@ -780,6 +780,19 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("RustDesk could not load a GStreamer component needed for screen capture ({})", "RustDesk kon een GStreamer-component die nodig is voor schermopname niet laden ({})"),
         ("Relay fallback delay in seconds", "Vertraging voordat relay wordt gebruikt in seconden"),
         ("relay-fallback-delay-tip", "Hoe lang een al tot stand gekomen relayverbinding wacht op de directe WebRTC-verbinding voordat deze in plaats daarvan wordt gebruikt. Verhoog de waarde om een trage directe verbinding meer tijd te geven; verlaag deze om op netwerken waar een directe verbinding niet mogelijk is sneller op de relay terug te vallen. Laat leeg voor de standaardwaarde van 2.5 seconden."),
-        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "Om een spraakgesprek te starten, schakel je \"Audio-opname\" in op de pagina \"Scherm delen\".")
+        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "Om een spraakgesprek te starten, schakel je \"Audio-opname\" in op de pagina \"Scherm delen\"."),
+        ("License required", ""),
+        ("License expires soon", ""),
+        ("License expires on {}. Contact RDN Network Data to renew.", ""),
+        ("The app only works with a valid license code. Enter the code you received from RDN Network Data.", ""),
+        ("Enter a new code", ""),
+        ("Activate license", ""),
+        ("Enter the license code you received from RDN Network Data.", ""),
+        ("Activate", ""),
+        ("Activation failed", ""),
+        ("The RDN Remote license is missing or has expired. Activate a license code in the app.", ""),
+        ("The license server is not configured", ""),
+        ("Invalid response from the license server", ""),
+        ("The license received is not valid for this computer", "")
     ].iter().cloned().collect();
 }

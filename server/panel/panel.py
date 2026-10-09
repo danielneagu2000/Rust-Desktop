@@ -562,13 +562,21 @@ def device_license(uuid):
 
 def activate(v, src_ip):
     now = time.time()
+    # The app sends its language; older apps send nothing and keep the Romanian messages.
+    en = not str(v.get("lang") or "ro").lower().startswith("ro")
+
+    def t(ro, en_text):
+        return en_text if en else ro
+
     with ACT_LOCK:
         max_fails, lock_seconds = lockout("activation")
         window, fails = ACT_FAILS.get(src_ip, (now, 0))
         if now - window > lock_seconds:
             window, fails = now, 0
         if fails >= max_fails:
-            return {"error": f"Prea multe încercări. Reîncearcă peste {minutes_text(window + lock_seconds - now)}."}
+            left = window + lock_seconds - now
+            return {"error": t(f"Prea multe încercări. Reîncearcă peste {minutes_text(left)}.",
+                               f"Too many attempts. Try again in {minutes_text_en(left)}.")}
 
     def fail(msg):
         with ACT_LOCK:
@@ -579,25 +587,28 @@ def activate(v, src_ip):
 
     uuid = str(v.get("uuid") or "")
     if not re.fullmatch(r"[A-Za-z0-9+/=]{8,100}", uuid):
-        return fail("Date lipsă de la aplicație")
+        return fail(t("Date lipsă de la aplicație", "Missing data from the app"))
     code = normalize_code(v.get("code"))
     if not uuid:
-        return fail("Date lipsă de la aplicație")
+        return fail(t("Date lipsă de la aplicație", "Missing data from the app"))
     if not signing_seed():
-        return {"error": "Serverul de licențe nu este configurat"}
+        return {"error": t("Serverul de licențe nu este configurat", "The license server is not configured")}
     rows = q("SELECT * FROM licenses WHERE code = ?", (code,))
     if not rows:
-        return fail("Cod de licență invalid")
+        return fail(t("Cod de licență invalid", "Invalid license code"))
     lic = rows[0]
     if lic["revoked"]:
-        return fail("Licența a fost revocată. Contactează RDN Network Data.")
+        return fail(t("Licența a fost revocată. Contactează RDN Network Data.",
+                      "The license has been revoked. Contact RDN Network Data."))
     if lic["expires"] is not None and lic["expires"] <= now:
-        return fail("Licența a expirat. Contactează RDN Network Data pentru prelungire.")
+        return fail(t("Licența a expirat. Contactează RDN Network Data pentru prelungire.",
+                      "The license has expired. Contact RDN Network Data to renew it."))
     with DB_LOCK:
         already = DB.execute("SELECT 1 FROM activations WHERE uuid=? AND code=?", (uuid, code)).fetchone()
         used = DB.execute("SELECT COUNT(*) FROM activations WHERE code=?", (code,)).fetchone()[0]
         if not already and used >= lic["seats"]:
-            return fail(f"Toate cele {lic['seats']} locuri ale licenței sunt ocupate.")
+            return fail(t(f"Toate cele {lic['seats']} locuri ale licenței sunt ocupate.",
+                          f"All {lic['seats']} seats of the license are in use."))
         if lic["starts"] is None:
             expires = add_months(now, lic["months"]) if lic["months"] else None
             DB.execute("UPDATE licenses SET starts=?, expires=? WHERE code=?", (now, expires, code))
@@ -765,6 +776,14 @@ def minutes_text(seconds):
         return "1 minut" if m == 1 else f"{m} minute"
     h = round(m / 60)
     return f"{h} ore" if h < 48 else f"{round(h / 24)} zile"
+
+
+def minutes_text_en(seconds):
+    m = max(1, int(-(-seconds // 60)))
+    if m < 120:
+        return "1 minute" if m == 1 else f"{m} minutes"
+    h = round(m / 60)
+    return f"{h} hours" if h < 48 else f"{round(h / 24)} days"
 
 
 def lockout_state():

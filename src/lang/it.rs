@@ -780,6 +780,19 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("RustDesk could not load a GStreamer component needed for screen capture ({})", "RustDesk non è riuscito a caricare un componente GStreamer necessario per l'acquisizione dello schermo ({})"),
         ("Relay fallback delay in seconds", "Ritardo fallback relay (secondi)"),
         ("relay-fallback-delay-tip", "Quanto tempo una connessione relay già attiva attende la connessione WebRTC diretta prima di essere usata. Aumentalo per dare a una connessione diretta lenta più tempo per funzionare; diminuiscilo per passare prima al relay sulle reti in cui non è possibile effettuare una connessione diretta. Lascia vuoto per il valore predefinito di 2,5 secondi."),
-        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "Per avviare una chiamata vocale, attiva nella pagina 'Condivisione schermo' la voce 'Cattura audio'.")
+        ("To start a voice call, enable \"Audio capture\" on the \"Screen share\" page.", "Per avviare una chiamata vocale, attiva nella pagina 'Condivisione schermo' la voce 'Cattura audio'."),
+        ("License required", ""),
+        ("License expires soon", ""),
+        ("License expires on {}. Contact RDN Network Data to renew.", ""),
+        ("The app only works with a valid license code. Enter the code you received from RDN Network Data.", ""),
+        ("Enter a new code", ""),
+        ("Activate license", ""),
+        ("Enter the license code you received from RDN Network Data.", ""),
+        ("Activate", ""),
+        ("Activation failed", ""),
+        ("The RDN Remote license is missing or has expired. Activate a license code in the app.", ""),
+        ("The license server is not configured", ""),
+        ("Invalid response from the license server", ""),
+        ("The license received is not valid for this computer", "")
     ].iter().cloned().collect();
 }
