@@ -683,6 +683,7 @@ def sysinfo(v, src_ip):
 
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = "panel"
+    sys_version = ""  # no Python version in the Server header
     timeout = 20  # per-socket; slow or stalled clients are dropped
 
     def log_message(self, fmt, *args):
@@ -1061,6 +1062,7 @@ def state(search):
 
 class PanelHandler(BaseHTTPRequestHandler):
     server_version = "panel"
+    sys_version = ""  # no Python version in the Server header
     timeout = 120
 
     def log_message(self, fmt, *args):
@@ -1220,7 +1222,8 @@ class PanelHandler(BaseHTTPRequestHandler):
         """Handles /portal/...; True when the request was the portal's."""
         path = urlparse(self.path).path
         m = re.search(r"^(.*?/portal)(/.*)?$", path)
-        if not m:
+        # The operator panel's own /api/license/portal action is not the portal.
+        if not m or "/api/" in m.group(1):
             return False
         prefix, rest = m.group(1), m.group(2) or ""
         if not rest:
@@ -1619,11 +1622,19 @@ def report(month):
     return {"month": month, "rows": out, "retention_days": conf("retention_days")}
 
 
+def csv_cell(v):
+    # Device and peer names come from the connecting computers; Excel would run a cell
+    # starting with = + - @ as a formula, so such text gets a leading apostrophe.
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 def csv_bytes(header, rows):
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")  # Excel în română folosește ";" ca separator
     w.writerow(header)
-    w.writerows(rows)
+    w.writerows([csv_cell(c) for c in row] for row in rows)
     return ("\ufeff" + buf.getvalue()).encode()
 
 
