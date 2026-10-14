@@ -137,15 +137,14 @@
     function months(n) { return EN ? n + (n === "1" ? " month" : " months") : n + (n === "1" ? " lună" : " luni"); }
     function eur(v) { return EN ? "€" + v : v + " €"; }
     document.querySelectorAll(".buy").forEach(function (box) {
-      var ids = {}, link = box.querySelector("a.btn"), sum = box.querySelector(".sum"), state = { m: "1", pay: "sub" };
+      var ids = {}, link = box.querySelector("a.btn"), sum = box.querySelector(".sum"), state = { m: "1", pay: "subscription" };
       box.dataset.ids.split(",").forEach(function (pair) { var kv = pair.split(":"); ids[kv[0]] = kv[1]; });
       function update() {
         box.querySelectorAll("[data-m]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.m === state.m)); });
         box.querySelectorAll("[data-pay]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.pay === state.pay)); });
-        link.href = "https://shop.rdndata.ro/checkout/?add-to-cart=" + ids[state.m] +
-          (state.pay === "sub" && box.dataset.sub ? "&" + box.dataset.sub : "");
+        link.href = "https://shop.rdndata.ro/checkout/?add-to-cart=" + ids[state.m] + "&wcsr_purchase_type=" + state.pay;
         var total = "<b>" + eur(Number(box.dataset.price) * Number(state.m)) + "</b>";
-        sum.innerHTML = state.pay === "sub"
+        sum.innerHTML = state.pay === "subscription"
           ? (EN ? "Total " + total + " · renews automatically every " + (state.m === "1" ? "month" : months(state.m)) + "; cancel anytime from your account"
                 : "Total " + total + " · se reînnoiește automat " + (state.m === "1" ? "în fiecare lună" : "la fiecare " + months(state.m)) + "; îl poți opri oricând din cont")
           : (EN ? "Total " + total + " · paid once for " + months(state.m) + ", no automatic renewal"
