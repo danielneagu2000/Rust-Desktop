@@ -415,3 +415,21 @@ section { padding: 24px 0; }
   .hero { padding-top: 92px; }
   .steps { gap: 18px 12px; }
 }
+
+/* Comanda din pagină: perioada și tipul plății */
+.buy { display: grid; gap: 10px; }
+.seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.seg.pay { grid-template-columns: 1fr 1fr; }
+.seg button { min-width: 0; padding: 10px 4px; white-space: nowrap; border-radius: 10px; border: 1px solid var(--line); background: var(--glass); color: var(--ink-2); font: 600 0.86rem/1 var(--body); cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+@media (max-width: 420px) { .seg button { font-size: 0.78rem; } }
+.seg button:hover { border-color: var(--line-2); color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.buy .sum { margin: 2px 0 0; font-size: 0.9rem; color: var(--ink-2); }
+.buy .sum b { color: var(--ink); }
+.plan .buy .btn { margin-top: 4px; }
+@media (prefers-color-scheme: light) {
+  .plan.pro .seg button { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .14); color: #d9cfd1; }
+  .plan.pro .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .plan.pro .buy .sum { color: #b9aaac; }
+  .plan.pro .buy .sum b { color: #fff; }
+}

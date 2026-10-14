@@ -130,4 +130,34 @@
       io.observe(el);
     });
   })();
+
+  /* Comanda din pagină: perioada și tipul plății aleg variația din shop, iar butonul duce direct la plată. */
+  (function () {
+    var EN = /^\/en(\/|$)/.test(location.pathname);
+    function months(n) { return EN ? n + (n === "1" ? " month" : " months") : n + (n === "1" ? " lună" : " luni"); }
+    function eur(v) { return EN ? "€" + v : v + " €"; }
+    document.querySelectorAll(".buy").forEach(function (box) {
+      var ids = {}, link = box.querySelector("a.btn"), sum = box.querySelector(".sum"), state = { m: "1", pay: "sub" };
+      box.dataset.ids.split(",").forEach(function (pair) { var kv = pair.split(":"); ids[kv[0]] = kv[1]; });
+      function update() {
+        box.querySelectorAll("[data-m]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.m === state.m)); });
+        box.querySelectorAll("[data-pay]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.pay === state.pay)); });
+        link.href = "https://shop.rdndata.ro/checkout/?add-to-cart=" + ids[state.m] +
+          (state.pay === "sub" && box.dataset.sub ? "&" + box.dataset.sub : "");
+        var total = "<b>" + eur(Number(box.dataset.price) * Number(state.m)) + "</b>";
+        sum.innerHTML = state.pay === "sub"
+          ? (EN ? "Total " + total + " · renews automatically every " + (state.m === "1" ? "month" : months(state.m)) + "; cancel anytime from your account"
+                : "Total " + total + " · se reînnoiește automat " + (state.m === "1" ? "în fiecare lună" : "la fiecare " + months(state.m)) + "; îl poți opri oricând din cont")
+          : (EN ? "Total " + total + " · paid once for " + months(state.m) + ", no automatic renewal"
+                : "Total " + total + " · plătești o singură dată pentru " + months(state.m) + ", fără reînnoire");
+      }
+      box.addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        if (b.dataset.m) state.m = b.dataset.m;
+        if (b.dataset.pay) state.pay = b.dataset.pay;
+        update();
+      });
+      update();
+    });
+  })();
 })();
