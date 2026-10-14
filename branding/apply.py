@@ -107,7 +107,9 @@ def load_config():
     cfg["SOURCE_URL"] = cfg.get("SOURCE_URL", "")
     if not cfg["SOURCE_URL"]:
         fail("SOURCE_URL is required: AGPL-3.0 obliges you to offer the source code to your users")
-    for k in ("WEBSITE_URL", "PRIVACY_URL", "SOURCE_URL"):
+    # Where users are told to get the source (About page, installer); defaults to the repository.
+    cfg["SOURCE_CODE_URL"] = cfg.get("SOURCE_CODE_URL") or cfg["SOURCE_URL"]
+    for k in ("WEBSITE_URL", "PRIVACY_URL", "SOURCE_URL", "SOURCE_CODE_URL"):
         if not re.fullmatch(url_re, cfg[k]):
             fail(f"{k} must be an http(s) URL without quotes or spaces")
     email = cfg.get("SUPPORT_EMAIL", "")
@@ -252,9 +254,10 @@ def update_patches(cfg):
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
          r"(final Uri url = Uri\.parse\(')[^']*('\);\n\s*await launchUrl\(url\);)",
          lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
+        # No "Changelog" link to the GitHub release page on the new-version card.
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
-         r"'https://github\.com/[^/']+/[^/']+/releases/tag/\$\{bind\.mainGetNewVersion\(\)\}'",
-         lambda m: f"'https://github.com/{owner}/{repo}/releases/tag/${{bind.mainGetNewVersion()}}'"),
+         r"help: (?:isToUpdate \? 'Changelog' : null|null),\n(\s*)link: (?:isToUpdate\n\s*\? '[^']*'\n\s*: null|null)\);",
+         lambda m: f"help: null,\n{m.group(1)}link: null);"),
         ("flutter/lib/mobile/pages/connection_page.dart", r"(final url = ')[^']*(';\n\s*// https://pub\.dev)",
          lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
         ("flutter/lib/mobile/pages/connection_page.dart",
@@ -270,7 +273,7 @@ def publisher_patches(cfg):
     """Publisher metadata and in-app legal notices: the company replaces Purslane
     as publisher, while the RustDesk copyright and AGPL notice stay visible."""
     company, year, display = cfg["COMPANY"], cfg["COPYRIGHT_YEAR"], cfg["DISPLAY_NAME"]
-    web, privacy, source = cfg["WEBSITE_URL"], cfg["PRIVACY_URL"], cfg["SOURCE_URL"]
+    web, privacy, source = cfg["WEBSITE_URL"], cfg["PRIVACY_URL"], cfg["SOURCE_CODE_URL"]
     web_host = re.sub(r"^https?://", "", web).rstrip("/")
     legal = f"Copyright \u00a9 {year} {company}. Based on RustDesk, \u00a9 Purslane Tech Pte. Ltd., AGPL-3.0."
     vendor = f"{company} <{cfg['SUPPORT_EMAIL']}>" if cfg["SUPPORT_EMAIL"] else company
@@ -360,7 +363,7 @@ def msi_license_rtf(cfg):
          f"{display} este software liber, bazat pe RustDesk (Copyright © Purslane Tech Pte. Ltd.) și distribuit "
          f"de {company} sub licența GNU Affero General Public License, versiunea 3 (AGPL-3.0). Poți folosi, copia, "
          f"modifica și redistribui programul în condițiile acestei licențe; nicio prevedere din acest document nu "
-         f"restrânge drepturile pe care ți le dă AGPL-3.0. Codul sursă complet: {cfg['SOURCE_URL']}. "
+         f"restrânge drepturile pe care ți le dă AGPL-3.0. Codul sursă complet: {cfg['SOURCE_CODE_URL']}. "
          f"Textul integral al licenței: https://www.gnu.org/licenses/agpl-3.0.html"),
         ("2. Fără garanție",
          "Conform secțiunilor 15 și 16 din AGPL-3.0, programul este furnizat „ca atare”, fără nicio garanție, "

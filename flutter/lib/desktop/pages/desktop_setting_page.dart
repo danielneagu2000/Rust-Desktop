@@ -2580,7 +2580,7 @@ class _AboutState extends State<_About> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Copyright © ${DateTime.now().toString().substring(0, 4)} RDN Network Data\nBased on RustDesk, Copyright © Purslane Tech Pte. Ltd.\nLicensed under AGPL-3.0. Source code: https://github.com/danielneagu2000/Rust-Desktop\n$license',
+                            'Copyright © ${DateTime.now().toString().substring(0, 4)} RDN Network Data\nBased on RustDesk, Copyright © Purslane Tech Pte. Ltd.\nLicensed under AGPL-3.0. Source code: https://remote.rdndata.ro/sursa/\n$license',
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(

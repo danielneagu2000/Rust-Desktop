@@ -449,10 +449,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           btnText,
           onPressed,
           closeButton: true,
-          help: isToUpdate ? 'Changelog' : null,
-          link: isToUpdate
-              ? 'https://github.com/danielneagu2000/Rust-Desktop/releases/tag/${bind.mainGetNewVersion()}'
-              : null);
+          help: null,
+          link: null);
     }
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
