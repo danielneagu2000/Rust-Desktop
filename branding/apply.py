@@ -134,6 +134,10 @@ def load_config():
     cfg["AUTO_UPDATE"] = (cfg.get("AUTO_UPDATE") or "Y").upper()
     if cfg["AUTO_UPDATE"] not in ("Y", "N"):
         fail("AUTO_UPDATE must be Y or N")
+    idle = cfg.get("IDLE_DISCONNECT_MINUTES") or "0"
+    if not re.fullmatch(r"[0-9]{1,4}", idle) or int(idle) > 1440:
+        fail("IDLE_DISCONNECT_MINUTES must be 0 (off) to 1440")
+    cfg["IDLE_DISCONNECT_MINUTES"] = int(idle)
 
     phone = cfg.get("SUPPORT_PHONE", "")
     if phone and not re.fullmatch(r"\+?[0-9 ()./-]{6,20}", phone):
@@ -222,9 +226,13 @@ def update_patches(cfg):
     from this repository's GitHub releases (the updater's URL allowlist)."""
     owner, repo = cfg["GITHUB_OWNER"], cfg["GITHUB_REPO"]
     web = cfg["WEBSITE_URL"]
+    pairs = [("allow-auto-update", "Y")] if cfg["AUTO_UPDATE"] == "Y" else []
+    if cfg["IDLE_DISCONNECT_MINUTES"]:
+        # Incoming sessions close after this many minutes without input from the controlling side.
+        pairs += [("allow-auto-disconnect", "Y"), ("auto-disconnect-timeout", str(cfg["IDLE_DISCONNECT_MINUTES"]))]
     defaults = (
-        'RwLock::new(HashMap::from([("allow-auto-update".to_owned(), "Y".to_owned())]))'
-        if cfg["AUTO_UPDATE"] == "Y" else "Default::default()"
+        "RwLock::new(HashMap::from([" + ", ".join(f'("{k}".to_owned(), "{v}".to_owned())' for k, v in pairs) + "]))"
+        if pairs else "Default::default()"
     )
     return [
         ("libs/hbb_common/src/lib.rs", r'(const URL: &str = ")[^"]*(";\n\n    use sysinfo::System;)',
