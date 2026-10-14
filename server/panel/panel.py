@@ -657,6 +657,7 @@ def heartbeat(v, src_ip):
         out["license"] = ""
         if conns:
             out["disconnect"] = sorted(set(out.get("disconnect", []) + conns))
+            out.setdefault("disconnect_reason", "Licența RDN Remote a acestui calculator a expirat sau a fost revocată.")
     if "modified_at" in v:
         out["modified_at"] = v["modified_at"]
     return out

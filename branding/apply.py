@@ -229,6 +229,9 @@ def update_patches(cfg):
          lambda m: f'{m.group(1)}{cfg["API_SERVER"]}/version/latest{m.group(2)}'),
         ("src/updater.rs", r'(if owner != ")[^"]*("\n\s*\|\| repo != ")[^"]*(")',
          lambda m: f"{m.group(1)}{owner}{m.group(2)}{repo}{m.group(3)}"),
+        # The updater test's accepted URL has to name the same repository as the check above.
+        ("src/updater.rs", r'("https://github\.com/)[^/"]+/[^/"]+(/releases/download/1\.4\.0/rustdesk-1\.4\.0-x86_64\.dmg")',
+         lambda m: f"{m.group(1)}{owner}/{repo}{m.group(2)}"),
         # Upstream skips update checks for renamed (custom) clients; this one has its own feed.
         ("src/common.rs", r"(pub fn check_software_update\(\) \{\n)(?:    if is_custom_client\(\) \{\n        return;\n    \}\n)?",
          lambda m: m.group(1)),

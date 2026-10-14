@@ -387,8 +387,14 @@ jobs:
         # is x64 / ARM64; the produced Package.msi is globbed since its bin/<platform>/ dir varies.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
+          # The app looks itself up as <APP_NAME>.exe, service <APP_NAME> and registry key
+          # <APP_NAME>; a package built as "RustDesk" would install under the wrong names
+          # and share upstream RustDesk's UpgradeCode, replacing an installed RustDesk.
+          $appName = (Select-String -Path ./branding/brand.env -Pattern '^APP_NAME=(.+)$').Matches[0].Groups[1].Value.Trim().Trim('"')
+          Copy-Item -Recurse ./rustdesk ./rustdesk-msi
+          Rename-Item ./rustdesk-msi/rustdesk.exe "$appName.exe"
           pushd ./res/msi
-          python preprocess.py --arp -d ../../rustdesk
+          python preprocess.py --arp -d ../../rustdesk-msi --app-name $appName
           nuget restore msi.sln
           $msiPlatform = if ('${{ matrix.job.arch }}' -eq 'aarch64') { 'ARM64' } else { 'x64' }
           msbuild msi.sln -p:Configuration=Release -p:Platform=$msiPlatform /p:TargetVersion=Windows10

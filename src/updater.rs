@@ -658,7 +658,7 @@ mod tests {
     #[test]
     fn update_download_file_accepts_expected_github_asset_urls() {
         let file = get_download_file_from_url(
-            "https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg",
+            "https://github.com/danielneagu2000/Rust-Desktop/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg",
         )
         .expect("valid GitHub release asset URL");
 
