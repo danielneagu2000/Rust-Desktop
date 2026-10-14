@@ -415,7 +415,9 @@ python3 branding/apply.py --check  # verifică
 3. compilează pentru toate platformele (**1–2 ore**; minutele GitHub Actions sunt gratuite
    pentru repo-uri publice);
 4. **numai dacă toate compilările au reușit**, publică release-ul ca „final” (adaugă
-   `update-manifest.json`).
+   `update-manifest.json`);
+5. păstrează pe GitHub cel mult **5 versiuni**: după publicare șterge, cu tot cu etichetă,
+   versiunile mai vechi al căror build a eșuat și pe cele mai vechi decât ultimele 5.
 
 Un release nefinalizat (în lucru sau eșuat) nu ajunge niciodată la clienți sau pe server.
 

@@ -64,4 +64,27 @@ jobs:
           EOF
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber assets/*
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease=false --latest
-          echo "::notice::$TAG published: servers pick it up within a day (or: sudo systemctl start rdn-update)."
+          echo "::notice::$TAG published: servers pick it up within 15 minutes (or: sudo systemctl start rdn-update)."
+
+      # Servers and clients only use the newest finished release. Keep at most 5 releases:
+      # older releases whose build failed (no update-manifest.json) and everything past the
+      # newest 5 are deleted with their tags. Drafts and the release just published are kept.
+      - name: Keep the newest 5 releases
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import json, os, subprocess
+          repo, tag, keep = os.environ["GITHUB_REPOSITORY"], os.environ["TAG"], 5
+          out = subprocess.run(["gh", "api", f"repos/{repo}/releases?per_page=100"], check=True, capture_output=True, text=True).stdout
+          releases = sorted((r for r in json.loads(out) if not r["draft"]), key=lambda r: r["created_at"], reverse=True)
+          current = next(r for r in releases if r["tag_name"] == tag)
+          def finished(r):
+              return any(a["name"] == "update-manifest.json" for a in r["assets"])
+          failed = [r for r in releases if r["created_at"] < current["created_at"] and not finished(r)]
+          kept = [r for r in releases if r not in failed]
+          for r in failed + kept[keep:]:
+              if r["tag_name"] == tag:
+                  continue
+              print(f"deleting release {r['tag_name']} ({'failed build' if r in failed else 'older than the newest ' + str(keep)})")
+              subprocess.run(["gh", "release", "delete", r["tag_name"], "--repo", repo, "--cleanup-tag", "--yes"], check=True)
+          EOF
