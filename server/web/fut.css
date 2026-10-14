@@ -391,3 +391,27 @@ section { padding: 56px 0; }
 @media (max-width: 1100px) { .nav { background: #120c0d; } }
 @media (max-width: 1100px) and (prefers-color-scheme: light) { .nav { background: #fff; } }
 .nav .lang { display: inline-flex; align-items: center; font: 600 0.8rem/1.2 var(--mono); letter-spacing: .08em; color: var(--ink); box-shadow: 0 0 0 1px var(--line) inset; margin-left: 4px; }
+
+/* Margini laterale ca în designul anterior (conținut de 1160px, 20px pe margini) și spații minime între containere */
+.wrap { max-width: 1200px; padding-inline: 20px; }
+section { padding: 24px 0; }
+.head { margin-bottom: 18px; gap: 10px; }
+.hero { padding: 100px 0 12px; }
+.facts { margin-top: 18px; }
+.stats { margin-top: 10px; }
+.portal, .about { margin-top: 14px; }
+.shot.big { margin-top: 0; }
+.specs { margin-top: 16px; }
+.more { margin-top: 12px; }
+.checks { margin-top: 18px; }
+.hero-grid, .dl-grid, .alt-grid, .contact-box { gap: 24px; }
+.sec-grid, .portal { gap: 28px; }
+.showcase, .showcase .side { gap: 14px; }
+.feats, .steps, .plans, .uses, .about { gap: 12px; }
+.os-grid { gap: 10px; }
+.faq { gap: 8px; }
+@media (max-width: 900px) {
+  section { padding: 18px 0; }
+  .hero { padding-top: 92px; }
+  .steps { gap: 18px 12px; }
+}
