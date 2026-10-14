@@ -1,0 +1,32 @@
+{
+    "name": "dbus-glib",
+    "cleanup": [
+        "*.la",
+        "/bin",
+        "/etc",
+        "/include",
+        "/lib/pkgconfig",
+        "/libexec",
+        "/share/gtk-doc",
+        "/share/man"
+    ],
+    "config-opts": [
+        "--disable-static",
+        "--disable-gtk-doc"
+    ],
+    "sources": [
+        {
+            "type": "archive",
+            "url": "https://dbus.freedesktop.org/releases/dbus-glib/dbus-glib-0.114.tar.gz",
+            "mirror-urls": [
+                "https://distfiles.gentoo.org/distfiles/04/dbus-glib-0.114.tar.gz",
+                "https://distcache.freebsd.org/ports-distfiles/dbus-glib-0.114.tar.gz",
+                "https://cdn.netbsd.org/pub/pkgsrc/distfiles/dbus-glib-0.114.tar.gz",
+                "https://ftp.fr.openbsd.org/pub/OpenBSD/distfiles/dbus-glib-0.114.tar.gz",
+                "https://deb.debian.org/debian/pool/main/d/dbus-glib/dbus-glib_0.114.orig.tar.gz",
+                "https://ftp.osuosl.org/pub/blfs/conglomeration/dbus-glib/dbus-glib-0.114.tar.gz"
+            ],
+            "sha256": "c09c5c085b2a0e391b8ee7d783a1d63fe444e96717cc1814d61b5e8fc2827a7c"
+        }
+    ]
+}

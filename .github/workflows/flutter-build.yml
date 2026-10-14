@@ -2549,6 +2549,8 @@ jobs:
             # package
             pushd flatpak
             git clone https://github.com/flathub/shared-modules.git --depth=1
+            # Same dbus-glib tarball (same sha256) with mirrors: dbus.freedesktop.org times out from the arm64 runners.
+            cp dbus-glib.json shared-modules/dbus-glib/dbus-glib.json
             flatpak-builder --user --install-deps-from=flathub -y --force-clean --repo=repo ./build ./rustdesk.json
             flatpak build-bundle ./repo rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.flatpak com.rustdesk.RustDesk
 
