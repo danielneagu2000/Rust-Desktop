@@ -154,7 +154,7 @@ docker compose restart hbbr >/dev/null
 chmod 700 data
 chmod 600 data/id_ed25519
 
-# Actualizare automată zilnică (auto_update.sh): kiturile de pe pagina de descărcare,
+# Actualizare automată la 15 minute (auto_update.sh): kiturile de pe pagina de descărcare,
 # versiunea anunțată clienților și serverul însuși, urmărind doar release-urile finalizate.
 SERVER_DIR="$(pwd)"
 for old in rdn-downloads.timer rdn-downloads.service; do
@@ -174,12 +174,12 @@ ExecStart=/bin/bash $SERVER_DIR/auto_update.sh
 EOF
 cat > /etc/systemd/system/rdn-update.timer <<EOF
 [Unit]
-Description=RDN Remote: verificare zilnică a release-urilor noi
+Description=RDN Remote: verificare la 15 minute a release-urilor noi
 
 [Timer]
 OnBootSec=5min
-OnCalendar=*-*-* 04:00:00
-RandomizedDelaySec=30min
+OnCalendar=*:0/15
+RandomizedDelaySec=2min
 Persistent=true
 
 [Install]

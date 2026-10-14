@@ -127,6 +127,12 @@ def main():
     # Release tags come from GitHub; never let one shape a path ("../", "/").
     version = re.sub(r"[^A-Za-z0-9._-]", "_", version).strip(".") or "release"
     target = FILES / version
+    current = None if args.from_dir else already_published(version, set(found) | {"source"})
+    if current:
+        # The timer runs every few minutes: refresh the manifest (server, key) without copying the installers again.
+        write_manifest(version, current["items"], current.get("published"))
+        log(f"Version {version} is already published")
+        return
     tmp = FILES / f".incoming-{os.getpid()}"
     tmp.mkdir(parents=True, exist_ok=True)
     items = []
@@ -189,6 +195,23 @@ def main():
         tmp_latest.write_text(json.dumps({"tag": version, "repo": REPO}))
         tmp_latest.replace(DATA / "latest.json")
     log(f"Published {len(items)} installer(s) for version {version}")
+
+
+def already_published(version, keys):
+    """The current manifest when it already offers this version with every file on disk, else None."""
+    try:
+        manifest = json.loads((FILES / "downloads.json").read_text())
+        latest = json.loads((DATA / "latest.json").read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(manifest, dict) or not isinstance(latest, dict):
+        return None
+    items = manifest.get("items") or []
+    if (manifest.get("version") != version or latest.get("tag") != version
+            or not keys <= {it.get("key") for it in items}
+            or not all((WEB / str(it.get("file") or "")).is_file() for it in items)):
+        return None
+    return manifest
 
 
 def write_manifest(version, items, published):

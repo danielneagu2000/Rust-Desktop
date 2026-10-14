@@ -90,7 +90,7 @@ Funcționează la fel, cu AlmaLinux sau altă distribuție de mai sus:
 - listează toate variantele, cu dimensiune și sumă de control SHA-256;
 - explică pașii (ID + parolă) și avertizează împotriva înșelătoriilor telefonice.
 
-**Fișierele se actualizează singure:** zilnic (și la pornire) serverul verifică release-urile
+**Fișierele se actualizează singure:** la fiecare 15 minute (și la pornire) serverul verifică release-urile
 din GitHub și descarcă ultima versiune compilată în `server/web/files/`. Manual:
 `sudo systemctl start rdn-update`. Până la primul release, pagina afișează „În curând”.
 
@@ -469,8 +469,8 @@ După ce un release e final, totul merge singur, fără intervenția ta:
 
 | Ce | Cum | Când |
 | --- | --- | --- |
-| Pagina de descărcare | serverul aduce noile kituri de pe GitHub | zilnic, ~04:00 |
-| Serverul (panou, site, configurație) | serverul trece la codul release-ului (`auto_update.sh`) | zilnic, ~04:00 |
+| Pagina de descărcare | serverul aduce noile kituri de pe GitHub | la cel mult 15 minute după release |
+| Serverul (panou, site, configurație) | serverul trece la codul release-ului (`auto_update.sh`) | la fel |
 | Aplicația pe **Windows** | se descarcă și se instalează singură, când nu e nicio sesiune activă | la verificarea periodică a aplicației |
 | Aplicația pe **macOS** | se actualizează prin serviciul de fundal (dacă aplicația e instalată) | la fel |
 | Aplicația pe **Linux** și **Android** | apare mesajul „versiune nouă”, cu link spre pagina de descărcare | la fel |

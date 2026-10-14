@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Actualizare automată (rulată zilnic de rdn-update.timer, instalat de install.sh):
+# Actualizare automată (rulată la 15 minute de rdn-update.timer, instalat de install.sh):
 #   1. aduce pe pagina de descărcare ultimul release finalizat de pe GitHub și anunță
 #      versiunea clienților (panoul răspunde la /version/latest);
 #   2. aduce serverul (panou, site, configurație) la același release, dacă s-a schimbat.
