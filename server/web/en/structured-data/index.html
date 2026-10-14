@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Structured data (Schema Markup): RDN Remote</title>
+<meta name="description" content="The schema.org structured data (JSON-LD) remote.rdndata.ro publishes for search engines, plus sitemap.xml and robots.txt.">
+<link rel="canonical" href="https://remote.rdndata.ro/en/structured-data/">
+<link rel="alternate" hreflang="ro" href="https://remote.rdndata.ro/date-structurate/">
+<link rel="alternate" hreflang="en" href="https://remote.rdndata.ro/en/structured-data/">
+<link rel="alternate" hreflang="x-default" href="https://remote.rdndata.ro/date-structurate/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<meta name="theme-color" content="#0a0708" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="/fonts.css?v=1">
+<link rel="stylesheet" href="/fut.css?v=5">
+<link rel="stylesheet" href="/footer.css">
+<style>
+.doc { max-width: 860px; margin-inline: auto; padding-inline: 24px; }
+.doc-head { padding: 130px 24px 26px; display: grid; gap: 14px; }
+.doc-head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 800; }
+.doc-head p { color: var(--ink-2); }
+main.doc { padding-bottom: 60px; }
+main.doc a { color: var(--neon-soft); }
+main.doc h2 { font-size: clamp(1.4rem, 2.6vw, 1.8rem); margin: 36px 0 12px; }
+main.doc h3 { font-size: 1.15rem; margin: 22px 0 8px; }
+main.doc p { margin: 0 0 14px; color: var(--ink-2); }
+main.doc ul { padding-left: 22px; color: var(--ink-2); } main.doc li { margin: 4px 0; }
+main.doc strong { color: var(--ink); }
+.box { padding: 18px 22px; margin-bottom: 18px; }
+.box dl { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; }
+.box dt { color: var(--ink-3); font: 600 0.75rem/2.1 var(--mono); text-transform: uppercase; letter-spacing: .08em; } .box dd { margin: 0; }
+.todo { background: #fff3cd; color: #7a5300; padding: 0 6px; border-radius: 4px; }
+.scroll { overflow-x: auto; margin: 12px 0; }
+.scroll table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+.scroll th, .scroll td { text-align: left; border-bottom: 1px solid var(--line); padding: 11px 14px; vertical-align: top; }
+.scroll td { color: var(--ink-2); }
+.scroll tr:last-child td { border-bottom: 0; }
+.scroll th { color: var(--neon-soft); font: 600 0.72rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+@media (max-width: 640px) { .doc { padding-inline: 16px; } .doc-head { padding: 104px 16px 20px; } .box dl { grid-template-columns: 1fr; gap: 0; } .box dd { margin-bottom: 8px; } }
+.ld { font: 500 0.78rem/1.55 var(--mono); padding: 16px 18px; border-radius: 14px; background: var(--glass); border: 1px solid var(--line); overflow: auto; max-height: 520px; white-space: pre; }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<header class="top">
+  <div class="wrap">
+    <div class="top-in">
+      <a class="brand" href="/en/" aria-label="RDN Remote, home page"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><b>RDN REMOTE</b></a>
+      <nav class="nav" id="nav" aria-label="Main menu">
+        <a href="/en/features/">Features</a>
+        <a href="/en/pricing/">Pricing</a>
+        <a href="/en/download/">Download</a>
+        <a href="/en/security/">Security</a>
+        <a href="/en/faq/">FAQ</a>
+        <a class="nav-client" href="/portal/">Client portal</a>
+        <a class="lang" href="/date-structurate/" hreflang="ro" lang="ro" title="Română">RO</a>
+      </nav>
+      <div class="top-cta"><a class="btn sm" href="/en/download/">Download</a></div>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Open the menu"><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="doc doc-head">
+  <span class="tag">SEO · schema.org</span>
+  <h1>Structured data</h1>
+  <p>What Google and other search engines read about <strong>RDN Remote</strong>, in schema.org format (JSON-LD), plus the files for indexing the site.</p>
+</div>
+
+<main class="doc">
+  <h2>What we publish</h2>
+  <div class="box glass-card"><dl id="ld-summary"><dt>Loading…</dt><dd></dd></dl></div>
+
+  <h2>Files for search engines</h2>
+  <ul>
+    <li><a href="/sitemap.xml">sitemap.xml</a>: the site's pages, in Romanian and English, with the links between languages.</li>
+    <li><a href="/robots.txt">robots.txt</a>: what search engines may index; installers and the client portal are not indexed.</li>
+  </ul>
+
+  <h2>Check it</h2>
+  <ul>
+    <li><a href="https://search.google.com/test/rich-results?url=https%3A%2F%2Fremote.rdndata.ro%2Fen%2F" rel="noopener">Google Rich Results Test</a></li>
+    <li><a href="https://validator.schema.org/#url=https%3A%2F%2Fremote.rdndata.ro%2Fen%2F" rel="noopener">Schema.org validator</a></li>
+  </ul>
+
+  <h2>The JSON-LD code</h2>
+  <p>The exact code of the home page, read from it just now.</p>
+  <pre class="ld" id="ld-code">Loading…</pre>
+</main>
+
+<footer class="rdn-footer" id="site-footer"></footer>
+<script src="/footer.js" defer></script>
+<script>
+(function () {
+  var btn = document.getElementById("menuBtn"), nav = document.getElementById("nav"), head = document.querySelector(".top");
+  function set(open) {
+    nav.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+  }
+  btn.addEventListener("click", function () { set(!nav.classList.contains("open")); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+  function scrolled() { head.classList.toggle("scrolled", window.scrollY > 8); }
+  scrolled();
+  window.addEventListener("scroll", scrolled, { passive: true });
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var TODO = '<span class="todo">[to be filled in server/web/site.json]</span>';
+  function esc(v) {
+    return String(v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  fetch("/site.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })
+    .then(function (s) {
+      var v = {
+        legal_name: s.legal_name, cui: s.cui, reg_com: s.reg_com, address: s.address, company: s.legal_name || s.company,
+        email: s.email ? '<a href="mailto:' + esc(s.email) + '">' + esc(s.email) + "</a>" : "",
+        phone: s.phone ? '<a href="tel:' + esc(String(s.phone).replace(/[^+\d]/g, "")) + '">' + esc(s.phone) + "</a>" : "",
+        privacy_updated_en: s.privacy_updated ? new Date(s.privacy_updated + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "",
+        copyright: "© " + new Date().getFullYear() + " " + (s.company || "RDN Network Data")
+      };
+      var html = { email: 1, phone: 1 };
+      document.querySelectorAll("[data-f]").forEach(function (el) {
+        var k = el.getAttribute("data-f"), val = v[k];
+        if (!val) { el.innerHTML = TODO; return; }
+        if (html[k]) el.innerHTML = val; else el.textContent = val;
+      });
+    });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  var sum = document.getElementById("ld-summary"), code = document.getElementById("ld-code");
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function row(k, v) { return "<dt>" + esc(k) + "</dt><dd>" + v + "</dd>"; }
+  fetch("/en/", { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var blocks = Array.prototype.map.call(doc.querySelectorAll('script[type="application/ld+json"]'), function (el) { return JSON.parse(el.textContent); });
+    if (!blocks.length) { sum.innerHTML = row("—", esc("The home page has no structured data.")); code.textContent = ""; return; }
+    code.textContent = blocks.map(function (b) { return JSON.stringify(b, null, 2); }).join("\n\n");
+    var out = [];
+    blocks.forEach(function (b) {
+      (b["@graph"] || [b]).forEach(function (g) {
+        if (g["@type"] === "SoftwareApplication") {
+          out.push(row("Application", "<strong>" + esc(g.name) + "</strong> · " + esc(g.applicationCategory)));
+          if (g.operatingSystem) out.push(row("Systems", esc(g.operatingSystem)));
+          if (g.offers) out.push(row("Offers", (Array.isArray(g.offers) ? g.offers : [g.offers]).map(function (o) {
+            return esc(o.name) + ": " + esc(o.price) + " " + esc(o.priceCurrency) + " per month";
+          }).join(" · ")));
+          var pub = g.publisher || {};
+          if (pub.name) out.push(row("Company", esc(pub.name) + (pub.url ? " · " + esc(pub.url) : "") + (pub.email ? " · " + esc(pub.email) : "")));
+        } else if (g["@type"] === "FAQPage") {
+          out.push(row("FAQ", esc((g.mainEntity || []).length) + " questions"));
+        } else if (g["@type"]) {
+          out.push(row(g["@type"], esc(g.name || "")));
+        }
+      });
+    });
+    sum.innerHTML = out.join("");
+  }).catch(function () { sum.innerHTML = row("—", esc("The data could not be read.")); code.textContent = ""; });
+})();
+</script>
+</body>
+</html>

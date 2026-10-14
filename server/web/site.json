@@ -106,15 +106,15 @@
       },
       {
         "text": "Sitemap",
-        "url": "https://www.rdndata.ro/sitemap.xml"
+        "url": "/sitemap.xml"
       },
       {
         "text": "Robots",
-        "url": "https://www.rdndata.ro/robots.txt"
+        "url": "/robots.txt"
       },
       {
         "text": "Schema Markup",
-        "url": "https://www.rdndata.ro/date-structurate/"
+        "url": "/date-structurate/"
       }
     ]
   }
