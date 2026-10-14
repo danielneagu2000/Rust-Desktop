@@ -18,6 +18,15 @@ REPO_DIR="$(dirname "$SERVER_DIR")"
 cd "$SERVER_DIR"
 git_() { git -c safe.directory="$REPO_DIR" -C "$REPO_DIR" "$@"; }
 
+# git înlocuiește Caddyfile cu un fișier nou, iar containerul web (care îl are montat ca fișier)
+# îl vede pe cel vechi până la repornire, de exemplu după un `git pull` făcut de mână.
+# Fără repornire, aplicațiile noi n-ar găsi API-ul prin HTTPS.
+if docker ps --format '{{.Names}}' | grep -qx rustdesk-web \
+   && ! docker exec rustdesk-web cat /etc/caddy/Caddyfile 2>/dev/null | cmp -s - Caddyfile; then
+  echo "Caddyfile s-a schimbat; repornesc site-ul."
+  docker compose restart web >/dev/null
+fi
+
 HOST="$(sed -n 's/^SERVER_HOST=//p' .env 2>/dev/null | tail -n 1)"
 docker run --rm -e SERVER_HOST="$HOST" \
   -v "$SERVER_DIR/web:/w:z" -v "$SERVER_DIR/data:/data:z" \

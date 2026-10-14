@@ -38,6 +38,13 @@
 		reverse_proxy 127.0.0.1:21120
 	}
 
+	# API-ul aplicațiilor (licențe, jurnale, versiunea curentă) prin HTTPS, către panou.
+	# Portul 21114 rămâne deschis pentru aplicațiile instalate înainte de această schimbare.
+	@api path /api/* /version/latest
+	handle @api {
+		reverse_proxy 127.0.0.1:21114
+	}
+
 	file_server
 }
 

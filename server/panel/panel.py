@@ -706,8 +706,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self.reply(200, latest_release() or {"url": ""})
         self.reply(404, {"error": "not found"})
 
+    def client_ip(self):
+        ip = self.client_address[0]
+        if ip in ("127.0.0.1", "::1"):
+            # Apps reaching the API over HTTPS come through Caddy, which sets X-Forwarded-For
+            # to the real address; its last entry is the one Caddy added.
+            fwd = [p.strip() for p in self.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+            if fwd and valid_ip(fwd[-1]):
+                return valid_ip(fwd[-1])
+        return ip
+
     def do_POST(self):
-        src_ip = self.client_address[0]
+        src_ip = self.client_ip()
         if not rate_ok(src_ip):
             return self.reply(429, {"error": "rate limited"})
         length = body_length(self.headers, MAX_BODY)
