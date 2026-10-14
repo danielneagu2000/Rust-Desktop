@@ -562,8 +562,8 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         var kinds = { auto: "automat", manual: "manual", "inainte-de-restaurare": "înainte de restaurare" };
         rows("t-backups", d.backups || [], function (b) {
           return '<tr><td class="mono">' + esc(b.name) + "</td><td>" + esc(kinds[b.label] || b.label) + "</td><td>" + esc(when(b.created)) +
-            '</td><td class="num">' + esc(size(b.size)) + '</td><td><a class="small" style="text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:8px" href="' +
-            base + "api/backup/download?name=" + encodeURIComponent(b.name) + '">Descarcă</a></td></tr>';
+            '</td><td class="num">' + esc(size(b.size)) + '</td><td style="white-space:nowrap"><a class="small" style="text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:8px" href="' +
+            base + "api/backup/download?name=" + encodeURIComponent(b.name) + '">Descarcă</a> <button class="small danger" data-del-backup="' + esc(b.name) + '">Șterge</button></td></tr>';
         }, 5);
       }).catch(function () {});
   }
@@ -661,6 +661,12 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
   document.getElementById("backup-now").addEventListener("submit", function (e) {
     e.preventDefault();
     post("backup/create", {}).then(function (r) { toast("Backup creat: " + r.name); loadBackups(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.getElementById("t-backups").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-del-backup]"); if (!b) return;
+    if (!confirm("Ștergi definitiv backup-ul " + b.dataset.delBackup + "?")) return;
+    post("backup/delete", { name: b.dataset.delBackup }).then(function () { toast("Backup șters"); loadBackups(); })
       .catch(function (err) { toast("Eroare: " + err.message); });
   });
   document.getElementById("restore-form").addEventListener("submit", function (e) {

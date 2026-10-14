@@ -1449,6 +1449,17 @@ class PanelHandler(BaseHTTPRequestHandler):
                 return self.reply(500, {"error": f"backup eșuat: {e}"})
             log(f"backup: {path.name}")
             return self.reply(200, {"ok": True, "name": path.name})
+        if action == "backup/delete":
+            name = as_text(v.get("name"), 100) or ""
+            path = BACKUP_DIR / name
+            if not re.fullmatch(rf"{backup.PREFIX}-[0-9]{{8}}-[0-9]{{6}}-[a-z-]+\.tar\.gz", name) or not path.is_file():
+                return self.reply(404, {"error": "backup inexistent"})
+            try:
+                path.unlink()
+            except OSError as e:
+                return self.reply(500, {"error": f"ștergere eșuată: {e}"})
+            log(f"backup: deleted {name}")
+            return self.reply(200, {"ok": True})
         self.reply(404, {"error": "unknown action"})
 
 
