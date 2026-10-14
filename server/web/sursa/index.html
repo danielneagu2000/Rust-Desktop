@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codul sursă: RDN Remote</title>
+<meta name="description" content="Descarcă codul sursă complet al aplicației RDN Remote, bazată pe RustDesk, sub licența AGPL-3.0.">
+<link rel="canonical" href="https://remote.rdndata.ro/sursa/">
+<link rel="alternate" hreflang="ro" href="https://remote.rdndata.ro/sursa/">
+<link rel="alternate" hreflang="en" href="https://remote.rdndata.ro/en/source/">
+<link rel="alternate" hreflang="x-default" href="https://remote.rdndata.ro/sursa/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/assets/favicon.png">
+<meta name="theme-color" content="#0a0708" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="/fonts.css?v=1">
+<link rel="stylesheet" href="/fut.css?v=2">
+<link rel="stylesheet" href="/footer.css">
+<style>
+.doc { max-width: 860px; margin-inline: auto; padding-inline: 24px; }
+.doc-head { padding: 130px 24px 26px; display: grid; gap: 14px; }
+.doc-head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-weight: 800; }
+.doc-head p { color: var(--ink-2); }
+main.doc { padding-bottom: 60px; }
+main.doc a { color: var(--neon-soft); }
+main.doc h2 { font-size: clamp(1.4rem, 2.6vw, 1.8rem); margin: 36px 0 12px; }
+main.doc h3 { font-size: 1.15rem; margin: 22px 0 8px; }
+main.doc p { margin: 0 0 14px; color: var(--ink-2); }
+main.doc ul { padding-left: 22px; color: var(--ink-2); } main.doc li { margin: 4px 0; }
+main.doc strong { color: var(--ink); }
+.box { padding: 18px 22px; margin-bottom: 18px; }
+.box dl { margin: 0; display: grid; grid-template-columns: 170px 1fr; gap: 8px 14px; }
+.box dt { color: var(--ink-3); font: 600 0.75rem/2.1 var(--mono); text-transform: uppercase; letter-spacing: .08em; } .box dd { margin: 0; }
+.todo { background: #fff3cd; color: #7a5300; padding: 0 6px; border-radius: 4px; }
+.scroll { overflow-x: auto; margin: 12px 0; }
+.scroll table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+.scroll th, .scroll td { text-align: left; border-bottom: 1px solid var(--line); padding: 11px 14px; vertical-align: top; }
+.scroll td { color: var(--ink-2); }
+.scroll tr:last-child td { border-bottom: 0; }
+.scroll th { color: var(--neon-soft); font: 600 0.72rem/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+@media (max-width: 640px) { .doc { padding-inline: 16px; } .doc-head { padding: 104px 16px 20px; } .box dl { grid-template-columns: 1fr; gap: 0; } .box dd { margin-bottom: 8px; } }
+.mono { font: 500 0.78rem/1.5 var(--mono); word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"></div>
+<header class="top">
+  <div class="wrap">
+    <div class="top-in">
+      <a class="brand" href="/" aria-label="RDN Remote, început de pagină"><img class="brand-logo" src="/assets/logo.png" width="600" height="392" alt="RDN Network Data"><b>RDN REMOTE</b></a>
+      <nav class="nav" id="nav" aria-label="Meniu principal">
+        <a href="/functii/">Funcții</a>
+        <a href="/preturi/">Prețuri</a>
+        <a href="/descarcare/">Descărcare</a>
+        <a href="/siguranta/">Siguranță</a>
+        <a href="/intrebari/">Întrebări</a>
+        <a class="nav-client" href="/portal/">Portal client</a>
+        <a class="lang" href="/en/source/" hreflang="en" lang="en" title="English">EN</a>
+      </nav>
+      <div class="top-cta"><a class="btn sm" href="/descarcare/">Descarcă</a></div>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="nav" aria-label="Deschide meniul"><span></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="doc doc-head">
+  <span class="tag">Open source · AGPL-3.0</span>
+  <h1>Codul sursă RDN Remote</h1>
+  <p>Aplicația <strong>RDN Remote</strong> este construită pe RustDesk și distribuită sub licența GNU Affero General Public License, versiunea 3.</p>
+</div>
+
+<main class="doc">
+  <p>Aici găsești codul sursă complet al versiunii de RDN Remote oferite acum pe acest site, exact cel din care au fost construite kiturile de instalare. Poți să-l folosești, să-l modifici și să-l redistribui în condițiile licenței AGPL-3.0.</p>
+
+  <div class="box glass-card"><dl>
+    <dt>Versiunea</dt><dd id="src-version">Se încarcă…</dd>
+    <dt>Arhiva</dt><dd id="src-file">Se încarcă…</dd>
+    <dt>SHA-256</dt><dd id="src-sha" class="mono"></dd>
+  </dl></div>
+
+  <h2>Licența</h2>
+  <p>RDN Remote se bazează pe RustDesk, Copyright © Purslane Tech Pte. Ltd., și este distribuit de RDN Network Data sub <a href="https://www.gnu.org/licenses/agpl-3.0.html" rel="noopener">GNU Affero General Public License v3.0</a>. Textul complet al licenței se află și în arhivă, în fișierul <code>LICENCE</code>.</p>
+
+  <h2>Versiuni mai vechi</h2>
+  <p>Pe site este păstrată arhiva versiunii curente. Pentru codul sursă al unei versiuni mai vechi pe care ai primit-o de la noi, scrie-ne la <span data-f="email"></span> și ți-l trimitem gratuit.</p>
+</main>
+
+<footer class="rdn-footer" id="site-footer"></footer>
+<script src="/footer.js" defer></script>
+<script>
+(function () {
+  var btn = document.getElementById("menuBtn"), nav = document.getElementById("nav"), head = document.querySelector(".top");
+  function set(open) {
+    nav.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.setAttribute("aria-label", open ? "Închide meniul" : "Deschide meniul");
+  }
+  btn.addEventListener("click", function () { set(!nav.classList.contains("open")); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+  function scrolled() { head.classList.toggle("scrolled", window.scrollY > 8); }
+  scrolled();
+  window.addEventListener("scroll", scrolled, { passive: true });
+})();
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var TODO = '<span class="todo">[de completat în server/web/site.json]</span>';
+  function esc(v) {
+    return String(v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  fetch("/site.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })
+    .then(function (s) {
+      var v = {
+        legal_name: s.legal_name, cui: s.cui, reg_com: s.reg_com, address: s.address, company: s.legal_name || s.company,
+        email: s.email ? '<a href="mailto:' + esc(s.email) + '">' + esc(s.email) + "</a>" : "",
+        phone: s.phone ? '<a href="tel:' + esc(String(s.phone).replace(/[^+\d]/g, "")) + '">' + esc(s.phone) + "</a>" : "",
+        privacy_updated_ro: s.privacy_updated ? new Date(s.privacy_updated + "T00:00:00").toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" }) : "",
+        copyright: "© " + new Date().getFullYear() + " " + (s.company || "RDN Network Data")
+      };
+      var html = { email: 1, phone: 1 };
+      document.querySelectorAll("[data-f]").forEach(function (el) {
+        var k = el.getAttribute("data-f"), val = v[k];
+        if (!val) { el.innerHTML = TODO; return; }
+        if (html[k]) el.innerHTML = val; else el.textContent = val;
+      });
+    });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function mb(n) { return n ? (n / 1048576).toFixed(1).replace(".", ",") + " MB" : ""; }
+  fetch("/files/downloads.json", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    .then(function (m) {
+      var it = m && (m.items || []).filter(function (x) { return x.key === "source"; })[0];
+      document.getElementById("src-version").textContent = m && m.version
+        ? m.version + (m.published ? ", publicată pe " + new Date(m.published * 1000).toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" }) : "")
+        : "—";
+      if (!it) {
+        document.getElementById("src-file").textContent = "Arhiva nu este disponibilă momentan. Scrie-ne și ți-o trimitem.";
+        return;
+      }
+      var f = "/" + it.file.replace(/^\/+/, "");
+      document.getElementById("src-file").innerHTML = '<a href="' + esc(f) + '" download>' + esc(f.split("/").pop()) + "</a> · " + esc(mb(it.size));
+      document.getElementById("src-sha").textContent = it.sha256 || "";
+    });
+})();
+</script>
+</body>
+</html>

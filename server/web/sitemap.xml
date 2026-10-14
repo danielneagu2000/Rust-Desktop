@@ -24,4 +24,16 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://remote.rdndata.ro/en/privacy.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://remote.rdndata.ro/confidentialitate.html"/>
   </url>
+  <url>
+    <loc>https://remote.rdndata.ro/sursa/</loc><lastmod>2026-10-14</lastmod><changefreq>monthly</changefreq><priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://remote.rdndata.ro/sursa/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remote.rdndata.ro/en/source/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remote.rdndata.ro/sursa/"/>
+  </url>
+  <url>
+    <loc>https://remote.rdndata.ro/en/source/</loc><lastmod>2026-10-14</lastmod><changefreq>monthly</changefreq><priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="ro" href="https://remote.rdndata.ro/sursa/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://remote.rdndata.ro/en/source/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://remote.rdndata.ro/sursa/"/>
+  </url>
 </urlset>

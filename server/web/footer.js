@@ -49,7 +49,6 @@
     var legal = (f.legal || []).map(link);
     legal.push('<a href="/confidentialitate.html">Confidențialitate RDN Remote</a>');
     legal.push('<span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0)</span>');
-    legal.push('<a href="' + href(s.source_url || "https://github.com/danielneagu2000/Rust-Desktop") + '" rel="noopener">Cod sursă</a>');
 
     el.innerHTML =
       '<div class="ft-top"><div class="ft-wrap">' +

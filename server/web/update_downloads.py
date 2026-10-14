@@ -153,6 +153,23 @@ def main():
             })
         if not items:
             sys.exit("no recognised installers found")
+        if not args.from_dir:
+            # AGPL-3.0: the complete source of this very version, offered next to its
+            # installers (the /sursa/ page and the apps' "About" link to it).
+            dest_name = f"{SLUG}-{version}-source.zip"
+            dest = tmp / dest_name
+            existing = target / dest_name
+            if existing.exists():
+                shutil.copy2(existing, dest)
+            else:
+                log("downloading the source code archive")
+                with http(rel["zipball_url"], accept="application/zip") as r, open(dest, "wb") as f:
+                    shutil.copyfileobj(r, f)
+            items.append({
+                "key": "source", "platform": "source", "label": "Cod sursă (.zip)",
+                "file": f"files/{target.name}/{dest_name}",
+                "size": dest.stat().st_size, "sha256": sha256(dest),
+            })
         if target.exists():
             shutil.rmtree(target)
         tmp.rename(target)
