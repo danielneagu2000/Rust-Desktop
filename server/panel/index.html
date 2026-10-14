@@ -268,9 +268,10 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
       <form id="settings-form" style="padding:12px 16px;display:grid;gap:10px;max-width:640px">
         <label>Sesiunea în acest panou expiră după (ore) <input type="number" id="panel_session_hours" min="1" max="720" required style="width:110px"></label>
         <label>Sesiunea în portalul clienților expiră după (ore) <input type="number" id="portal_session_hours" min="1" max="720" required style="width:110px"></label>
+        <label>Deconectare după inactivitate în panou și portal (ore) <input type="number" id="idle_logout_hours" min="0" max="72" required style="width:110px"></label>
         <label>Parola din portal are minim (caractere) <input type="number" id="portal_min_password" min="8" max="64" required style="width:110px"></label>
         <label>Istoricul conexiunilor și alarmele se păstrează (zile) <input type="number" id="retention_days" min="7" max="3650" required style="width:110px"></label>
-        <div><button class="primary" type="submit">Salvează</button> <span class="sub">Sesiunile noi folosesc imediat noile durate; cele deschise își păstrează expirarea.</span></div>
+        <div><button class="primary" type="submit">Salvează</button> <span class="sub">Sesiunile noi folosesc imediat noile durate; cele deschise își păstrează expirarea. Inactivitate 0 = fără deconectare.</span></div>
       </form>
       <p class="hint" style="border-top:1px solid var(--line);border-bottom:0">Blocările după încercări greșite se setează în tab-ul <b>IP-uri blocate</b>, iar legătura cu shopul în tab-ul <b>Shop</b>. Parola și 2FA-ul acestui panou rămân în <span class="mono">server/.env</span> (pe server).</p>
     </div>
@@ -567,10 +568,16 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         }, 5);
       }).catch(function () {});
   }
+  /* Deconectare la inactivitate: reîmprospătarea automată spune serverului dacă ai folosit pagina între timp. */
+  var used = false;
+  ["mousemove", "mousedown", "keydown", "wheel", "scroll", "touchstart"].forEach(function (ev) {
+    document.addEventListener(ev, function () { used = true; }, { capture: true, passive: true });
+  });
+  function activity() { var v = used ? "1" : "0"; used = false; return v; }
   function load() {
     if (document.getElementById("backup").classList.contains("on")) loadBackups();
     var q = document.getElementById("q").value.trim();
-    return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin" })
+    return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin", headers: { "X-Active": activity() } })
       .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (d) { data = d; render(); })
       .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });

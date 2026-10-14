@@ -852,6 +852,24 @@ def lockout_action(action, v):
 SESSION_COOKIE = "rdn_panel"
 PANEL_SESSIONS = {}  # token -> expiry
 TOTP_LAST = [0]  # last accepted time step; a code works only once
+LAST_ACTIVE = {}  # panel or portal session token -> time of the user's last activity
+
+
+def idle_expired(token, active):
+    """True when the session saw no user activity for idle_logout_hours (0 = never). The
+    pages refresh themselves every few seconds; only requests marked active keep it open."""
+    limit, now = conf("idle_logout_hours") * 3600, time.time()
+    with AUTH_LOCK:
+        if token not in LAST_ACTIVE:
+            for t in [t for t, ts in LAST_ACTIVE.items() if ts < now - 31 * 86400]:
+                del LAST_ACTIVE[t]
+            LAST_ACTIVE[token] = now
+        if limit and now - LAST_ACTIVE[token] > limit:
+            del LAST_ACTIVE[token]
+            return True
+        if active:
+            LAST_ACTIVE[token] = now
+    return False
 
 
 def totp_ok(code, now=None):
@@ -1123,12 +1141,20 @@ class PanelHandler(BaseHTTPRequestHandler):
         with AUTH_LOCK:
             expiry = PANEL_SESSIONS.get(token) if token else None
         if expiry and expiry > now:
-            return True
+            if not idle_expired(token, self.user_active()):
+                return True
+            with AUTH_LOCK:
+                PANEL_SESSIONS.pop(token, None)
+            log("panel: session closed after inactivity")
         if "/api/" in urlparse(self.path).path:
             self.reply(401, {"error": "autentificare necesară"})
         else:
             self.reply(200, login_page(), "text/html; charset=utf-8")
         return False
+
+    def user_active(self):
+        """A page load, an action, or a refresh that reports the user's input since the previous one."""
+        return self.command == "POST" or self.headers.get("X-Active") == "1" or "/api/" not in urlparse(self.path).path
 
     def cookie(self, name):
         for part in self.headers.get("Cookie", "").split(";"):
@@ -1276,6 +1302,11 @@ class PanelHandler(BaseHTTPRequestHandler):
         with AUTH_LOCK:
             expiry, uid = PORTAL_SESSIONS.get(token, (0, None)) if token else (0, None)
         if expiry <= time.time():
+            return None
+        if idle_expired(token, self.user_active()):
+            with AUTH_LOCK:
+                PORTAL_SESSIONS.pop(token, None)
+            log("portal: session closed after inactivity")
             return None
         return portal_user(uid)
 
@@ -1952,6 +1983,7 @@ SHOP_NOTE_FOOTER = "Suport: office@rdndata.ro | 0723 122 097"
 CONFIG = {
     "panel_session_hours": ("int", 12, 1, 720),
     "portal_session_hours": ("int", 12, 1, 720),
+    "idle_logout_hours": ("int", 3, 0, 72),
     "portal_min_password": ("int", 10, 8, 64),
     "retention_days": ("int", RETENTION_DAYS, 7, 3650),
     "shop_statuses": ("set", "processing,completed", tuple(SHOP_STATUSES)),

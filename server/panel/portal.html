@@ -285,8 +285,14 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); }
     document.getElementById("status").textContent = "Actualizat " + new Date().toLocaleTimeString("ro-RO");
   }
 
+  /* Deconectare la inactivitate: reîmprospătarea automată spune serverului dacă ai folosit pagina între timp. */
+  var used = false;
+  ["mousemove", "mousedown", "keydown", "wheel", "scroll", "touchstart"].forEach(function (ev) {
+    document.addEventListener(ev, function () { used = true; }, { capture: true, passive: true });
+  });
+  function activity() { var v = used ? "1" : "0"; used = false; return v; }
   function load() {
-    return fetch(base + "api/state", { credentials: "same-origin", cache: "no-store" })
+    return fetch(base + "api/state", { credentials: "same-origin", cache: "no-store", headers: { "X-Active": activity() } })
       .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (d) { data = d; render(); })
       .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });
