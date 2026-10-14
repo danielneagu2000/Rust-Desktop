@@ -1222,10 +1222,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             order = json.loads(body)
         except ValueError:
             # WooCommerce's test delivery when the webhook is saved: "webhook_id=N".
+            log(f"shop: webhook test delivery received ({body[:40].decode('utf-8', 'replace')})")
             return self.reply(200, {"ok": True})
         if not isinstance(order, dict):
             return self.reply(400, {"error": "bad json"})
-        return self.reply(200, {"ok": True, "result": shop_order(order)})
+        result = shop_order(order)
+        log(f"shop: webhook for order {as_int(order.get('id'))} ({as_text(order.get('status'), 30)}): {result}")
+        return self.reply(200, {"ok": True, "result": result})
 
     # ------------------------------------------------------------ organization portal
 
