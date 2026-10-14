@@ -1172,7 +1172,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "http://remote.rdndata.ro:21114".to_owned()
+    "https://remote.rdndata.ro".to_owned()
 }
 
 #[inline]

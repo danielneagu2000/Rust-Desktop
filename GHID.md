@@ -112,7 +112,9 @@ pagina ca să nu intre în conflict. În Virtualmin creează site-ul `remote.rdn
 
 Rulează pe același server și primește automat jurnalele de la toate calculatoarele care
 folosesc aplicația ta. Nu trebuie configurat nimic pe calculatoare: clienții trimit singuri
-datele la `http://SERVER:21114`.
+datele la `API_SERVER` din `branding/brand.env`, prin HTTPS (`https://remote.rdndata.ro`, ruta
+`@api` din `server/Caddyfile`). Aplicațiile instalate înainte de 1.5.0-5 folosesc încă
+`http://SERVER:21114`, de aceea portul 21114 rămâne deschis.
 
 Ce arată:
 

@@ -508,7 +508,7 @@ pub const VER_TYPE_RUSTDESK_CLIENT: &str = "rustdesk-client";
 pub const VER_TYPE_RUSTDESK_SERVER: &str = "rustdesk-server";
 
 pub fn version_check_request(typ: String) -> (VersionCheckRequest, String) {
-    const URL: &str = "http://remote.rdndata.ro:21114/version/latest";
+    const URL: &str = "https://remote.rdndata.ro/version/latest";
 
     use sysinfo::System;
     let system = System::new();
