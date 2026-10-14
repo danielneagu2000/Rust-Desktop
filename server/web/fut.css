@@ -433,3 +433,48 @@ section { padding: 24px 0; }
   .plan.pro .buy .sum { color: #b9aaac; }
   .plan.pro .buy .sum b { color: #fff; }
 }
+
+/* Antet ca pe migrare.rdndata.ro: bară pe toată lățimea, translucidă, cu linie roșie dedesubt.
+   Sigla (.brand) rămâne neschimbată. */
+.top { position: fixed; inset: 0 0 auto 0; z-index: 30; background: rgba(14, 11, 12, .8); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px); border-bottom: 2px solid #ff5a52; transition: box-shadow .2s ease; }
+.top.scrolled { box-shadow: 0 10px 30px -18px rgba(0, 0, 0, .7); }
+.top-in { position: relative; height: auto; padding: 14px 0; justify-content: space-between; gap: 16px; border: 0; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; transition: padding .2s ease; }
+.top.scrolled .top-in { padding-block: 8px; }
+.brand { flex: none; }
+.nav { margin-left: 0; gap: 4px; align-items: center; font-size: 0.95rem; }
+.nav a { padding: 8px 10px; border-radius: 8px; color: var(--ink-2); }
+.nav a:hover { color: var(--neon-soft); background: rgba(255, 255, 255, .06); }
+.nav .nav-client { color: var(--ink); font-weight: 600; background: none; box-shadow: none; margin-left: 0; }
+.nav .nav-client:hover { color: var(--neon-soft); background: rgba(255, 255, 255, .06); }
+.top-cta { display: flex; align-items: center; gap: 10px; flex: none; }
+.top-cta .btn { padding: 11px 18px; font-size: 0.95rem; border-radius: 999px; }
+.top-cta .lang { display: inline-grid; place-items: center; min-width: 44px; height: 42px; padding: 0 12px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, .16); color: var(--ink); text-decoration: none; font: 700 0.82rem/1 var(--mono); letter-spacing: .08em; transition: border-color .15s ease, color .15s ease; }
+.top-cta .lang:hover { border-color: var(--neon-soft); color: var(--neon-soft); }
+.menu-btn { margin-left: 0; place-items: center; }
+@media (max-width: 1180px) {
+  .menu-btn { display: grid; }
+  .top-cta { display: flex; }
+  .nav { display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 2px; padding: 10px; background: #1c1819; border: 1px solid var(--line); border-radius: 0 0 16px 16px; box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .6); }
+  .nav.open { display: flex; }
+  .nav a { padding: 12px 14px; font-size: 1.02rem; }
+  .nav .nav-client { margin: 0; }
+}
+@media (min-width: 1181px) and (max-width: 1320px) { .nav { gap: 2px; } .nav a { padding-inline: 8px; } }
+@media (max-width: 480px) {
+  .top-in { gap: 10px; }
+  .top-cta { gap: 6px; }
+  .top-cta .lang { min-width: 40px; height: 40px; padding: 0 10px; }
+  .menu-btn { width: 40px; height: 40px; }
+}
+@media (max-width: 420px) { .top-cta .btn { display: none; } }
+@media (prefers-color-scheme: light) {
+  .top { background: rgba(244, 244, 245, .85); border-bottom-color: #b80d0d; }
+  .top.scrolled { box-shadow: 0 10px 30px -18px rgba(60, 6, 6, .45); }
+  .nav a:hover, .nav .nav-client:hover { color: #b80d0d; background: rgba(0, 0, 0, .05); }
+  .nav .nav-client { color: var(--ink); background: none; }
+  .top-cta .lang { border-color: rgba(0, 0, 0, .14); }
+}
+@media (max-width: 1180px) and (prefers-color-scheme: light) {
+  .nav { background: #fff; border-color: rgba(0, 0, 0, .1); box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .25); }
+}
+
