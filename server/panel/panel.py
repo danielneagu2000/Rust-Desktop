@@ -1214,6 +1214,11 @@ class PanelHandler(BaseHTTPRequestHandler):
         secret = setting("shop_secret")
         if len(secret) < SHOP_MIN_SECRET:
             return self.reply(503, {"error": "shop not configured"})
+        # WooCommerce sends this test delivery unsigned when a webhook is saved and reports
+        # an error unless it gets a 200. It changes nothing here.
+        if re.fullmatch(rb"webhook_id=[0-9]{1,12}", body):
+            log(f"shop: webhook test delivery received ({body.decode()})")
+            return self.reply(200, {"ok": True})
         expected = base64.b64encode(hmac.new(secret.encode(), body, hashlib.sha256).digest()).decode()
         if not hmac.compare_digest(expected, self.headers.get("X-WC-Webhook-Signature", "")):
             log(f"shop: webhook with a bad signature from {self.client_ip()}")
