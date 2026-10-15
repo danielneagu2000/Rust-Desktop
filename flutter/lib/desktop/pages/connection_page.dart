@@ -49,6 +49,12 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     });
   }
 
+  void onSupport() {
+    // Set by branding/apply.py from SUPPORT_URL in branding/brand.env.
+    const supportUrl = "https://remote.rdndata.ro/contact/";
+    launchUrlString(supportUrl);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -111,6 +117,19 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
           ),
         );
 
+    supportWidget() => InkWell(
+          onTap: onSupport,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.support_agent, size: em + 4),
+              Text(' ${translate('Support')}',
+                  style: TextStyle(
+                      decoration: TextDecoration.underline, fontSize: em)),
+            ],
+          ),
+        ).marginOnly(left: em, right: em);
+
     basicWidget() => Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -136,6 +155,11 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
             // ready && public
             // No need to show the guide if is custom client.
             if (!isIncomingOnly) setupServerWidget(),
+            // Branded apps: the company's support page instead of RustDesk's server tip.
+            if (!isIncomingOnly && bind.isCustomClient()) ...[
+              const Spacer(),
+              supportWidget(),
+            ],
           ],
         );
 

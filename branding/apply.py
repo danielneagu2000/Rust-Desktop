@@ -109,7 +109,9 @@ def load_config():
         fail("SOURCE_URL is required: AGPL-3.0 obliges you to offer the source code to your users")
     # Where users are told to get the source (About page, installer); defaults to the repository.
     cfg["SOURCE_CODE_URL"] = cfg.get("SOURCE_CODE_URL") or cfg["SOURCE_URL"]
-    for k in ("WEBSITE_URL", "PRIVACY_URL", "SOURCE_URL", "SOURCE_CODE_URL"):
+    # The "Support" link in the desktop status line.
+    cfg["SUPPORT_URL"] = cfg.get("SUPPORT_URL") or cfg["WEBSITE_URL"]
+    for k in ("WEBSITE_URL", "PRIVACY_URL", "SOURCE_URL", "SOURCE_CODE_URL", "SUPPORT_URL"):
         if not re.fullmatch(url_re, cfg[k]):
             fail(f"{k} must be an http(s) URL without quotes or spaces")
     email = cfg.get("SUPPORT_EMAIL", "")
@@ -321,6 +323,9 @@ def publisher_patches(cfg):
         ("flutter/lib/desktop/pages/install_page.dart",
          r"(launchUrlString\(\n\s*')[^']*('\),\n\s*child: Tooltip\(\n\s*message: ')[^']*(',)",
          lambda m: f"{m.group(1)}{privacy}{m.group(2)}{privacy}{m.group(3)}"),
+        # Desktop status line: the "Support" link.
+        ("flutter/lib/desktop/pages/connection_page.dart", r'(const supportUrl = ")[^"]*(";)',
+         lambda m: f"{m.group(1)}{cfg['SUPPORT_URL']}{m.group(2)}"),
         # Mobile settings: website and privacy links.
         ("flutter/lib/mobile/pages/settings_page.dart", r"(?m)^const url = '[^']*';$", const(f"const url = '{web}/';")),
         ("flutter/lib/mobile/pages/settings_page.dart",

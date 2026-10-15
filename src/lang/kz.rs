@@ -795,6 +795,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Invalid response from the license server", ""),
         ("The license received is not valid for this computer", ""),
         ("Without a license, this computer can only be controlled from RDN Remote apps whose license allows it. To connect to other computers, enter the code you received from RDN Network Data.", ""),
-        ("The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.", "")
+        ("The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.", ""),
+        ("Support", "")
     ].iter().cloned().collect();
 }
