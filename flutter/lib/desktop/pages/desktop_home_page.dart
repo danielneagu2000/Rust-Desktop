@@ -448,7 +448,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
           btnText,
           onPressed,
-          closeButton: true,
+          // Forced updates (AUTO_UPDATE=FORCE in branding/brand.env): the card stays until updated.
+          closeButton: !isOptionFixed(kOptionAllowAutoUpdate),
           help: null,
           link: null);
     }

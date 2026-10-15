@@ -80,6 +80,10 @@ pub const MIN_INTERVAL: Duration = Duration::from_secs(60 * 10);
 /// Retry interval when an update check fails or a session is active (30 minutes).
 pub const RETRY_INTERVAL: Duration = Duration::from_secs(60 * 30);
 
+/// How often a running app looks for a new release; the server answers from its own manifest,
+/// so an hourly check is cheap and installs a release within the hour once no session is open.
+pub const CHECK_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
 pub fn update_controlling_session_count(count: usize) {
     CONTROLLING_SESSION_COUNT.store(count, Ordering::SeqCst);
 }
@@ -146,7 +150,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
     }
 
     let mut last_check_time = Instant::now();
-    let mut check_interval = DUR_ONE_DAY;
+    let mut check_interval = CHECK_INTERVAL;
     loop {
         let recv_res = rx_msg.recv_timeout(check_interval);
         match &recv_res {
@@ -165,7 +169,7 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
                     check_interval = RETRY_INTERVAL;
                 } else {
                     last_check_time = Instant::now();
-                    check_interval = DUR_ONE_DAY;
+                    check_interval = CHECK_INTERVAL;
                 }
             }
             Ok(UpdateMsg::Exit) => break,
@@ -499,7 +503,7 @@ pub fn start_auto_update_macos() {
             log::info!("[root-update] Auto-update scheduler thread started.");
             std::thread::sleep(INITIAL_CHECK_DELAY);
             wait_for_failed_update_retry();
-            let mut interval = DUR_ONE_DAY;
+            let mut interval = CHECK_INTERVAL;
             loop {
                 log::info!("[root-update] Running scheduled update check...");
                 let no_active_conns = has_no_active_conns_ipc();
@@ -515,7 +519,7 @@ pub fn start_auto_update_macos() {
                                 // failure interval until the new daemon replaces us.
                                 interval = RETRY_INTERVAL;
                             } else {
-                                interval = DUR_ONE_DAY;
+                                interval = CHECK_INTERVAL;
                             }
                         }
                         Err(e) => {

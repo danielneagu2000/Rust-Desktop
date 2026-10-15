@@ -134,8 +134,8 @@ def load_config():
     if cfg["LICENSE_REQUIRED"] not in ("Y", "N"):
         fail("LICENSE_REQUIRED must be Y or N")
     cfg["AUTO_UPDATE"] = (cfg.get("AUTO_UPDATE") or "Y").upper()
-    if cfg["AUTO_UPDATE"] not in ("Y", "N"):
-        fail("AUTO_UPDATE must be Y or N")
+    if cfg["AUTO_UPDATE"] not in ("Y", "N", "FORCE"):
+        fail("AUTO_UPDATE must be Y, N or FORCE")
     idle = cfg.get("IDLE_DISCONNECT_MINUTES") or "0"
     if not re.fullmatch(r"[0-9]{1,4}", idle) or int(idle) > 1440:
         fail("IDLE_DISCONNECT_MINUTES must be 0 (off) to 1440")
@@ -229,13 +229,20 @@ def update_patches(cfg):
     owner, repo = cfg["GITHUB_OWNER"], cfg["GITHUB_REPO"]
     web = cfg["WEBSITE_URL"]
     pairs = [("allow-auto-update", "Y")] if cfg["AUTO_UPDATE"] == "Y" else []
+    # FORCE: users cannot turn off automatic updates or the update check that shows the
+    # "new version" card (fixed options, greyed out in the settings).
+    forced = [("allow-auto-update", "Y")] if cfg["AUTO_UPDATE"] == "FORCE" else []
+    forced_local = [("enable-check-update", "Y")] if cfg["AUTO_UPDATE"] == "FORCE" else []
     if cfg["IDLE_DISCONNECT_MINUTES"]:
         # Incoming sessions close after this many minutes without input from the controlling side.
         pairs += [("allow-auto-disconnect", "Y"), ("auto-disconnect-timeout", str(cfg["IDLE_DISCONNECT_MINUTES"]))]
-    defaults = (
-        "RwLock::new(HashMap::from([" + ", ".join(f'("{k}".to_owned(), "{v}".to_owned())' for k, v in pairs) + "]))"
-        if pairs else "Default::default()"
-    )
+    def settings_map(kv):
+        return (
+            "RwLock::new(HashMap::from([" + ", ".join(f'("{k}".to_owned(), "{v}".to_owned())' for k, v in kv) + "]))"
+            if kv else "Default::default()"
+        )
+
+    defaults = settings_map(pairs)
     return [
         ("libs/hbb_common/src/lib.rs", r'(const URL: &str = ")[^"]*(";\n\n    use sysinfo::System;)',
          lambda m: f'{m.group(1)}{cfg["API_SERVER"]}/version/latest{m.group(2)}'),
@@ -256,6 +263,12 @@ def update_patches(cfg):
         ("libs/hbb_common/src/config.rs",
          r"(pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
          lambda m: f"{m.group(1)}{defaults};"),
+        ("libs/hbb_common/src/config.rs",
+         r"(pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
+         lambda m: f"{m.group(1)}{settings_map(forced)};"),
+        ("libs/hbb_common/src/config.rs",
+         r"(pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
+         lambda m: f"{m.group(1)}{settings_map(forced_local)};"),
         # Desktop "new version" card: shown for this client too, links to its own site/releases.
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
          r"if \((?:!bind\.isCustomClient\(\) &&\n\s*)?updateUrl\.isNotEmpty &&\n(\s*)!isCardClosed"
