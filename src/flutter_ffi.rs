@@ -2449,6 +2449,9 @@ pub fn main_on_main_window_close() {
     // may called more than one times
     #[cfg(windows)]
     crate::portable_service::client::drop_portable_service_shared_memory();
+    // The installed service keeps the one-time password in memory; closing the app retires the
+    // one it showed, as quitting a portable app (one process) already does.
+    crate::ui_interface::update_temporary_password();
 }
 
 pub fn main_current_is_wayland() -> SyncReturn<bool> {
