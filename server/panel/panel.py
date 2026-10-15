@@ -583,6 +583,8 @@ def activate(v, src_ip):
             ACT_FAILS[src_ip] = (window, fails + 1)
             if len(ACT_FAILS) > 10000:
                 ACT_FAILS.clear()
+        log(f"licenses: activation refused for {normalize_code(v.get('code'))[:40]} on "
+            f"{as_text(v.get('id'), 40)} ({src_ip}): {msg}")
         return {"error": msg}
 
     uuid = str(v.get("uuid") or "")
