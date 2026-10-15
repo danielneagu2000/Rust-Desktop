@@ -316,8 +316,8 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
                 colors: [
-                  Color(0xffe242bc),
-                  Color(0xfff4727c),
+                  Color(0xffe0161e),
+                  Color(0xff8f0606),
                 ],
               ),
             ),

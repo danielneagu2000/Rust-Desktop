@@ -603,11 +603,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           child: Container(
               decoration: BoxDecoration(
                   gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
                 colors: [
-                  Color.fromARGB(255, 226, 66, 188),
-                  Color.fromARGB(255, 244, 114, 124),
+                  Color(0xffe0161e),
+                  Color(0xff8f0606),
                 ],
               )),
               padding: EdgeInsets.all(20),
