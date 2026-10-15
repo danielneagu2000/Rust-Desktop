@@ -98,6 +98,8 @@ def body_length(headers, limit):
 
 
 def log(msg):
+    # Messages carry text sent by anyone (device IDs, codes): no line breaks or terminal escapes.
+    msg = re.sub(r"[\x00-\x1f\x7f-\x9f]", "?", str(msg))
     print(time.strftime("%Y-%m-%d %H:%M:%S"), msg, flush=True)
 
 
