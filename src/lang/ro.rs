@@ -796,6 +796,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("The license received is not valid for this computer", "Licența primită nu este validă pentru acest calculator"),
         ("Without a license, this computer can only be controlled from RDN Remote apps whose license allows it. To connect to other computers, enter the code you received from RDN Network Data.", "Fără licență, acest calculator poate fi controlat doar din aplicații RDN Remote a căror licență permite asta. Ca să te conectezi la alte calculatoare, introdu codul primit de la RDN Network Data."),
         ("The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.", "Calculatorul la distanță nu are licență RDN Remote, iar licența ta nu permite controlul calculatoarelor fără licență."),
-        ("Support", "Suport")
+        ("Support", "Suport"),
+        ("The remote computer only accepts connections from RDN Remote apps with a valid license. Update the app and check its license.", "Calculatorul la distanță acceptă conexiuni doar din aplicații RDN Remote cu licență validă. Actualizează aplicația și verifică licența.")
     ].iter().cloned().collect();
 }

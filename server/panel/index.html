@@ -271,6 +271,7 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         <label>Deconectare după inactivitate în panou și portal (ore) <input type="number" id="idle_logout_hours" min="0" max="72" required style="width:110px"></label>
         <label>Parola din portal are minim (caractere) <input type="number" id="portal_min_password" min="8" max="64" required style="width:110px"></label>
         <label>Istoricul conexiunilor și alarmele se păstrează (zile) <input type="number" id="retention_days" min="7" max="3650" required style="width:110px"></label>
+        <label class="sw"><input type="checkbox" id="require_controller_license"> Calculatoarele cu licență acceptă conexiuni doar din aplicații RDN Remote cu licență validă (o aplicație modificată sau fără licență nu se mai poate conecta). Pornește-o după ce toate aplicațiile tehnicienilor, inclusiv cele de pe telefon, au versiunea nouă (coloana Versiune din Dispozitive).</label>
         <div><button class="primary" type="submit">Salvează</button> <span class="sub">Sesiunile noi folosesc imediat noile durate; cele deschise își păstrează expirarea. Inactivitate 0 = fără deconectare.</span></div>
       </form>
       <p class="hint" style="border-top:1px solid var(--line);border-bottom:0">Blocările după încercări greșite se setează în tab-ul <b>IP-uri blocate</b>, iar legătura cu shopul în tab-ul <b>Shop</b>. Parola și 2FA-ul acestui panou rămân în <span class="mono">server/.env</span> (pe server).</p>

@@ -248,6 +248,15 @@ Limită: codul sursă e public (AGPL-3.0), deci un programator poate compila o v
 verificarea licenței și o poate conecta la serverul tău (cheia publică a serverului nu e
 secretă). Licența oprește utilizarea obișnuită, nu un programator hotărât.
 
+Ca o astfel de aplicație modificată să nu se poată conecta nici la calculatoarele cu licență,
+bifează în **Setări** „Calculatoarele cu licență acceptă conexiuni doar din aplicații RDN Remote
+cu licență validă”. Fiecare aplicație cu licență primește de la server un permis semnat (24 de
+ore, doar cu ID-ul ei), pe care îl arată calculatorului la care se conectează; fără el, conexiunea
+e refuzată. Bifează abia după ce toate aplicațiile tehnicienilor, inclusiv cele de pe telefon,
+au versiunea nouă (coloana **Versiune** din Dispozitive): cele vechi nu trimit permisul.
+Rămâne posibil ca cineva să modifice **ambele** aplicații (și pe cea controlată); doar serverul
+de conexiuni (hbbs/hbbr, imaginea oficială RustDesk) ar putea opri și asta.
+
 Pentru a opri temporar închiderea sesiunilor dispozitivelor fără licență (de ex. la teste cu
 aplicația RustDesk oficială): `LICENSE_REQUIRED=N` în `server/.env`, apoi `docker compose up -d`.
 

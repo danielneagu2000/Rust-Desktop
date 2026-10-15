@@ -68,11 +68,15 @@ pub fn check_outgoing() -> ResultType<()> {
     Ok(())
 }
 
-/// Pass the panel signs for licenses allowed to control computers without one (issue_pass in
-/// server/panel/panel.py). Peers see it, so it carries the device ID and an expiry, no uuid.
+/// Pass the panel signs for every licensed device (issue_pass in server/panel/panel.py), sent
+/// to the computers it controls as proof of its license. Peers see it, so it carries the
+/// device ID, an expiry and whether it may control computers without a license, no uuid.
 const PASS_PREFIX: &[u8] = b"\x00RDN-PASS-1\x00";
 const OPTION_PASS: &str = "license-pass";
+/// "Y" when the panel's require_controller_license is on (server process).
+const OPTION_STRICT: &str = "license-strict";
 pub const PEER_BLOCKED_MSG: &str = "The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.";
+pub const STRICT_BLOCKED_MSG: &str = "The remote computer only accepts connections from RDN Remote apps with a valid license. Update the app and check its license.";
 
 #[derive(Deserialize)]
 struct Pass {
@@ -80,6 +84,9 @@ struct Pass {
     i: String,
     /// Expiry, unix seconds.
     e: i64,
+    /// 1 when the license may control computers without a license.
+    #[serde(default)]
+    p: u8,
 }
 
 fn verify_pass(pass: &str) -> Option<Pass> {
@@ -93,8 +100,8 @@ fn verify_pass(pass: &str) -> Option<Pass> {
     (pass.e > now()).then_some(pass)
 }
 
-/// Pass pushed by the panel in the heartbeat response (server process); empty when the
-/// license does not allow it.
+/// Pass pushed by the panel in the heartbeat response (server process); empty without a valid
+/// license.
 pub fn store_pass(pass: &str) {
     if !REQUIRED || Config::get_option(OPTION_PASS) == pass {
         return;
@@ -118,10 +125,29 @@ pub fn login_pass() -> String {
     crate::ui_interface::get_option(OPTION_PASS)
 }
 
-/// Incoming login (server process): this computer is licensed, or the controlling one sent a
-/// pass issued to the ID it logs in with.
-pub fn login_allowed(pass: &str, peer_id: &str) -> bool {
-    is_allowed() || verify_pass(pass).map_or(false, |p| p.i == peer_id)
+/// Panel setting pushed in the heartbeat response (server process).
+pub fn store_strict(on: bool) {
+    let value = if on { "Y" } else { "" };
+    if REQUIRED && Config::get_option(OPTION_STRICT) != value {
+        Config::set_option(OPTION_STRICT.to_owned(), value.to_owned());
+    }
+}
+
+/// Incoming login (server process), with the pass the controlling app sent for the ID it logs
+/// in with. A licensed computer accepts it, or with the panel's require_controller_license on
+/// only when the pass is valid; one without a license only when the pass allows that.
+pub fn login_check(pass: &str, peer_id: &str) -> Result<(), &'static str> {
+    let pass = verify_pass(pass).filter(|p| p.i == peer_id);
+    if is_allowed() {
+        if Config::get_option(OPTION_STRICT) == "Y" && pass.is_none() {
+            return Err(STRICT_BLOCKED_MSG);
+        }
+        return Ok(());
+    }
+    match pass {
+        Some(p) if p.p == 1 => Ok(()),
+        _ => Err(PEER_BLOCKED_MSG),
+    }
 }
 
 /// Token pushed by the panel in the heartbeat response (server process).

@@ -502,10 +502,12 @@ TOKEN_TTL = 7 * 86400
 # a leading zero byte can never start a valid protobuf message, so a token can't be
 # mistaken for one (and vice versa).
 TOKEN_PREFIX = b"\x00RDN-LICENSE-1\x00"
-# Licenses with "peer_control" on also get a pass that a computer without a license accepts
-# (PASS_PREFIX in src/license.rs). The app sends it to the computers it controls, so it holds
-# only the device ID and a short expiry: the license token names the machine uuid, which is
-# all the API asks for before handing out that machine's license.
+# Every licensed device also gets a pass (PASS_PREFIX in src/license.rs) that it sends to the
+# computers it controls, as proof of its license: p=1 when the license may control computers
+# without one ("peer_control"), which then accept it; with "require_controller_license" on,
+# computers with a license accept only apps that send a pass. Peers see it, so it holds only
+# the device ID: the license token names the machine uuid, which is all the API asks for
+# before handing out that machine's license.
 PASS_PREFIX = b"\x00RDN-PASS-1\x00"
 PASS_TTL = 86400
 try:  # libsodium (constant time) when the image provides it; see panel/Dockerfile
@@ -613,14 +615,14 @@ def issue_pass(device_id, lic):
     seed = signing_seed()
     if not seed or not device_id:
         return ""
-    expires = lic["expires"]
-    key = (device_id, lic["code"], expires)
+    expires, peer = lic["expires"], 1 if lic["peer_control"] else 0
+    key = (device_id, lic["code"], expires, peer)
     cached = _PASS_CACHE.get(key)
     now = time.time()
     if cached and now - cached[1] < 3600:
         return cached[0]
     exp = now + PASS_TTL if expires is None else min(expires, now + PASS_TTL)
-    payload = PASS_PREFIX + json.dumps({"i": device_id, "e": int(exp)}, separators=(",", ":")).encode()
+    payload = PASS_PREFIX + json.dumps({"i": device_id, "e": int(exp), "p": peer}, separators=(",", ":")).encode()
     token = base64.b64encode(_sign(seed, payload) + payload).decode()
     if len(_PASS_CACHE) > 5000:
         _PASS_CACHE.clear()
@@ -749,7 +751,8 @@ def heartbeat(v, src_ip):
         token = issue_token(uuid, lic)
         if token:
             out["license"] = token
-            out["license_pass"] = issue_pass(as_text(v.get("id"), 40), lic) if lic["peer_control"] else ""
+            out["license_pass"] = issue_pass(as_text(v.get("id"), 40), lic)
+            out["license_strict"] = 1 if conf("require_controller_license") else 0
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
         # Licensed builds drop their token and block themselves; close what is open unless it is
@@ -2110,6 +2113,8 @@ CONFIG = {
     "idle_logout_hours": ("int", 3, 0, 72),
     "portal_min_password": ("int", 10, 8, 64),
     "retention_days": ("int", RETENTION_DAYS, 7, 3650),
+    # Computers with a license accept only apps that prove a license of their own (a pass).
+    "require_controller_license": ("bool", 0),
     "shop_statuses": ("set", "processing,completed", tuple(SHOP_STATUSES)),
     "shop_renew": ("bool", 1),
     "shop_quantity": ("choice", "sessions", ("sessions", "seats", "months", "none")),

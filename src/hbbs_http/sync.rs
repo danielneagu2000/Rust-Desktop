@@ -259,6 +259,9 @@ async fn start_hbbs_sync_async() {
                         if let Some(pass) = rsp.remove("license_pass") {
                             crate::license::store_pass(pass.as_str().unwrap_or_default());
                         }
+                        if let Some(strict) = rsp.remove("license_strict") {
+                            crate::license::store_strict(strict.as_i64() == Some(1));
+                        }
                         crate::license::set_disconnect_reason(
                             rsp.remove("disconnect_reason").as_ref().and_then(|r| r.as_str()).unwrap_or_default(),
                         );
