@@ -256,6 +256,9 @@ async fn start_hbbs_sync_async() {
                         if let Some(token) = rsp.remove("license") {
                             crate::license::store_from_server(token.as_str().unwrap_or_default());
                         }
+                        if let Some(pass) = rsp.remove("license_pass") {
+                            crate::license::store_pass(pass.as_str().unwrap_or_default());
+                        }
                         crate::license::set_disconnect_reason(
                             rsp.remove("disconnect_reason").as_ref().and_then(|r| r.as_str()).unwrap_or_default(),
                         );

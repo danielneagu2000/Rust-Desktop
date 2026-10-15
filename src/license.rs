@@ -68,35 +68,60 @@ pub fn check_outgoing() -> ResultType<()> {
     Ok(())
 }
 
-/// Sent with every outgoing login, so a computer without a license accepts a session
-/// controlled from this licensed one (UI process).
-pub fn login_token() -> String {
+/// Pass the panel signs for licenses allowed to control computers without one (issue_pass in
+/// server/panel/panel.py). Peers see it, so it carries the device ID and an expiry, no uuid.
+const PASS_PREFIX: &[u8] = b"\x00RDN-PASS-1\x00";
+const OPTION_PASS: &str = "license-pass";
+pub const PEER_BLOCKED_MSG: &str = "The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.";
+
+#[derive(Deserialize)]
+struct Pass {
+    /// Device ID the pass was issued to.
+    i: String,
+    /// Expiry, unix seconds.
+    e: i64,
+}
+
+fn verify_pass(pass: &str) -> Option<Pass> {
+    if pass.is_empty() {
+        return None;
+    }
+    let signed = crate::decode64(pass).ok()?;
+    let pk = crate::common::get_rs_pk(hbb_common::config::RS_PUB_KEY)?;
+    let payload = hbb_common::sodiumoxide::crypto::sign::verify(&signed, &pk).ok()?;
+    let pass: Pass = serde_json::from_slice(payload.strip_prefix(PASS_PREFIX)?).ok()?;
+    (pass.e > now()).then_some(pass)
+}
+
+/// Pass pushed by the panel in the heartbeat response (server process); empty when the
+/// license does not allow it.
+pub fn store_pass(pass: &str) {
+    if !REQUIRED || Config::get_option(OPTION_PASS) == pass {
+        return;
+    }
+    if pass.is_empty() || verify_pass(pass).is_some() {
+        Config::set_option(OPTION_PASS.to_owned(), pass.to_owned());
+    } else {
+        hbb_common::throttled_log!(
+            crate::common::API_LOG_INTERVAL,
+            warn,
+            "Ignoring a license pass that does not verify"
+        );
+    }
+}
+
+/// Sent with every outgoing login (UI process).
+pub fn login_pass() -> String {
     if !REQUIRED {
         return String::new();
     }
-    crate::ui_interface::get_option(OPTION_TOKEN)
+    crate::ui_interface::get_option(OPTION_PASS)
 }
 
 /// Incoming login (server process): this computer is licensed, or the controlling one sent a
-/// license token of its own. That token is bound to the other computer's uuid, so only the
-/// signature and the expiry can be checked here.
-pub fn login_allowed(peer_token: &str) -> bool {
-    if is_allowed() {
-        return true;
-    }
-    let Some(signed) = crate::decode64(peer_token).ok() else {
-        return false;
-    };
-    let Some(pk) = crate::common::get_rs_pk(hbb_common::config::RS_PUB_KEY) else {
-        return false;
-    };
-    let Ok(payload) = hbb_common::sodiumoxide::crypto::sign::verify(&signed, &pk) else {
-        return false;
-    };
-    payload
-        .strip_prefix(TOKEN_PREFIX)
-        .and_then(|p| serde_json::from_slice::<Claims>(p).ok())
-        .map_or(false, |c| c.e > now())
+/// pass issued to the ID it logs in with.
+pub fn login_allowed(pass: &str, peer_id: &str) -> bool {
+    is_allowed() || verify_pass(pass).map_or(false, |p| p.i == peer_id)
 }
 
 /// Token pushed by the panel in the heartbeat response (server process).

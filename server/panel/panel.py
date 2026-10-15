@@ -114,6 +114,8 @@ def db():
         conn.execute("ALTER TABLE licenses ADD COLUMN bandwidth INTEGER DEFAULT 0")
     if cols and "sessions" not in cols:
         conn.execute("ALTER TABLE licenses ADD COLUMN sessions INTEGER DEFAULT 1")
+    if cols and "peer_control" not in cols:
+        conn.execute("ALTER TABLE licenses ADD COLUMN peer_control INTEGER DEFAULT 0")
     # Organization portal: names and rights per device (set by the client's administrator).
     acols = {r[1] for r in conn.execute("PRAGMA table_info(activations)")}
     for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1")):
@@ -156,7 +158,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS licenses (
             code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
             created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT,
-            bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1
+            bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1, peer_control INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
@@ -454,6 +456,12 @@ TOKEN_TTL = 7 * 86400
 # a leading zero byte can never start a valid protobuf message, so a token can't be
 # mistaken for one (and vice versa).
 TOKEN_PREFIX = b"\x00RDN-LICENSE-1\x00"
+# Licenses with "peer_control" on also get a pass that a computer without a license accepts
+# (PASS_PREFIX in src/license.rs). The app sends it to the computers it controls, so it holds
+# only the device ID and a short expiry: the license token names the machine uuid, which is
+# all the API asks for before handing out that machine's license.
+PASS_PREFIX = b"\x00RDN-PASS-1\x00"
+PASS_TTL = 86400
 try:  # libsodium (constant time) when the image provides it; see panel/Dockerfile
     import nacl.signing
 
@@ -465,6 +473,7 @@ PERIODS = (0, 1, 3, 6, 9, 12)
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _SIGNING_SEED = None
 _TOKEN_CACHE = {}
+_PASS_CACHE = {}
 ACT_FAILS = {}
 ACT_LOCK = threading.Lock()
 
@@ -554,6 +563,25 @@ def issue_token(uuid, lic):
     return token
 
 
+def issue_pass(device_id, lic):
+    seed = signing_seed()
+    if not seed or not device_id:
+        return ""
+    expires = lic["expires"]
+    key = (device_id, lic["code"], expires)
+    cached = _PASS_CACHE.get(key)
+    now = time.time()
+    if cached and now - cached[1] < 3600:
+        return cached[0]
+    exp = now + PASS_TTL if expires is None else min(expires, now + PASS_TTL)
+    payload = PASS_PREFIX + json.dumps({"i": device_id, "e": int(exp)}, separators=(",", ":")).encode()
+    token = base64.b64encode(_sign(seed, payload) + payload).decode()
+    if len(_PASS_CACHE) > 5000:
+        _PASS_CACHE.clear()
+    _PASS_CACHE[key] = (token, now)
+    return token
+
+
 def device_license(uuid):
     rows = q(
         "SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code WHERE a.uuid = ?",
@@ -563,8 +591,9 @@ def device_license(uuid):
 
 
 def controller_licensed(uuid, conn_id):
-    """A computer without a license may be controlled from a licensed one. True as long as the
-    session's controlling device is not reported yet (the audit event can trail the heartbeat)."""
+    """A computer without a license may be controlled from a license with peer_control on. True as
+    long as the session's controlling device is not reported yet (the audit event can trail the
+    heartbeat)."""
     s = open_session(uuid, conn_id)
     if not s or not s["peer_id"]:
         return True
@@ -573,7 +602,7 @@ def controller_licensed(uuid, conn_id):
            WHERE a.device_id = ? OR a.uuid IN (SELECT uuid FROM devices WHERE device_id = ?)""",
         (s["peer_id"], s["peer_id"]),
     )
-    return any(license_ok(r) for r in rows)
+    return any(license_ok(r) and r["peer_control"] for r in rows)
 
 
 def activate(v, src_ip):
@@ -669,11 +698,12 @@ def heartbeat(v, src_ip):
         token = issue_token(uuid, lic)
         if token:
             out["license"] = token
+            out["license_pass"] = issue_pass(as_text(v.get("id"), 40), lic) if lic["peer_control"] else ""
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
         # Licensed builds drop their token and block themselves; close what is open unless it is
-        # controlled from a licensed computer.
-        out["license"] = ""
+        # controlled from a license allowed to (controller_licensed).
+        out["license"] = out["license_pass"] = ""
         closing = [c for c in conns if not controller_licensed(uuid, c)]
         if closing:
             out["disconnect"] = sorted(set(out.get("disconnect", []) + closing))
@@ -1574,7 +1604,7 @@ def license_action(action, v):
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1604,6 +1634,11 @@ def license_action(action, v):
             return 400, {"error": "Limită invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
         x("UPDATE licenses SET bandwidth=? WHERE code=?", (kbps, code))
         log(f"licenses: {code} bandwidth {kbps or 'unlimited'} kbit/s")
+        return 200, {"ok": True}
+    if action == "peer":
+        on = 1 if v.get("on") else 0
+        x("UPDATE licenses SET peer_control=? WHERE code=?", (on, code))
+        log(f"licenses: {code} control of computers without a license {'on' if on else 'off'}")
         return 200, {"ok": True}
     if action == "portal":
         email = (as_text(v.get("email"), 254) or "").strip().lower()

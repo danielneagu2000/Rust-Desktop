@@ -794,6 +794,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("The license server is not configured", "Serverul de licențe nu este configurat"),
         ("Invalid response from the license server", "Răspuns invalid de la serverul de licențe"),
         ("The license received is not valid for this computer", "Licența primită nu este validă pentru acest calculator"),
-        ("Without a license, this computer can only be controlled from a licensed RDN Remote app. To connect to other computers, enter the code you received from RDN Network Data.", "Fără licență, acest calculator poate fi controlat doar dintr-o aplicație RDN Remote cu licență. Ca să te conectezi la alte calculatoare, introdu codul primit de la RDN Network Data.")
+        ("Without a license, this computer can only be controlled from RDN Remote apps whose license allows it. To connect to other computers, enter the code you received from RDN Network Data.", "Fără licență, acest calculator poate fi controlat doar din aplicații RDN Remote a căror licență permite asta. Ca să te conectezi la alte calculatoare, introdu codul primit de la RDN Network Data."),
+        ("The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.", "Calculatorul la distanță nu are licență RDN Remote, iar licența ta nu permite controlul calculatoarelor fără licență.")
     ].iter().cloned().collect();
 }

@@ -2868,8 +2868,8 @@ impl Connection {
             if !self.check_login_scope(&lr).await {
                 return false;
             }
-            if !crate::license::login_allowed(&lr.rdn_license) {
-                self.send_login_error(crate::license::BLOCKED_MSG).await;
+            if !crate::license::login_allowed(&lr.rdn_pass, &lr.my_id) {
+                self.send_login_error(crate::license::PEER_BLOCKED_MSG).await;
                 return false;
             }
             self.awaiting_2fa = false;

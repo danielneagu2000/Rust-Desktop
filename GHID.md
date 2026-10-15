@@ -221,6 +221,15 @@ telefon → calculator), cât timp fiecare dispozitiv are licența activată (oc
 Licența e necesară pe **toate** dispozitivele: și pe calculatoarele clienților, și pe ale
 tehnicienilor. Pentru calculatoarele tale creează o licență „nelimitată” (de ex. „Intern RDN”).
 
+- **PC fără licență** (coloana Conexiuni, butonul **Pornește** / **Oprește**; implicit oprit,
+  și pentru licențele create din shop): calculatoarele licenței se pot conecta și la calculatoare
+  fără licență, de exemplu la un client care tocmai a descărcat aplicația. Calculatorul fără
+  licență poate fi doar controlat, nu se poate conecta nicăieri. Sesiunile se numără la
+  conexiunile simultane ale licenței și apar în rapoartele și în portalul ei. Dacă oprești
+  opțiunea sau licența expiră, sesiunile ei deschise pe calculatoare fără licență se închid în
+  câteva secunde. Aplicația primește de la server un permis semnat, valabil 24 de ore, care
+  conține doar ID-ul ei.
+
 Cum funcționează: serverul semnează licența cu cheia lui (`server/data/id_ed25519`), iar aplicația
 o verifică cu cheia publică pe care o are compilată, deci nu poate fi falsificată. Serverul o
 reîmprospătează la fiecare ~15 secunde; o licență revocată sau expirată blochează aplicația în

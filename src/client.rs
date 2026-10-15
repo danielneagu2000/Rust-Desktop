@@ -3884,7 +3884,7 @@ impl LoginConfigHandler {
             avatar,
             ..Default::default()
         };
-        lr.rdn_license = crate::license::login_token();
+        lr.rdn_pass = crate::license::login_pass();
         match self.conn_type {
             ConnType::FILE_TRANSFER => lr.set_file_transfer(FileTransfer {
                 dir: self.get_remote_dir(),
