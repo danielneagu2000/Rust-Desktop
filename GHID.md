@@ -229,6 +229,10 @@ tehnicienilor. Pentru calculatoarele tale creează o licență „nelimitată”
   opțiunea sau licența expiră, sesiunile ei deschise pe calculatoare fără licență se închid în
   câteva secunde. Aplicația primește de la server un permis semnat, valabil 24 de ore, care
   conține doar ID-ul ei.
+  Butonul **Limită** stabilește câte calculatoare fără licență **diferite** poate controla licența
+  în 30 de zile (0 = nelimitat); tabelul arată câte a folosit, de ex. „3 / 10 în 30 zile”. Un
+  calculator controlat deja în ultimele 30 de zile se reconectează oricând; unul nou peste limită
+  e închis în câteva secunde, cu mesaj pentru tehnician, și apare în tab-ul **Alarme**.
 
 Cum funcționează: serverul semnează licența cu cheia lui (`server/data/id_ed25519`), iar aplicația
 o verifică cu cheia publică pe care o are compilată, deci nu poate fi falsificată. Serverul o

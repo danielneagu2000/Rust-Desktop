@@ -544,8 +544,10 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         '</td><td style="white-space:normal;min-width:110px">' + (l.months ? ext : "") +
         '</td><td class="num">' + (l.sessions ? l.sessions : "nelimitat") +
         '<br><button class="small" data-sessions="' + esc(l.code) + '" data-n="' + (l.sessions || 0) + '" style="margin-top:4px">Schimbă</button>' +
-        '<div style="margin-top:8px;font-size:12px;color:var(--muted);white-space:nowrap">PC fără licență: ' + (l.peer_control ? "da" : "nu") + "</div>" +
-        '<button class="small" data-peer="' + esc(l.code) + '" data-on="' + (l.peer_control ? 1 : 0) + '" style="margin-top:4px">' + (l.peer_control ? "Oprește" : "Pornește") + "</button>" +
+        '<div style="margin-top:8px;font-size:12px;color:var(--muted);white-space:nowrap">PC fără licență: ' + (l.peer_control ? "da" : "nu") +
+        '<br><span title="Calculatoare fără licență diferite controlate în ultimele 30 de zile / limita">' + (l.peer_used || 0) + " / " + (l.peer_max || "nelimitat") + " în 30 zile</span></div>" +
+        '<button class="small" data-peer="' + esc(l.code) + '" data-on="' + (l.peer_control ? 1 : 0) + '" style="margin-top:4px">' + (l.peer_control ? "Oprește" : "Pornește") + "</button> " +
+        '<button class="small" data-peer-max="' + esc(l.code) + '" data-n="' + (l.peer_max || 0) + '" style="margin-top:4px">Limită</button>' +
         '</td><td>' + (l.bandwidth ? (l.bandwidth / 1000) + " Mbit/s" : "nelimitată") +
         '<br><button class="small" data-bandwidth="' + esc(l.code) + '" data-mbps="' + (l.bandwidth / 1000 || 0) + '" style="margin-top:4px">Schimbă</button>' + "</td><td>" +
         (l.revoked ? '<button class="small" data-restore="' + esc(l.code) + '">Reactivează</button>'
@@ -604,7 +606,7 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
     try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
   });
   document.body.addEventListener("click", function (e) {
-    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-portal],[data-delete],[data-purge]");
+    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-peer-max],[data-portal],[data-delete],[data-purge]");
     if (lic) { licenseClick(lic); return; }
     var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
     if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
@@ -648,6 +650,11 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
           "Calculatoarele ei (cu aplicația actualizată) se vor putea conecta și la calculatoare fără licență. Calculatoarele fără licență tot nu se pot conecta nicăieri."
         : "Oprești pentru licența " + d.peer + " controlul calculatoarelor fără licență?\nSesiunile ei deschise pe calculatoare fără licență se închid în câteva secunde.")) return;
       post("license/peer", { code: d.peer, on: on }).then(function () { toast(on ? "Pornit" : "Oprit"); load(); }).catch(fail);
+    } else if (d.peerMax) {
+      var m = prompt("Câte calculatoare fără licență diferite poate controla licența " + d.peerMax + " în 30 de zile? (0 = nelimitat)\n" +
+        "Un calculator controlat deja în ultimele 30 de zile nu se numără din nou; unul nou peste limită e închis în câteva secunde.", d.n);
+      if (m === null) return;
+      post("license/peer_max", { code: d.peerMax, peer_max: Number(m.trim()) }).then(function () { toast("Limită salvată"); load(); }).catch(fail);
     } else if (d.bandwidth) {
       var v = prompt("Limita de bandă pentru licența " + d.bandwidth + ", în Mbit/s (0 = nelimitat).\n" +
         "Se aplică la ce trimite fiecare calculator al licenței (imagine, sunet, fișiere), în câteva secunde.", d.mbps);

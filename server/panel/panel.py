@@ -81,8 +81,13 @@ ALARMS = {
     100: "Închisă: limita de conexiuni simultane a licenței",
     101: "Închisă: dispozitivul nu are drept de control (portal)",
     102: "Închisă: calculatorul acceptă doar dispozitive din organizație (portal)",
+    103: "Închisă: limita de calculatoare fără licență a licenței",
 }
 ALARM_SESSION_LIMIT = 100
+ALARM_PEER_LIMIT = 103
+# Computers without a license that a license controlled count towards its peer_max for this long
+# after their last session.
+PEER_WINDOW = 30 * 86400
 BLOCKING_ALARMS = (1, 2, 6)
 
 DB_LOCK = threading.Lock()
@@ -116,6 +121,8 @@ def db():
         conn.execute("ALTER TABLE licenses ADD COLUMN sessions INTEGER DEFAULT 1")
     if cols and "peer_control" not in cols:
         conn.execute("ALTER TABLE licenses ADD COLUMN peer_control INTEGER DEFAULT 0")
+    if cols and "peer_max" not in cols:
+        conn.execute("ALTER TABLE licenses ADD COLUMN peer_max INTEGER DEFAULT 0")
     # Organization portal: names and rights per device (set by the client's administrator).
     acols = {r[1] for r in conn.execute("PRAGMA table_info(activations)")}
     for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1")):
@@ -158,7 +165,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS licenses (
             code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
             created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT,
-            bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1, peer_control INTEGER DEFAULT 0
+            bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1, peer_control INTEGER DEFAULT 0,
+            peer_max INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS peer_targets (
+            code TEXT, uuid TEXT, last REAL, PRIMARY KEY (code, uuid)
         );
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
@@ -314,8 +325,9 @@ def ingest_conn(v, src_ip):
             ),
         )
         peer_id = as_text(peer[0] if len(peer) > 0 else "", 40)
-        if not enforce_device_rights(uuid, conn_id, peer_id, device_id):
-            enforce_session_limit(uuid, conn_id, peer_id, device_id)
+        if not enforce_device_rights(uuid, conn_id, peer_id, device_id) and \
+                not enforce_session_limit(uuid, conn_id, peer_id, device_id):
+            enforce_peer_limit(uuid, conn_id, peer_id, device_id)
 
 
 # Why the panel closed a connection, per device; sent with the next heartbeat's "disconnect".
@@ -399,6 +411,40 @@ def enforce_session_limit(uuid, conn_id, peer_id, device_id):
          json.dumps({"licență": lic["code"], "client": lic["client"], "de la": peer_id, "limită": limit}, ensure_ascii=False)),
     )
     log(f"licenses: {lic['code']} at its limit of {limit} sessions; closing {peer_id} -> {device_id}")
+    return True
+
+
+def enforce_peer_limit(uuid, conn_id, peer_id, device_id):
+    """Closes a session to a computer without a license once the controller's license has reached
+    peer_max different such computers in PEER_WINDOW. One it already controlled in that window
+    does not count again; every session it accepts moves the computer's window forward."""
+    if not peer_id or license_ok(device_license(uuid)):
+        return
+    lic = controller_license(peer_id)
+    if not lic:
+        return
+    now, limit = time.time(), int(lic.get("peer_max") or 0)
+    since = now - PEER_WINDOW
+    known = q("SELECT 1 FROM peer_targets WHERE code=? AND uuid=? AND last > ?", (lic["code"], uuid, since))
+    used = q("SELECT COUNT(*) AS n FROM peer_targets WHERE code=? AND last > ?", (lic["code"], since))[0]["n"]
+    if limit > 0 and not known and used >= limit:
+        x("INSERT INTO pending_disconnect(uuid, conn_id, ts) VALUES(?,?,?)", (uuid, conn_id, now))
+        DISCONNECT_REASON[uuid] = (
+            f"Licența {lic['client'] or ''} permite controlul a cel mult {limit} "
+            f"{'calculator' if limit == 1 else 'calculatoare'} fără licență în 30 de zile, iar limita e atinsă. "
+            "Contactează RDN Network Data pentru o limită mai mare."
+        )
+        x(
+            "INSERT INTO alarms(ts, uuid, device_id, typ, ip, info) VALUES(?,?,?,?,?,?)",
+            (now, uuid, device_id, ALARM_PEER_LIMIT, None,
+             json.dumps({"licență": lic["code"], "client": lic["client"], "de la": peer_id, "limită": limit},
+                        ensure_ascii=False)),
+        )
+        log(f"licenses: {lic['code']} at its limit of {limit} computers without a license; "
+            f"closing {peer_id} -> {device_id}")
+        return
+    x("""INSERT INTO peer_targets(code, uuid, last) VALUES(?,?,?)
+         ON CONFLICT(code, uuid) DO UPDATE SET last=excluded.last""", (lic["code"], uuid, now))
 
 
 def ingest_alarm(v, src_ip):
@@ -590,6 +636,16 @@ def device_license(uuid):
     return rows[0] if rows else None
 
 
+def controller_license(peer_id):
+    """License of a controlling device that may control computers without a license, or None."""
+    rows = q(
+        """SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code
+           WHERE a.device_id = ? OR a.uuid IN (SELECT uuid FROM devices WHERE device_id = ?)""",
+        (peer_id, peer_id),
+    )
+    return next((r for r in rows if license_ok(r) and r["peer_control"]), None)
+
+
 def controller_licensed(uuid, conn_id):
     """A computer without a license may be controlled from a license with peer_control on. True as
     long as the session's controlling device is not reported yet (the audit event can trail the
@@ -597,12 +653,7 @@ def controller_licensed(uuid, conn_id):
     s = open_session(uuid, conn_id)
     if not s or not s["peer_id"]:
         return True
-    rows = q(
-        """SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code
-           WHERE a.device_id = ? OR a.uuid IN (SELECT uuid FROM devices WHERE device_id = ?)""",
-        (s["peer_id"], s["peer_id"]),
-    )
-    return any(license_ok(r) and r["peer_control"] for r in rows)
+    return controller_license(s["peer_id"]) is not None
 
 
 def activate(v, src_ip):
@@ -1096,10 +1147,13 @@ def state(search):
         a_["online"] = now - (a_["dev_seen"] or 0) < ONLINE_SECONDS
         acts.setdefault(a_["code"], []).append(a_)
     portal = {r["code"]: r["n"] for r in q("SELECT code, COUNT(*) AS n FROM portal_users GROUP BY code")}
+    peer_used = {r["code"]: r["n"] for r in q(
+        "SELECT code, COUNT(*) AS n FROM peer_targets WHERE last > ? GROUP BY code", (now - PEER_WINDOW,))}
     for l_ in licenses:
         l_["status"] = license_status(l_, now)
         l_["devices"] = acts.get(l_["code"], [])
         l_["portal_users"] = portal.get(l_["code"], 0)
+        l_["peer_used"] = peer_used.get(l_["code"], 0)
 
     def one(sql, args=()):
         return q(sql, args)[0]["n"] or 0
@@ -1571,6 +1625,7 @@ def license_delete(code):
     x("DELETE FROM portal_users WHERE code=?", (code,))
     x("DELETE FROM activations WHERE code=?", (code,))
     x("DELETE FROM shop_licenses WHERE code=?", (code,))
+    x("DELETE FROM peer_targets WHERE code=?", (code,))
     x("DELETE FROM licenses WHERE code=?", (code,))
     log(f"licenses: {code} deleted")
 
@@ -1604,7 +1659,7 @@ def license_action(action, v):
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer", "peer_max") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1639,6 +1694,13 @@ def license_action(action, v):
         on = 1 if v.get("on") else 0
         x("UPDATE licenses SET peer_control=? WHERE code=?", (on, code))
         log(f"licenses: {code} control of computers without a license {'on' if on else 'off'}")
+        return 200, {"ok": True}
+    if action == "peer_max":
+        n = as_int(v.get("peer_max"))
+        if n is None or not 0 <= n <= 100000:
+            return 400, {"error": "Număr invalid (0 = nelimitat)"}
+        x("UPDATE licenses SET peer_max=? WHERE code=?", (n, code))
+        log(f"licenses: {code} computers without a license {n or 'unlimited'}")
         return 200, {"ok": True}
     if action == "portal":
         email = (as_text(v.get("email"), 254) or "").strip().lower()
@@ -2488,6 +2550,7 @@ def restore_live(blob):
         sync_hbbr_blocklist()
         restored.append("IP-uri blocate")
     _TOKEN_CACHE.clear()
+    _PASS_CACHE.clear()
     log(f"backup: restored {manifest.get('created')} (safety copy {safety.name})")
     return 200, {"ok": True, "restored": restored, "created": manifest.get("created"), "safety": safety.name}
 
@@ -2501,6 +2564,7 @@ def housekeeping():
             x("DELETE FROM devices WHERE last_seen < ?", (cutoff,))
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
+            x("DELETE FROM peer_targets WHERE last < ?", (time.time() - PEER_WINDOW,))
             # The audit API is public: cap what unauthenticated posts can grow to.
             for table, order in (("sessions", "started"), ("alarms", "ts"), ("devices", "last_seen")):
                 x(f"DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} "
