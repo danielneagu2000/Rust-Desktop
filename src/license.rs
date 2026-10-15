@@ -95,7 +95,11 @@ pub fn ui_status() -> String {
 /// Activates `code` on the panel and stores the returned token; returns JSON
 /// {"ok": true} or {"error": "..."} for the UI.
 pub fn activate(code: &str) -> String {
-    match activate_(code.trim()) {
+    // ipc::get_id and ipc::set_options start their own Tokio runtime; called inside
+    // activate_'s runtime they panic, and with panic = "abort" the app closes.
+    let result = activate_(code.trim(), device_id())
+        .map(|token| crate::ui_interface::set_option(OPTION_TOKEN.to_owned(), token));
+    match result {
         Ok(()) => serde_json::json!({ "ok": true }).to_string(),
         Err(e) => serde_json::json!({ "error": e.to_string() }).to_string(),
     }
@@ -123,7 +127,7 @@ fn ui_lang() -> String {
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn activate_(code: &str) -> ResultType<()> {
+async fn activate_(code: &str, id: String) -> ResultType<String> {
     let api = crate::common::get_api_server(
         crate::ui_interface::get_option("api-server"),
         crate::ui_interface::get_option("custom-rendezvous-server"),
@@ -134,7 +138,7 @@ async fn activate_(code: &str) -> ResultType<()> {
     let body = serde_json::json!({
         "code": code,
         "uuid": crate::encode64(hbb_common::get_uuid()),
-        "id": device_id(),
+        "id": id,
         "hostname": crate::common::hostname(),
         "lang": ui_lang(),
     });
@@ -149,8 +153,7 @@ async fn activate_(code: &str) -> ResultType<()> {
     if verify(token).is_none() {
         hbb_common::bail!("The license received is not valid for this computer");
     }
-    crate::ui_interface::set_option(OPTION_TOKEN.to_owned(), token.to_owned());
-    Ok(())
+    Ok(token.to_owned())
 }
 
 /// Reason the panel gave with its last heartbeat "disconnect" (e.g. the license's limit
