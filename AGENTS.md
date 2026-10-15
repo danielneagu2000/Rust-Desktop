@@ -172,6 +172,24 @@ A refactor added to cover a corner case rarely converges. Each new counter, time
 * Do not report a rare corner case as blocking when fixing it needs new state; mark it as a known limit the author may leave unfixed.
 * Treat growth across review rounds as a finding: if the latest commits add more state than the original fix, say so instead of asking for more handling.
 
+## Releases
+
+The owner's standing rule: **no new version is released without a thorough security review of
+exactly the code being released.** A release is the "Publish new version" workflow
+(`.github/workflows/release.yml`); `.claude/hooks/release-gate.py` refuses to start it until the
+review is recorded for the current `origin/master` commit.
+
+* Review every change since the last release tag (`git diff <last tag>..origin/master`), app and
+  server alike, not only the latest commit. A commit pushed after the review needs its own review.
+* Cover at least: what other computers, peers and the public API can now send or read (tokens,
+  identifiers, personal data); authentication, authorization and CSRF on the panel and portal;
+  input validation, injection (SQL, HTML/JS, shell, log lines) and paths; signatures, keys and
+  expiry of licenses and passes; secrets in code, logs or workflows; and new dependencies.
+* Fix what the review finds before releasing, then tell the user in plain words what was checked,
+  what was found and what was fixed.
+* Then record the review and start the release:
+  `git fetch origin master && git rev-parse origin/master > .claude/security-reviewed`.
+
 ## Localization (`src/lang/*.rs`)
 
 Each file is a `HashMap<key, translation>`. Layout:

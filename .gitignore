@@ -68,3 +68,6 @@ flutter/web/
 !flutter/assets/logo.png
 !flutter/assets/logo_dark.png
 !server/web/assets/*.png
+
+# Local marker of the last security review before a release (.claude/hooks/release-gate.py)
+.claude/security-reviewed

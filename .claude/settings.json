@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__github__actions_run_trigger",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/release-gate.py\"",
+            "timeout": 90,
+            "onFailure": "block",
+            "statusMessage": "Checking the security review before a release"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/release-gate.py\"",
+            "if": "Bash(gh *)",
+            "timeout": 90,
+            "onFailure": "block",
+            "statusMessage": "Checking the security review before a release"
+          }
+        ]
+      }
+    ]
+  }
+}
