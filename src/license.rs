@@ -68,6 +68,37 @@ pub fn check_outgoing() -> ResultType<()> {
     Ok(())
 }
 
+/// Sent with every outgoing login, so a computer without a license accepts a session
+/// controlled from this licensed one (UI process).
+pub fn login_token() -> String {
+    if !REQUIRED {
+        return String::new();
+    }
+    crate::ui_interface::get_option(OPTION_TOKEN)
+}
+
+/// Incoming login (server process): this computer is licensed, or the controlling one sent a
+/// license token of its own. That token is bound to the other computer's uuid, so only the
+/// signature and the expiry can be checked here.
+pub fn login_allowed(peer_token: &str) -> bool {
+    if is_allowed() {
+        return true;
+    }
+    let Some(signed) = crate::decode64(peer_token).ok() else {
+        return false;
+    };
+    let Some(pk) = crate::common::get_rs_pk(hbb_common::config::RS_PUB_KEY) else {
+        return false;
+    };
+    let Ok(payload) = hbb_common::sodiumoxide::crypto::sign::verify(&signed, &pk) else {
+        return false;
+    };
+    payload
+        .strip_prefix(TOKEN_PREFIX)
+        .and_then(|p| serde_json::from_slice::<Claims>(p).ok())
+        .map_or(false, |c| c.e > now())
+}
+
 /// Token pushed by the panel in the heartbeat response (server process).
 pub fn store_from_server(token: &str) {
     if !REQUIRED || Config::get_option(OPTION_TOKEN) == token {

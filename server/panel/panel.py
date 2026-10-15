@@ -560,6 +560,20 @@ def device_license(uuid):
     return rows[0] if rows else None
 
 
+def controller_licensed(uuid, conn_id):
+    """A computer without a license may be controlled from a licensed one. True as long as the
+    session's controlling device is not reported yet (the audit event can trail the heartbeat)."""
+    s = open_session(uuid, conn_id)
+    if not s or not s["peer_id"]:
+        return True
+    rows = q(
+        """SELECT l.* FROM activations a JOIN licenses l ON l.code = a.code
+           WHERE a.device_id = ? OR a.uuid IN (SELECT uuid FROM devices WHERE device_id = ?)""",
+        (s["peer_id"], s["peer_id"]),
+    )
+    return any(license_ok(r) for r in rows)
+
+
 def activate(v, src_ip):
     now = time.time()
     # The app sends its language; older apps send nothing and keep the Romanian messages.
@@ -655,10 +669,12 @@ def heartbeat(v, src_ip):
             out["license"] = token
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
-        # Licensed builds drop their token and block themselves; close what is open.
+        # Licensed builds drop their token and block themselves; close what is open unless it is
+        # controlled from a licensed computer.
         out["license"] = ""
-        if conns:
-            out["disconnect"] = sorted(set(out.get("disconnect", []) + conns))
+        closing = [c for c in conns if not controller_licensed(uuid, c)]
+        if closing:
+            out["disconnect"] = sorted(set(out.get("disconnect", []) + closing))
             out.setdefault("disconnect_reason", "Licența RDN Remote a acestui calculator a expirat sau a fost revocată.")
     if "modified_at" in v:
         out["modified_at"] = v["modified_at"]

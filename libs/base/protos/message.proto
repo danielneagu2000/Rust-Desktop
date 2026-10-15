@@ -84,6 +84,9 @@ message LoginRequest {
   string my_platform = 13;
   bytes hwid = 14;
   string avatar = 17;
+  // RDN Remote: license token of the controlling app (src/license.rs). A high number so a
+  // field upstream adds later never collides with it.
+  string rdn_license = 1001;
 }
 
 message Terminal {

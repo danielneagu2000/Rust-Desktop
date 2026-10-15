@@ -793,6 +793,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("The RDN Remote license is missing or has expired. Activate a license code in the app.", "Licența RDN Remote lipsește sau a expirat. Activează un cod de licență în aplicație."),
         ("The license server is not configured", "Serverul de licențe nu este configurat"),
         ("Invalid response from the license server", "Răspuns invalid de la serverul de licențe"),
-        ("The license received is not valid for this computer", "Licența primită nu este validă pentru acest calculator")
+        ("The license received is not valid for this computer", "Licența primită nu este validă pentru acest calculator"),
+        ("Without a license, this computer can only be controlled from a licensed RDN Remote app. To connect to other computers, enter the code you received from RDN Network Data.", "Fără licență, acest calculator poate fi controlat doar dintr-o aplicație RDN Remote cu licență. Ca să te conectezi la alte calculatoare, introdu codul primit de la RDN Network Data.")
     ].iter().cloned().collect();
 }

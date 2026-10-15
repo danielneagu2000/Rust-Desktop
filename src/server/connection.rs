@@ -1504,10 +1504,6 @@ impl Connection {
         if !self.check_whitelist(&addr).await {
             return false;
         }
-        if !crate::license::is_allowed() {
-            self.send_login_error(crate::license::BLOCKED_MSG).await;
-            return false;
-        }
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if crate::is_server() && Config::get_option("allow-only-conn-window-open") == "Y" {
             if !crate::check_process("", !crate::platform::is_root()) {
@@ -2870,6 +2866,10 @@ impl Connection {
         // After handling CloseReason messages, proceed to process other message types
         if let Some(message::Union::LoginRequest(lr)) = msg.union {
             if !self.check_login_scope(&lr).await {
+                return false;
+            }
+            if !crate::license::login_allowed(&lr.rdn_license) {
+                self.send_login_error(crate::license::BLOCKED_MSG).await;
                 return false;
             }
             self.awaiting_2fa = false;

@@ -64,7 +64,7 @@ class _LicenseBannerState extends State<LicenseBanner> {
     } else {
       title = translate('License required');
       text = translate(
-          'The app only works with a valid license code. Enter the code you received from RDN Network Data.');
+          'Without a license, this computer can only be controlled from a licensed RDN Remote app. To connect to other computers, enter the code you received from RDN Network Data.');
       color = Colors.red.shade700;
     }
     return Container(

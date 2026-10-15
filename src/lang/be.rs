@@ -793,6 +793,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("The RDN Remote license is missing or has expired. Activate a license code in the app.", ""),
         ("The license server is not configured", ""),
         ("Invalid response from the license server", ""),
-        ("The license received is not valid for this computer", "")
+        ("The license received is not valid for this computer", ""),
+        ("Without a license, this computer can only be controlled from a licensed RDN Remote app. To connect to other computers, enter the code you received from RDN Network Data.", "")
     ].iter().cloned().collect();
 }
