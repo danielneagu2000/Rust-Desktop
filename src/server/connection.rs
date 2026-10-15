@@ -3112,6 +3112,10 @@ impl Connection {
             #[cfg(feature = "flutter")]
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(lr) = _s.lr.clone().take() {
+                if !crate::license::login_allowed(&lr.rdn_pass, &lr.my_id) {
+                    self.send_login_error(crate::license::PEER_BLOCKED_MSG).await;
+                    return false;
+                }
                 SWITCH_SIDES_UUID
                     .lock()
                     .unwrap()

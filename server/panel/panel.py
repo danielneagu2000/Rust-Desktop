@@ -104,7 +104,7 @@ def body_length(headers, limit):
 
 def log(msg):
     # Messages carry text sent by anyone (device IDs, codes): no line breaks or terminal escapes.
-    msg = re.sub(r"[\x00-\x1f\x7f-\x9f]", "?", str(msg))
+    msg = re.sub(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]", "?", str(msg))
     print(time.strftime("%Y-%m-%d %H:%M:%S"), msg, flush=True)
 
 
@@ -1659,7 +1659,8 @@ def license_action(action, v):
         log(f"licenses: created {code} for {client} ({seats} seats, {months or 'unlimited'} months)")
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
-    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer", "peer_max") and not rows:
+    if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer", "peer_max",
+                  "peer_reset") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1701,6 +1702,12 @@ def license_action(action, v):
             return 400, {"error": "Număr invalid (0 = nelimitat)"}
         x("UPDATE licenses SET peer_max=? WHERE code=?", (n, code))
         log(f"licenses: {code} computers without a license {n or 'unlimited'}")
+        return 200, {"ok": True}
+    if action == "peer_reset":
+        # The audit API is public, so whoever knows a technician's ID can fill this list with
+        # sessions that never happened; emptying it is the remedy.
+        x("DELETE FROM peer_targets WHERE code=?", (code,))
+        log(f"licenses: {code} list of computers without a license emptied")
         return 200, {"ok": True}
     if action == "portal":
         email = (as_text(v.get("email"), 254) or "").strip().lower()
