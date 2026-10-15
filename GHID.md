@@ -194,6 +194,11 @@ pornire afișează „Licență necesară” cu butonul **Activează licența**.
   nelimitată). Primești un cod de forma `RDN-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX` (25 de caractere aleatorii), pe care îl trimiți clientului.
   Perioada începe la prima activare.
 - **Prelungește** cu +1, +3, +6, +9 sau +12 luni (de la data expirării, sau de azi dacă a expirat).
+- **Editează** (primul buton din dreapta fiecărei licențe): într-o singură fereastră schimbi
+  clientul, nota, numărul de calculatoare, data de expirare (gol = nelimitată; la un cod
+  neactivat, perioada în luni), conexiunile simultane, banda, „PC fără licență” și limita lui.
+  Tot acolo vezi calculatoarele licenței (cu **Eliberează locul**) și conexiunile ei active (cu
+  **Deconectează**). Data nouă de expirare ajunge pe calculatoare în câteva secunde.
 - **Revocă** sau **Reactivează** o licență; **Eliberează locul** unui calculator (tab-ul
   Dispozitive), de exemplu când clientul își schimbă calculatorul.
 - Tab-ul **Dispozitive** arată pentru fiecare calculator licența și data expirării, plus cine e

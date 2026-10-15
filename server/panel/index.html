@@ -80,6 +80,17 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
 .tile { position: relative; overflow: hidden; }
 .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, #ff4d5c, #b3121f); opacity: .8; }
 @media (max-width: 640px) { header, main { padding-left: 16px; padding-right: 16px; } input[type=search] { width: 100%; max-width: none; } .tools { width: 100%; } }
+dialog.dlg { border: 1px solid var(--line); border-radius: 12px; padding: 0; background: var(--card); color: var(--text); width: min(760px, 94vw); }
+dialog.dlg::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg h2 { font-size: 15px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.dlg h3 { font-size: 13px; margin: 16px 0 6px; }
+.dlg-body { padding: 12px 16px; max-height: 72vh; overflow: auto; }
+.dlg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.dlg-grid > label:not(.sw) { display: grid; gap: 4px; font-size: 13px; }
+.dlg-body table { width: 100%; }
+.dlg-foot { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+@media (max-width: 640px) { .dlg-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -313,6 +324,30 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
     </div>
   </section>
 </main>
+
+<dialog id="lic-edit" class="dlg">
+  <form id="lic-edit-form">
+    <h2>Editează licența <span class="mono" id="le-code"></span> <span id="le-status"></span></h2>
+    <div class="dlg-body">
+      <div class="dlg-grid">
+        <label>Client <input type="text" id="le-client" maxlength="100" required></label>
+        <label>Notă <input type="text" id="le-note" maxlength="300"></label>
+        <label>Calculatoare (locuri) <input type="number" id="le-seats" min="1" max="10000" required></label>
+        <label id="le-exp-wrap">Expiră pe (gol = nelimitată) <input type="date" id="le-expires"></label>
+        <label id="le-months-wrap">Perioadă de la prima activare (luni, 0 = nelimitată) <input type="number" id="le-months" min="0" max="120"></label>
+        <label>Conexiuni simultane (0 = nelimitat) <input type="number" id="le-sessions" min="0" max="1000" required></label>
+        <label>Bandă pe calculator, Mbit/s (0 = nelimitat) <input type="number" id="le-mbps" min="0" max="10000" step="0.1" required></label>
+        <label>Calculatoare fără licență în 30 de zile (0 = nelimitat) <input type="number" id="le-peer-max" min="0" max="100000" required></label>
+        <label class="sw"><input type="checkbox" id="le-peer"> Poate controla calculatoare fără licență</label>
+      </div>
+      <h3>Calculatoarele licenței</h3>
+      <div id="le-devices"></div>
+      <h3>Conexiuni active ale licenței</h3>
+      <div id="le-conns"></div>
+    </div>
+    <div class="dlg-foot"><button type="button" id="le-close">Închide</button><button class="primary" type="submit">Salvează</button></div>
+  </form>
+</dialog>
 <div id="toast"></div>
 <script>
 (function () {
@@ -552,6 +587,7 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         (l.peer_used ? ' <button class="small" data-peer-reset="' + esc(l.code) + '" style="margin-top:4px" title="Golește lista calculatoarelor fără licență numărate în 30 de zile">Golește</button>' : "") +
         '</td><td>' + (l.bandwidth ? (l.bandwidth / 1000) + " Mbit/s" : "nelimitată") +
         '<br><button class="small" data-bandwidth="' + esc(l.code) + '" data-mbps="' + (l.bandwidth / 1000 || 0) + '" style="margin-top:4px">Schimbă</button>' + "</td><td>" +
+        '<button class="small primary" data-edit="' + esc(l.code) + '" style="margin-bottom:4px">Editează</button><br>' +
         (l.revoked ? '<button class="small" data-restore="' + esc(l.code) + '">Reactivează</button>'
                    : '<button class="small danger" data-revoke="' + esc(l.code) + '">Revocă</button>') +
         (l.status === "revocată" || l.status === "expirată"
@@ -585,7 +621,7 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
     var q = document.getElementById("q").value.trim();
     return fetch(base + "api/state" + (q ? "?q=" + encodeURIComponent(q) : ""), { credentials: "same-origin", headers: { "X-Active": activity() } })
       .then(function (r) { if (r.status === 401) { location.reload(); throw new Error("sesiune expirată"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(function (d) { data = d; render(); })
+      .then(function (d) { data = d; render(); if (editCode) renderLicenseEditLists(); })
       .catch(function (e) { document.getElementById("status").textContent = "Eroare la încărcare: " + e.message; });
   }
   function post(action, body) {
@@ -608,7 +644,7 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
     try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
   });
   document.body.addEventListener("click", function (e) {
-    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-peer-max],[data-peer-reset],[data-portal],[data-delete],[data-purge]");
+    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-peer-max],[data-peer-reset],[data-edit],[data-portal],[data-delete],[data-purge]");
     if (lic) { licenseClick(lic); return; }
     var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
     if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
@@ -627,6 +663,82 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         .catch(function (err) { toast("Eroare: " + err.message); });
     }
   });
+  // "Editează": every field of a license, its computers and its open sessions in one dialog.
+  var editCode = null;
+  function editField(id) { return document.getElementById(id); }
+  function isoDay(ts) {
+    var d = new Date(ts * 1000), two = function (n) { return ("0" + n).slice(-2); };
+    return d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate());
+  }
+  function editLicense() { return (data.licenses || []).filter(function (x) { return x.code === editCode; })[0]; }
+  function renderLicenseEditLists() {
+    var l = editLicense();
+    if (!l) return;
+    editField("le-status").innerHTML = statusPill(l.status);
+    var devs = l.devices || [], uuids = {}, ids = {}, online = {};
+    devs.forEach(function (a) { uuids[a.uuid] = 1; if (a.device_id) ids[a.device_id] = 1; });
+    (data.devices || []).forEach(function (d) { if (d.online) online[d.uuid] = 1; });
+    editField("le-devices").innerHTML = devs.length
+      ? '<table><thead><tr><th>Stare</th><th>ID</th><th>Nume</th><th>Activat</th><th></th></tr></thead><tbody>' +
+        devs.map(function (a) {
+          return "<tr><td>" + (a.online ? pill("online", "ok") : pill("offline", "mute")) + '</td><td class="mono">' + esc(a.device_id || "?") +
+            "</td><td>" + esc(a.alias || a.hostname || "") + "</td><td>" + esc(a.activated ? day(a.activated) : "—") +
+            '</td><td><button type="button" class="small danger" data-edit-release="' + esc(a.uuid) + '">Eliberează locul</button></td></tr>';
+        }).join("") + "</tbody></table>"
+      : '<p class="sub">Niciun calculator activat cu acest cod.</p>';
+    var conns = (data.sessions || []).filter(function (r) { return r.authed && !r.ended && (uuids[r.uuid] || ids[r.peer_id]); });
+    editField("le-conns").innerHTML = conns.length
+      ? '<table><thead><tr><th>De la</th><th>Către</th><th>Tip</th><th>Durată</th><th></th></tr></thead><tbody>' +
+        conns.map(function (r) {
+          return '<tr><td class="mono">' + esc(r.peer_id || "—") + '</td><td><span class="mono">' + esc(r.device_id || "") + "</span>" +
+            (r.hostname ? " · " + esc(r.hostname) : "") + "</td><td>" + esc(r.type_label || "—") + "</td><td>" + esc(dur(r.authed, r.ended)) +
+            "</td><td>" + (online[r.uuid] ? '<button type="button" class="small danger" data-disc="' + esc(r.uuid) + '" data-conn="' + esc(r.conn_id) + '">Deconectează</button>' : "") +
+            "</td></tr>";
+        }).join("") + "</tbody></table>"
+      : '<p class="sub">Nicio conexiune activă.</p>';
+  }
+  function openLicenseEdit(code) {
+    editCode = code;
+    var l = editLicense();
+    if (!l) return;
+    editField("le-code").textContent = l.code;
+    editField("le-client").value = l.client || "";
+    editField("le-note").value = l.note || "";
+    editField("le-seats").value = l.seats;
+    editField("le-sessions").value = l.sessions || 0;
+    editField("le-mbps").value = (l.bandwidth || 0) / 1000;
+    editField("le-peer").checked = !!l.peer_control;
+    editField("le-peer-max").value = l.peer_max || 0;
+    var activated = l.starts != null;
+    editField("le-exp-wrap").style.display = activated ? "" : "none";
+    editField("le-months-wrap").style.display = activated ? "none" : "";
+    editField("le-expires").value = l.expires ? isoDay(l.expires) : "";
+    editField("le-months").value = l.months || 0;
+    renderLicenseEditLists();
+    editField("lic-edit").showModal();
+  }
+  editField("le-close").addEventListener("click", function () { editField("lic-edit").close(); });
+  editField("lic-edit").addEventListener("close", function () { editCode = null; });
+  editField("lic-edit-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("license/edit", {
+      code: editCode, client: editField("le-client").value.trim(), note: editField("le-note").value.trim(),
+      seats: Number(editField("le-seats").value), sessions: Number(editField("le-sessions").value),
+      mbps: editField("le-mbps").value.trim(), peer_control: editField("le-peer").checked,
+      peer_max: Number(editField("le-peer-max").value), expires: editField("le-expires").value,
+      months: Number(editField("le-months").value)
+    }).then(function () { toast("Licență salvată"); editField("lic-edit").close(); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  editField("lic-edit").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-edit-release]");
+    if (!b) return;
+    if (!confirm("Eliberezi locul de licență al acestui calculator? Calculatorul se blochează până primește un cod.")) return;
+    post("license/release", { uuid: b.dataset.editRelease })
+      .then(function () { toast("Loc eliberat"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+
   function licenseClick(el) {
     var d = el.dataset, fail = function (err) { toast("Eroare: " + err.message); };
     if (d.copy) {
@@ -657,6 +769,8 @@ button.primary { background: linear-gradient(135deg, #d61f2c, #b3121f); border-c
         "Un calculator controlat deja în ultimele 30 de zile nu se numără din nou; unul nou peste limită e închis în câteva secunde.", d.n);
       if (m === null) return;
       post("license/peer_max", { code: d.peerMax, peer_max: Number(m.trim()) }).then(function () { toast("Limită salvată"); load(); }).catch(fail);
+    } else if (d.edit) {
+      openLicenseEdit(d.edit);
     } else if (d.peerReset) {
       if (!confirm("Golești lista calculatoarelor fără licență numărate pentru licența " + d.peerReset + "?\n" +
         "Limita începe din nou de la 0. Folosește-o dacă lista conține calculatoare pe care tehnicianul nu le-a controlat (vezi Alarme).")) return;

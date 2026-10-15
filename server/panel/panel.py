@@ -1633,6 +1633,49 @@ def license_delete(code):
     log(f"licenses: {code} deleted")
 
 
+def license_edit(lic, v):
+    """All of a license's data from the panel's "Editează" form, saved together or not at all."""
+    client = (as_text(v.get("client"), 100) or "").strip()
+    if not client:
+        return 400, {"error": "Completează numele clientului"}
+    seats, sessions, peer_max = as_int(v.get("seats")), as_int(v.get("sessions")), as_int(v.get("peer_max"))
+    if not seats or not 1 <= seats <= 10000:
+        return 400, {"error": "Număr de calculatoare invalid"}
+    if sessions is None or not 0 <= sessions <= 1000:
+        return 400, {"error": "Număr de conexiuni simultane invalid (0 = nelimitat)"}
+    kbps = bandwidth_kbps(v.get("mbps"))
+    if kbps is None:
+        return 400, {"error": "Limită de bandă invalidă (0 = nelimitat, maxim 10000 Mbit/s)"}
+    if peer_max is None or not 0 <= peer_max <= 100000:
+        return 400, {"error": "Limită invalidă de calculatoare fără licență (0 = nelimitat)"}
+    fields = {
+        "client": client, "note": as_text(v.get("note"), 300) or "", "seats": seats, "sessions": sessions,
+        "bandwidth": kbps, "peer_control": 1 if v.get("peer_control") else 0, "peer_max": peer_max,
+    }
+    if lic["starts"] is None:
+        # Not activated yet: the period starts at the first activation.
+        months = as_int(v.get("months"))
+        if months is None or not 0 <= months <= 120:
+            return 400, {"error": "Perioadă invalidă (0-120 luni, 0 = nelimitată)"}
+        fields["months"] = months
+    else:
+        raw = str(v.get("expires") or "").strip()
+        fields["expires"] = None
+        if raw:
+            m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw)
+            try:
+                day = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+            except ValueError:
+                day = None
+            if not day or not 2000 <= day.year <= 2100:
+                return 400, {"error": "Dată de expirare invalidă"}
+            # Valid until the end of that day, local time.
+            fields["expires"] = time.mktime((day.year, day.month, day.day, 23, 59, 59, 0, 0, -1))
+    x(f"UPDATE licenses SET {', '.join(k + '=?' for k in fields)} WHERE code=?", (*fields.values(), lic["code"]))
+    log(f"licenses: {lic['code']} edited")
+    return 200, {"ok": True}
+
+
 def license_action(action, v):
     code = as_text(v.get("code"), 40) or ""
     if action == "create":
@@ -1663,7 +1706,7 @@ def license_action(action, v):
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
     if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer", "peer_max",
-                  "peer_reset") and not rows:
+                  "peer_reset", "edit") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1681,6 +1724,8 @@ def license_action(action, v):
         x("UPDATE licenses SET revoked=? WHERE code=?", (1 if action == "revoke" else 0, code))
         log(f"licenses: {code} {action}d")
         return 200, {"ok": True}
+    if action == "edit":
+        return license_edit(rows[0], v)
     if action == "seats":
         seats = as_int(v.get("seats"))
         if not seats or not 1 <= seats <= 10000:
