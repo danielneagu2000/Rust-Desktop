@@ -515,7 +515,7 @@ section { padding: 24px 0; }
 
 /* Telefoane: cifrele pe un singur rând pe ecranele înguste, imaginile 3D mai mici ca să nu lungească pagina */
 @media (max-width: 374px) { .stats { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .alt-art, .dl-art, .sec-art { max-width: 240px; } .portal .art img { max-width: 260px; } }
+@media (max-width: 600px) { .alt-art, .dl-art, .sec-art { max-width: 240px; } .portal .art img { max-width: 250px; } }
 
 /* Monitoare 4K la scalare 100-125%: pagina e mărită ca să arate ca pe un ecran Full HD */
 @media (min-width: 2800px) and (min-height: 1500px) { body { zoom: 1.5; } html { scroll-padding-top: 120px; } }
