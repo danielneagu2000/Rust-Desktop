@@ -62,7 +62,7 @@
           '<span class="sep">|</span><span>All Rights Reserved</span><span class="sep">|</span>' +
           "<span>Powered by <b>" + esc(company) + "</b></span>" +
           (legal.length ? '<span class="sep"></span>' + legal.join('<span class="sep">·</span>') : "") +
-        '</div><a class="ft-logo" href="' + href(f.home_url || "/") + '" aria-label="' + esc(company) + '"><img src="/assets/logo.png" alt=""></a></div>' +
+        '</div><a class="ft-logo" href="' + href(f.home_url || "/") + '" aria-label="' + esc(company) + '"><img src="/assets/logo-sm.png" alt=""></a></div>' +
       "</div></div>";
 
     var now = document.getElementById("ft-now");

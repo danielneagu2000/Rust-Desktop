@@ -505,3 +505,18 @@ section { padding: 24px 0; }
   .shot-notes p { font-size: 0.86rem; }
 }
 @media (max-width: 600px) { .shot-notes { grid-template-columns: 1fr; } }
+
+/* Întrebările frecvente pe două coloane, ca pe migrare.rdndata.ro */
+.faq { grid-template-columns: repeat(2, 1fr); gap: 14px 22px; align-items: start; }
+@media (max-width: 800px) { .faq { grid-template-columns: 1fr; } }
+
+/* Tabletă: imaginea din antet crește cu lățimea, ca fereastra aplicației să nu acopere textul de deasupra */
+@media (min-width: 601px) and (max-width: 900px) { .stage { height: calc(60vw + 120px); } .stage .screen { bottom: 48px; } }
+
+/* Telefoane: cifrele pe un singur rând pe ecranele înguste, imaginile 3D mai mici ca să nu lungească pagina */
+@media (max-width: 374px) { .stats { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .alt-art, .dl-art, .sec-art { max-width: 240px; } .portal .art img { max-width: 260px; } }
+
+/* Monitoare 4K la scalare 100-125%: pagina e mărită ca să arate ca pe un ecran Full HD */
+@media (min-width: 2800px) and (min-height: 1500px) { body { zoom: 1.5; } html { scroll-padding-top: 120px; } }
+@media (min-width: 3400px) and (min-height: 1900px) { body { zoom: 2; } html { scroll-padding-top: 160px; } }
