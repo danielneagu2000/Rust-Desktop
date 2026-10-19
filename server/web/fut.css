@@ -392,8 +392,9 @@ section { padding: 56px 0; }
 @media (max-width: 1100px) and (prefers-color-scheme: light) { .nav { background: #fff; } }
 .nav .lang { display: inline-flex; align-items: center; font: 600 0.8rem/1.2 var(--mono); letter-spacing: .08em; color: var(--ink); box-shadow: 0 0 0 1px var(--line) inset; margin-left: 4px; }
 
-/* Conținut pe toată lățimea ecranului, cu 20px pe margini, și spații minime între containere */
+/* Antetul pe toată lățimea ecranului, cu 20px pe margini; conținutul paginii pe cel mult 1500px, centrat; spații minime între containere */
 .wrap { max-width: none; padding-inline: 20px; }
+main .wrap { max-width: 1540px; margin-inline: auto; }
 .shot.big { transform-origin: left center; }
 section { padding: 24px 0; }
 .head { margin-bottom: 18px; gap: 10px; }
