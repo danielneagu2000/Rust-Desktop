@@ -436,12 +436,16 @@ section { padding: 24px 0; }
 }
 
 /* Antet ca pe migrare.rdndata.ro: bară pe toată lățimea, translucidă, cu linie roșie dedesubt.
-   Sigla (.brand) rămâne neschimbată. */
+   Lângă siglă, numele și adresa site-ului pe două rânduri, tot ca acolo. */
 .top { position: fixed; inset: 0 0 auto 0; z-index: 30; background: rgba(14, 11, 12, .8); -webkit-backdrop-filter: saturate(1.4) blur(14px); backdrop-filter: saturate(1.4) blur(14px); border-bottom: 2px solid #ff5a52; transition: box-shadow .2s ease; }
 .top.scrolled { box-shadow: 0 10px 30px -18px rgba(0, 0, 0, .7); }
 .top-in { position: relative; height: auto; padding: 14px 0; justify-content: space-between; gap: 16px; border: 0; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; transition: padding .2s ease; }
 .top.scrolled .top-in { padding-block: 8px; }
 .brand { flex: none; }
+.brand-text { display: grid; gap: 5px; }
+.brand b { font: 900 1.35rem/1 var(--display); font-stretch: 112%; letter-spacing: -0.01em; }
+.brand-text span { font: 500 0.8rem/1 var(--mono); color: var(--ink-2); }
+@media (max-width: 480px) { .brand b { font-size: 1.1rem; } .brand-text span { display: none; } }
 .nav { margin-left: 0; gap: 4px; align-items: center; font-size: 0.95rem; }
 .nav a { padding: 8px 10px; border-radius: 8px; color: var(--ink-2); }
 .nav a:hover { color: var(--neon-soft); background: rgba(255, 255, 255, .06); }
