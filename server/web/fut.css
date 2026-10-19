@@ -392,29 +392,30 @@ section { padding: 56px 0; }
 @media (max-width: 1100px) and (prefers-color-scheme: light) { .nav { background: #fff; } }
 .nav .lang { display: inline-flex; align-items: center; font: 600 0.8rem/1.2 var(--mono); letter-spacing: .08em; color: var(--ink); box-shadow: 0 0 0 1px var(--line) inset; margin-left: 4px; }
 
-/* Antetul pe toată lățimea ecranului, cu 20px pe margini; conținutul paginii pe cel mult 1500px, centrat; spații minime între containere */
+/* Antetul pe toată lățimea ecranului, cu 20px pe margini; conținutul paginii pe cel mult 1500px, centrat.
+   Spații mici și egale: 12px între carduri, 18px între celelalte blocuri ale unei secțiuni, 36px între secțiuni, 24px între coloane. */
 .wrap { max-width: none; padding-inline: 20px; }
 main .wrap { max-width: 1540px; margin-inline: auto; }
 .shot.big { transform-origin: left center; }
-section { padding: 24px 0; }
+section { padding: 18px 0; }
+main > section:last-child { padding-bottom: 36px; }
 .head { margin-bottom: 18px; gap: 10px; }
-.hero { padding: 100px 0 12px; }
-.facts { margin-top: 18px; }
-.stats { margin-top: 10px; }
-.portal, .about { margin-top: 14px; }
+.hero { padding: 100px 0 18px; }
+.facts { margin: 18px 0 0; }
+.stats { margin-top: 12px; }
+.portal, .vat, .specs, .specs-note { margin-top: 18px; }
+.about { margin-top: 12px; }
 .shot.big { margin-top: 0; }
-.specs { margin-top: 16px; }
 .more { margin-top: 12px; }
 .checks { margin-top: 18px; }
-.hero-grid, .dl-grid, .alt-grid, .contact-box { gap: 24px; }
-.sec-grid, .portal { gap: 28px; }
-.showcase, .showcase .side { gap: 14px; }
-.feats, .steps, .plans, .uses, .about { gap: 12px; }
-.os-grid { gap: 10px; }
-.faq { gap: 8px; }
+figcaption { margin-top: 12px; }
+.hero-grid, .dl-grid, .alt-grid, .contact-box, .sec-grid, .portal { gap: 24px; }
+.showcase, .showcase .side { gap: 12px; }
+.feats, .steps, .plans, .uses, .about, .os-grid { gap: 12px; }
+.faq { gap: 12px; }
 @media (max-width: 900px) {
-  section { padding: 18px 0; }
   .hero { padding-top: 92px; }
+  .hero-grid, .dl-grid, .alt-grid, .contact-box, .sec-grid, .portal { row-gap: 18px; }
   .steps { gap: 18px 12px; }
 }
 
@@ -487,7 +488,7 @@ section { padding: 24px 0; }
 
 
 /* Sub captura mare: carduri care umplu înălțimea rămasă până la capătul celor două capturi mici */
-.shot-notes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-self: stretch; }
+.shot-notes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-self: stretch; }
 .shot-notes li { padding: 20px 22px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-content: center; }
 .shot-notes .ico { grid-row: span 2; align-self: start; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: #fff;
   background: radial-gradient(circle at 30% 25%, #ff6b63, #b80d0d 55%, #5c0303); box-shadow: 0 10px 24px -10px rgba(255, 40, 30, .8), 0 0 0 1px rgba(255, 255, 255, .15) inset; }
@@ -507,7 +508,7 @@ section { padding: 24px 0; }
 @media (max-width: 600px) { .shot-notes { grid-template-columns: 1fr; } }
 
 /* Întrebările frecvente pe două coloane, ca pe migrare.rdndata.ro */
-.faq { grid-template-columns: repeat(2, 1fr); gap: 14px 22px; align-items: start; }
+.faq { grid-template-columns: repeat(2, 1fr); align-items: start; }
 @media (max-width: 800px) { .faq { grid-template-columns: 1fr; } }
 
 /* Tabletă: imaginea din antet crește cu lățimea, ca fereastra aplicației să nu acopere textul de deasupra */
