@@ -448,6 +448,7 @@ section { padding: 24px 0; }
 .nav .nav-client { color: var(--ink); font-weight: 600; background: none; box-shadow: none; margin-left: 0; }
 .nav .nav-client:hover { color: var(--neon-soft); background: rgba(255, 255, 255, .06); }
 .top-cta { display: flex; align-items: center; gap: 10px; flex: none; }
+@media (min-width: 1181px) { .nav { margin-left: auto; } .top-cta { display: none; } }
 .top-cta .btn { padding: 11px 18px; font-size: 0.95rem; border-radius: 999px; }
 .top .lang { display: inline-grid; place-items: center; min-width: 44px; height: 42px; margin: 0 4px; padding: 0 12px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, .16); box-shadow: none; color: var(--ink); text-decoration: none; font: 700 0.82rem/1 var(--mono); letter-spacing: .08em; transition: border-color .15s ease, color .15s ease; }
 .top .lang:hover { border-color: var(--neon-soft); color: var(--neon-soft); background: none; }
