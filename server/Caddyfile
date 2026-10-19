@@ -30,7 +30,7 @@
 	}
 
 	# Nu servi scriptul de actualizare și fișierele temporare.
-	@private path /update_downloads.py /files/.incoming-* /files/*.tmp
+	@private path /update_downloads.py /__pycache__/* /files/.incoming-* /files/*.tmp
 	respond @private 404
 
 	handle @portal {
