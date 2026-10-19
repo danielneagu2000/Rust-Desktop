@@ -484,3 +484,23 @@ section { padding: 24px 0; }
   .nav { background: #fff; border-color: rgba(0, 0, 0, .1); box-shadow: 0 22px 44px -18px rgba(0, 0, 0, .25); }
 }
 
+
+/* Sub captura mare: carduri care umplu înălțimea rămasă până la capătul celor două capturi mici */
+.shot-notes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-self: stretch; }
+.shot-notes li { padding: 20px 22px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-content: center; }
+.shot-notes .ico { grid-row: span 2; align-self: start; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: #fff;
+  background: radial-gradient(circle at 30% 25%, #ff6b63, #b80d0d 55%, #5c0303); box-shadow: 0 10px 24px -10px rgba(255, 40, 30, .8), 0 0 0 1px rgba(255, 255, 255, .15) inset; }
+.shot-notes .ico svg { width: 20px; height: 20px; }
+.shot-notes h3 { font-size: 1.05rem; }
+.shot-notes p { margin: 0; color: var(--ink-2); font-size: 0.92rem; }
+@media (min-width: 901px) {
+  .showcase { grid-template-rows: auto 1fr; }
+  .showcase .side { grid-column: 2; grid-row: 1 / span 2; }
+  .shot-notes { grid-column: 1; grid-row: 2; }
+}
+@media (min-width: 901px) and (max-width: 1220px) {
+  .shot-notes li { grid-template-columns: 1fr; padding: 14px 16px; }
+  .shot-notes .ico { display: none; }
+  .shot-notes p { font-size: 0.86rem; }
+}
+@media (max-width: 600px) { .shot-notes { grid-template-columns: 1fr; } }
