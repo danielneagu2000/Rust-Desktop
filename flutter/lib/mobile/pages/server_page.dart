@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../common.dart';
 import '../../common/widgets/dialog.dart';
+import '../../common/widgets/license.dart';
 import '../../consts.dart';
 import '../../models/platform_model.dart';
 import '../../models/server_model.dart';
@@ -118,21 +119,32 @@ class _DropDownAction extends StatelessWidget {
             if (showPasswordOption)
               PopupMenuItem(
                 value: kUsePermanentPassword,
+                enabled: permanentPasswordAllowed(),
                 child: listTile('Use permanent password',
                     verificationMethod == kUsePermanentPassword),
               ),
             if (showPasswordOption)
               PopupMenuItem(
                 value: kUseBothPasswords,
+                enabled: permanentPasswordAllowed(),
                 child: listTile(
                     'Use both passwords',
                     verificationMethod != kUseTemporaryPassword &&
                         verificationMethod != kUsePermanentPassword),
               ),
+            if (showPasswordOption && !permanentPasswordAllowed())
+              PopupMenuItem(
+                value: "permanentPasswordSupport",
+                child: Text(translate(
+                    "This computer's license does not include a permanent password. To activate it, contact RDN Network Data support for an additional package."),
+                    style: const TextStyle(fontSize: 13)),
+              ),
           ];
         },
         onSelected: (value) async {
-          if (value == "changeID") {
+          if (value == "permanentPasswordSupport") {
+            openLicenseSupport();
+          } else if (value == "changeID") {
             changeIdDialog();
           } else if (value == "setPermanentPassword") {
             setPasswordDialog();

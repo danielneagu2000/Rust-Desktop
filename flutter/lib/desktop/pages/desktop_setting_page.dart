@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
+import 'package:flutter_hbb/common/widgets/license.dart';
 import 'package:flutter_hbb/common/widgets/setting_widgets.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
@@ -1247,6 +1248,7 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
           ];
           bool tmpEnabled = model.verificationMethod != kUsePermanentPassword;
           bool permEnabled = model.verificationMethod != kUseTemporaryPassword;
+          final permAllowed = permanentPasswordAllowed();
           String currentValue =
               passwordValues[passwordKeys.indexOf(model.verificationMethod)];
           List<Widget> radios = passwordValues
@@ -1255,7 +1257,8 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
                     value: value,
                     groupValue: currentValue,
                     label: value,
-                    onChanged: locked
+                    onChanged: locked ||
+                            (!permAllowed && value != passwordValues[0])
                         ? null
                         : ((value) async {
                             callback() async {
@@ -1384,6 +1387,9 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
             // if (usePassword)
             //   hide_cm(!locked).marginOnly(left: _kContentHSubMargin - 6),
             if (usePassword) radios[2],
+            if (usePassword && !permAllowed)
+              permanentPasswordNote(context).marginOnly(
+                  left: _kContentHSubMargin, top: 6, bottom: 6),
           ]);
         })));
   }

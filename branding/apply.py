@@ -339,6 +339,9 @@ def publisher_patches(cfg):
         # Desktop status line: the "Support" link.
         ("flutter/lib/desktop/pages/connection_page.dart", r'(const supportUrl = ")[^"]*(";)',
          lambda m: f"{m.group(1)}{cfg['SUPPORT_URL']}{m.group(2)}"),
+        # Password settings: the support link under "no permanent password in this license".
+        ("flutter/lib/common/widgets/license.dart", r'(const licenseSupportUrl = ")[^"]*(";)',
+         lambda m: f"{m.group(1)}{cfg['SUPPORT_URL']}{m.group(2)}"),
         # Mobile settings: website and privacy links.
         ("flutter/lib/mobile/pages/settings_page.dart", r"(?m)^const url = '[^']*';$", const(f"const url = '{web}/';")),
         ("flutter/lib/mobile/pages/settings_page.dart",

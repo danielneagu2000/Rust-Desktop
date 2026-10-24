@@ -339,6 +339,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         <label>Bandă pe calculator, Mbit/s (0 = nelimitat) <input type="number" id="le-mbps" min="0" max="10000" step="0.1" required></label>
         <label>Calculatoare fără licență în 30 de zile (0 = nelimitat) <input type="number" id="le-peer-max" min="0" max="100000" required></label>
         <label class="sw"><input type="checkbox" id="le-peer"> Poate controla calculatoare fără licență</label>
+        <label class="sw"><input type="checkbox" id="le-perm"> Parolă permanentă pe calculatoarele ei (acces oricând, de oriunde)</label>
       </div>
       <h3>Calculatoarele licenței</h3>
       <div id="le-devices"></div>
@@ -585,6 +586,8 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         '<button class="small" data-peer="' + esc(l.code) + '" data-on="' + (l.peer_control ? 1 : 0) + '" style="margin-top:4px">' + (l.peer_control ? "Oprește" : "Pornește") + "</button> " +
         '<button class="small" data-peer-max="' + esc(l.code) + '" data-n="' + (l.peer_max || 0) + '" style="margin-top:4px">Limită</button>' +
         (l.peer_used ? ' <button class="small" data-peer-reset="' + esc(l.code) + '" style="margin-top:4px" title="Golește lista calculatoarelor fără licență numărate în 30 de zile">Golește</button>' : "") +
+        '<div style="margin-top:8px;font-size:12px;color:var(--muted);white-space:nowrap">Parolă permanentă: ' + (l.permanent ? "da" : "nu") + "</div>" +
+        '<button class="small" data-perm="' + esc(l.code) + '" data-on="' + (l.permanent ? 1 : 0) + '" style="margin-top:4px">' + (l.permanent ? "Oprește" : "Pornește") + "</button>" +
         '</td><td>' + (l.bandwidth ? (l.bandwidth / 1000) + " Mbit/s" : "nelimitată") +
         '<br><button class="small" data-bandwidth="' + esc(l.code) + '" data-mbps="' + (l.bandwidth / 1000 || 0) + '" style="margin-top:4px">Schimbă</button>' + "</td><td>" +
         '<button class="small primary" data-edit="' + esc(l.code) + '" style="margin-bottom:4px">Editează</button><br>' +
@@ -644,7 +647,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     try { localStorage.setItem("panel-tab", t.dataset.tab); } catch (err) {}
   });
   document.body.addEventListener("click", function (e) {
-    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-peer-max],[data-peer-reset],[data-edit],[data-portal],[data-delete],[data-purge]");
+    var lic = e.target.closest("[data-copy],[data-extend],[data-revoke],[data-restore],[data-release],[data-bandwidth],[data-sessions],[data-peer],[data-peer-max],[data-peer-reset],[data-perm],[data-edit],[data-portal],[data-delete],[data-purge]");
     if (lic) { licenseClick(lic); return; }
     var el = e.target.closest("[data-ip],[data-block],[data-unblock],[data-disc]"); if (!el) return;
     if (el.dataset.ip) { document.getElementById("q").value = el.dataset.ip; load(); return; }
@@ -708,6 +711,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     editField("le-sessions").value = l.sessions || 0;
     editField("le-mbps").value = (l.bandwidth || 0) / 1000;
     editField("le-peer").checked = !!l.peer_control;
+    editField("le-perm").checked = !!l.permanent;
     editField("le-peer-max").value = l.peer_max || 0;
     var activated = l.starts != null;
     editField("le-exp-wrap").style.display = activated ? "" : "none";
@@ -724,7 +728,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     post("license/edit", {
       code: editCode, client: editField("le-client").value.trim(), note: editField("le-note").value.trim(),
       seats: Number(editField("le-seats").value), sessions: Number(editField("le-sessions").value),
-      mbps: editField("le-mbps").value.trim(), peer_control: editField("le-peer").checked,
+      mbps: editField("le-mbps").value.trim(), peer_control: editField("le-peer").checked, permanent: editField("le-perm").checked,
       peer_max: Number(editField("le-peer-max").value), expires: editField("le-expires").value,
       months: Number(editField("le-months").value)
     }).then(function () { toast("Licență salvată"); editField("lic-edit").close(); load(); })
@@ -764,6 +768,13 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
           "Calculatoarele ei (cu aplicația actualizată) se vor putea conecta și la calculatoare fără licență. Calculatoarele fără licență tot nu se pot conecta nicăieri."
         : "Oprești pentru licența " + d.peer + " controlul calculatoarelor fără licență?\nSesiunile ei deschise pe calculatoare fără licență se închid în câteva secunde.")) return;
       post("license/peer", { code: d.peer, on: on }).then(function () { toast(on ? "Pornit" : "Oprit"); load(); }).catch(fail);
+    } else if (d.perm) {
+      var pOn = d.on !== "1";
+      if (!confirm(pOn
+        ? "Permiți parola permanentă pe calculatoarele licenței " + d.perm + "?\n" +
+          "Clientul își poate pune în aplicație (Setări → Securitate) o parolă permanentă și se poate conecta la acele calculatoare oricând, de oriunde, fără parola unică."
+        : "Oprești parola permanentă pentru licența " + d.perm + "?\nCalculatoarele ei vor accepta doar parola unică de la următoarea verificare (câteva secunde dacă sunt online).")) return;
+      post("license/permanent", { code: d.perm, on: pOn }).then(function () { toast(pOn ? "Parolă permanentă permisă" : "Parolă permanentă oprită"); load(); }).catch(fail);
     } else if (d.peerMax) {
       var m = prompt("Câte calculatoare fără licență diferite poate controla licența " + d.peerMax + " în 30 de zile? (0 = nelimitat)\n" +
         "Un calculator controlat deja în ultimele 30 de zile nu se numără din nou; unul nou peste limită e închis în câteva secunde.", d.n);

@@ -35,6 +35,9 @@ struct Claims {
     /// Upload limit for this computer in kbit/s, set per license in the panel; 0 = none.
     #[serde(default)]
     b: u32,
+    /// 1 when the license allows a permanent password on this computer, set in the panel.
+    #[serde(default)]
+    w: u8,
 }
 
 fn now() -> i64 {
@@ -58,6 +61,12 @@ fn verify(token: &str) -> Option<Claims> {
 /// Incoming connections (server process).
 pub fn is_allowed() -> bool {
     !REQUIRED || verify(&Config::get_option(OPTION_TOKEN)).is_some()
+}
+
+/// Logins with the permanent password (server process). The panel turns it on per license, and
+/// it is part of the signed token, so editing the local config can't turn it on.
+pub fn permanent_password_allowed() -> bool {
+    !REQUIRED || verify(&Config::get_option(OPTION_TOKEN)).map_or(false, |c| c.w == 1)
 }
 
 /// Outgoing connections (UI process, which sees the service's options over IPC).
@@ -162,13 +171,15 @@ pub fn store_from_server(token: &str) {
     }
 }
 
-/// JSON for the Flutter license banner: {"required", "valid", "expires", "client"}.
+/// JSON for the Flutter license banner and password settings:
+/// {"required", "valid", "expires", "client", "permanent"}.
 pub fn ui_status() -> String {
     let claims = verify(&crate::ui_interface::get_option(OPTION_TOKEN));
     serde_json::json!({
         "required": REQUIRED,
         "valid": claims.is_some(),
         "expires": claims.as_ref().map(|c| c.x).unwrap_or(0),
+        "permanent": claims.as_ref().map_or(false, |c| c.w == 1),
         "client": claims.map(|c| c.n).unwrap_or_default(),
     })
     .to_string()

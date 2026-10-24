@@ -2570,7 +2570,9 @@ impl Connection {
                 return true;
             }
         }
-        if password::permanent_enabled() || allow_permanent_password {
+        if (password::permanent_enabled() || allow_permanent_password)
+            && crate::license::permanent_password_allowed()
+        {
             let print_fallback = || {
                 if allow_permanent_password && !password::permanent_enabled() {
                     log::info!("Permanent password accepted via logon-screen fallback");

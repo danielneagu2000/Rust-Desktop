@@ -123,6 +123,8 @@ def db():
         conn.execute("ALTER TABLE licenses ADD COLUMN peer_control INTEGER DEFAULT 0")
     if cols and "peer_max" not in cols:
         conn.execute("ALTER TABLE licenses ADD COLUMN peer_max INTEGER DEFAULT 0")
+    if cols and "permanent" not in cols:
+        conn.execute("ALTER TABLE licenses ADD COLUMN permanent INTEGER DEFAULT 0")
     # Organization portal: names and rights per device (set by the client's administrator).
     acols = {r[1] for r in conn.execute("PRAGMA table_info(activations)")}
     for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1")):
@@ -166,7 +168,7 @@ def init_db():
             code TEXT PRIMARY KEY, client TEXT, seats INTEGER, months INTEGER,
             created REAL, starts REAL, expires REAL, revoked INTEGER DEFAULT 0, note TEXT,
             bandwidth INTEGER DEFAULT 0, sessions INTEGER DEFAULT 1, peer_control INTEGER DEFAULT 0,
-            peer_max INTEGER DEFAULT 0
+            peer_max INTEGER DEFAULT 0, permanent INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS peer_targets (
             code TEXT, uuid TEXT, last REAL, PRIMARY KEY (code, uuid)
@@ -593,14 +595,16 @@ def issue_token(uuid, lic):
         return None
     expires = lic["expires"]
     bandwidth = int(lic.get("bandwidth") or 0)
-    key = (uuid, lic["code"], expires, bandwidth)
+    # w=1: the license allows a permanent password on its computers (src/license.rs).
+    permanent = 1 if lic.get("permanent") else 0
+    key = (uuid, lic["code"], expires, bandwidth, permanent)
     cached = _TOKEN_CACHE.get(key)
     now = time.time()
     if cached and now - cached[1] < 3600:
         return cached[0]
     token_exp = now + TOKEN_TTL if expires is None else min(expires, now + TOKEN_TTL)
     payload = json.dumps(
-        {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or "", "b": bandwidth},
+        {"u": uuid, "e": int(token_exp), "x": int(expires or 0), "n": lic["client"] or "", "b": bandwidth, "w": permanent},
         separators=(",", ":"), ensure_ascii=False,
     ).encode()
     payload = TOKEN_PREFIX + payload
@@ -1651,6 +1655,7 @@ def license_edit(lic, v):
     fields = {
         "client": client, "note": as_text(v.get("note"), 300) or "", "seats": seats, "sessions": sessions,
         "bandwidth": kbps, "peer_control": 1 if v.get("peer_control") else 0, "peer_max": peer_max,
+        "permanent": 1 if v.get("permanent") else 0,
     }
     if lic["starts"] is None:
         # Not activated yet: the period starts at the first activation.
@@ -1706,7 +1711,7 @@ def license_action(action, v):
         return 200, {"ok": True, "code": code}
     rows = q("SELECT * FROM licenses WHERE code=?", (code,))
     if action in ("extend", "revoke", "restore", "seats", "bandwidth", "sessions", "portal", "peer", "peer_max",
-                  "peer_reset", "edit") and not rows:
+                  "peer_reset", "edit", "permanent") and not rows:
         return 404, {"error": "Licență inexistentă"}
     if action == "extend":
         lic, months = rows[0], as_int(v.get("months"))
@@ -1743,6 +1748,11 @@ def license_action(action, v):
         on = 1 if v.get("on") else 0
         x("UPDATE licenses SET peer_control=? WHERE code=?", (on, code))
         log(f"licenses: {code} control of computers without a license {'on' if on else 'off'}")
+        return 200, {"ok": True}
+    if action == "permanent":
+        on = 1 if v.get("on") else 0
+        x("UPDATE licenses SET permanent=? WHERE code=?", (on, code))
+        log(f"licenses: {code} permanent password {'allowed' if on else 'not allowed'}")
         return 200, {"ok": True}
     if action == "peer_max":
         n = as_int(v.get("peer_max"))

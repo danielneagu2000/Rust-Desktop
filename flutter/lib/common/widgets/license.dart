@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 /// License banner for builds with licensing enabled (src/license.rs). It stays
 /// hidden when licensing is off, warns a week before expiry, and asks for a
@@ -102,6 +103,46 @@ class _LicenseBannerState extends State<LicenseBanner> {
       ),
     );
   }
+}
+
+// Set by branding/apply.py from SUPPORT_URL in branding/brand.env.
+const licenseSupportUrl = "https://remote.rdndata.ro/contact/";
+
+/// Whether this computer's license allows a permanent password; the server process enforces it
+/// (permanent_password_allowed in src/license.rs). Always true when licensing is off.
+bool permanentPasswordAllowed() {
+  try {
+    final s = jsonDecode(bind.mainGetCommonSync(key: 'license-status'));
+    return s is! Map || s['required'] != true || s['permanent'] == true;
+  } catch (_) {
+    return true;
+  }
+}
+
+void openLicenseSupport() => launchUrlString(licenseSupportUrl);
+
+/// Shown with the password settings while the license has no permanent password.
+Widget permanentPasswordNote(BuildContext context) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+          translate(
+              "This computer's license does not include a permanent password. To activate it, contact RDN Network Data support for an additional package."),
+          style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).textTheme.bodySmall?.color)),
+      const SizedBox(height: 4),
+      InkWell(
+        onTap: openLicenseSupport,
+        child: Text(translate('Support'),
+            style: const TextStyle(
+                fontSize: 13,
+                color: MyTheme.accent,
+                decoration: TextDecoration.underline)),
+      ),
+    ],
+  );
 }
 
 String _date(int unixSeconds) {

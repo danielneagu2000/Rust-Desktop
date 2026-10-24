@@ -797,6 +797,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Without a license, this computer can only be controlled from RDN Remote apps whose license allows it. To connect to other computers, enter the code you received from RDN Network Data.", ""),
         ("The remote computer has no RDN Remote license, and your license does not allow controlling computers without one.", ""),
         ("Support", ""),
-        ("The remote computer only accepts connections from RDN Remote apps with a valid license. Update the app and check its license.", "")
+        ("The remote computer only accepts connections from RDN Remote apps with a valid license. Update the app and check its license.", ""),
+        ("This computer's license does not include a permanent password. To activate it, contact RDN Network Data support for an additional package.", "")
     ].iter().cloned().collect();
 }

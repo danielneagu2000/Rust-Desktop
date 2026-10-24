@@ -196,7 +196,8 @@ pornire afișează „Licență necesară” cu butonul **Activează licența**.
 - **Prelungește** cu +1, +3, +6, +9 sau +12 luni (de la data expirării, sau de azi dacă a expirat).
 - **Editează** (primul buton din dreapta fiecărei licențe): într-o singură fereastră schimbi
   clientul, nota, numărul de calculatoare, data de expirare (gol = nelimitată; la un cod
-  neactivat, perioada în luni), conexiunile simultane, banda, „PC fără licență” și limita lui.
+  neactivat, perioada în luni), conexiunile simultane, banda, „PC fără licență” și limita lui,
+  „Parolă permanentă”.
   Tot acolo vezi calculatoarele licenței (cu **Eliberează locul**) și conexiunile ei active (cu
   **Deconectează**). Data nouă de expirare ajunge pe calculatoare în câteva secunde.
 - **Revocă** sau **Reactivează** o licență; **Eliberează locul** unui calculator (tab-ul
@@ -242,6 +243,18 @@ tehnicienilor. Pentru calculatoarele tale creează o licență „nelimitată”
   care îl trimit aplicațiile nu e semnat (ca la RustDesk), deci cineva care știe ID-ul unui
   tehnician poate umple lista cu calculatoare false și îl poate bloca la calculatoare noi; în
   acest caz golești lista.
+- **Parolă permanentă** (coloana Conexiuni, butonul **Pornește** / **Oprește**, sau bifa din
+  **Editează**; implicit oprită, și pentru licențele create din shop): calculatoarele licenței pot
+  folosi o parolă permanentă, pusă de client în aplicație (Setări → Securitate), cu care se
+  conectează la ele oricând, de oriunde (acces nesupravegheat). Fără bifă, calculatoarele acceptă
+  doar parola unică: în aplicație opțiunile cu parolă permanentă sunt inactive, iar clientul vede
+  mesajul că o poate activa prin suport, ca pachet suplimentar, cu link spre pagina de suport.
+  Opțiunea face parte din licența semnată, deci nu poate fi pornită din setările calculatorului;
+  schimbarea ajunge pe calculatoare în câteva secunde dacă sunt online. Parola permanentă
+  rămâne salvată pe calculator și funcționează din nou dacă pornești opțiunea. Un calculator
+  setat să folosească **doar** parola permanentă nu mai acceptă nicio parolă cât timp opțiunea e
+  oprită; clientul alege atunci „Folosește parola unică”. Cere aplicația 1.5.1 sau mai nouă: cele
+  vechi nu verifică opțiunea și acceptă în continuare parola permanentă.
 
 Cum funcționează: serverul semnează licența cu cheia lui (`server/data/id_ed25519`), iar aplicația
 o verifică cu cheia publică pe care o are compilată, deci nu poate fi falsificată. Serverul o
