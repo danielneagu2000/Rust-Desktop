@@ -557,6 +557,13 @@ Se schimbă: numele afișat, serverul și cheia încorporate, iconițele și log
 care publică (metadate), textul de licență al instalatorului MSI, adresa de unde se verifică
 actualizările.
 
+Tot din `branding/brand.env` vin câteva setări implicite ale aplicației: actualizarea automată
+(`AUTO_UPDATE`), închiderea sesiunilor inactive (`IDLE_DISCONNECT_MINUTES`) și felul în care apare
+ecranul de la distanță pe calculator (`VIEW_STYLE`): `adaptive` îl potrivește la fereastră,
+`original` îl arată 1:1, deci mai mare decât fereastra dacă rezoluția de acolo e mai mare. Se aplică
+la calculatoarele la care te conectezi prima dată; la unul folosit deja rămâne alegerea făcută în
+meniul sesiunii (Afișare → „Scalare automată” / „Dimensiune originală”).
+
 Există două nume: `APP_NAME` (tehnic, fără spații, ex. `RDNRemote`), folosit în aplicație,
 în foldere și în numele serviciilor, și `DISPLAY_NAME` (ex. `RDN Remote`), afișat de sistem
 pe scurtături, pe ecranul telefonului și în proprietățile fișierului.

@@ -140,6 +140,9 @@ def load_config():
     if not re.fullmatch(r"[0-9]{1,4}", idle) or int(idle) > 1440:
         fail("IDLE_DISCONNECT_MINUTES must be 0 (off) to 1440")
     cfg["IDLE_DISCONNECT_MINUTES"] = int(idle)
+    cfg["VIEW_STYLE"] = (cfg.get("VIEW_STYLE") or "original").lower()
+    if cfg["VIEW_STYLE"] not in ("original", "adaptive"):
+        fail("VIEW_STYLE must be original or adaptive")
 
     phone = cfg.get("SUPPORT_PHONE", "")
     if phone and not re.fullmatch(r"\+?[0-9 ()./-]{6,20}", phone):
@@ -243,6 +246,7 @@ def update_patches(cfg):
         )
 
     defaults = settings_map(pairs)
+    display = settings_map([("view_style", "adaptive")] if cfg["VIEW_STYLE"] == "adaptive" else [])
     return [
         ("libs/hbb_common/src/lib.rs", r'(const URL: &str = ")[^"]*(";\n\n    use sysinfo::System;)',
          lambda m: f'{m.group(1)}{cfg["API_SERVER"]}/version/latest{m.group(2)}'),
@@ -269,6 +273,10 @@ def update_patches(cfg):
         ("libs/hbb_common/src/config.rs",
          r"(pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
          lambda m: f"{m.group(1)}{settings_map(forced_local)};"),
+        # Remote session view on computers: fit to the window ("adaptive") or 1:1 ("original").
+        ("libs/hbb_common/src/config.rs",
+         r"(pub static ref DEFAULT_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = )[^\n]*;",
+         lambda m: f"{m.group(1)}{display};"),
         # Desktop "new version" card: shown for this client too, links to its own site/releases.
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
          r"if \((?:!bind\.isCustomClient\(\) &&\n\s*)?updateUrl\.isNotEmpty &&\n(\s*)!isCardClosed"
