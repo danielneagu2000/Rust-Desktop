@@ -82,6 +82,8 @@ if [[ -z "${WEB:-}" ]]; then
   fi
 fi
 
+# Setările pe care scriptul nu le gestionează (ex. LICENSE_REQUIRED, RETENTION_DAYS) rămân cum erau.
+OTHER_ENV="$(grep -Ev '^(SERVER_HOST|PANEL_USER|PANEL_PASSWORD|PANEL_BIND|PANEL_DOMAIN|PANEL_TOTP_SECRET|WEB_ADDRESS|COMPOSE_PROFILES)=' .env 2>/dev/null || true)"
 umask 077
 cat > .env <<EOF
 SERVER_HOST=$HOST
@@ -93,6 +95,7 @@ PANEL_TOTP_SECRET=$PANEL_TOTP_SECRET
 WEB_ADDRESS=$WEB_ADDRESS
 EOF
 [[ "$WEB" == 1 ]] && echo "COMPOSE_PROFILES=web" >> .env
+[[ -n "$OTHER_ENV" ]] && printf '%s\n' "$OTHER_ENV" >> .env
 umask 022
 
 PRIVATE_NETS="10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
