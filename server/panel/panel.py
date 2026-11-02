@@ -1663,13 +1663,16 @@ def license_edit(lic, v):
         "bandwidth": kbps, "peer_control": 1 if v.get("peer_control") else 0, "peer_max": peer_max,
         "permanent": 1 if v.get("permanent") else 0,
     }
+    # Activated, extended or renewed while the dialog was open: saving would undo that.
+    if v.get("seen_starts", lic["starts"]) != lic["starts"] or v.get("seen_expires", lic["expires"]) != lic["expires"]:
+        return 409, {"error": "Licența s-a schimbat între timp (activare sau prelungire). Închide și redeschide Editează."}
     if lic["starts"] is None:
         # Not activated yet: the period starts at the first activation.
         months = as_int(v.get("months"))
-        if months is None or not 0 <= months <= 120:
+        if months is None or not 0 <= months <= max(120, lic["months"] or 0):
             return 400, {"error": "Perioadă invalidă (0-120 luni, 0 = nelimitată)"}
         fields["months"] = months
-    else:
+    elif "expires" in v:
         raw = str(v.get("expires") or "").strip()
         fields["expires"] = None
         if raw:
@@ -1680,8 +1683,12 @@ def license_edit(lic, v):
                 day = None
             if not day or not 2000 <= day.year <= 2100:
                 return 400, {"error": "Dată de expirare invalidă"}
-            # Valid until the end of that day, local time.
-            fields["expires"] = time.mktime((day.year, day.month, day.day, 23, 59, 59, 0, 0, -1))
+            # Valid until the end of that day, in the operator's time zone when the panel sent it.
+            tz = as_int(v.get("tz"))
+            if tz is not None and -900 <= tz <= 900:
+                fields["expires"] = calendar.timegm((day.year, day.month, day.day, 23, 59, 59)) + tz * 60
+            else:
+                fields["expires"] = time.mktime((day.year, day.month, day.day, 23, 59, 59, 0, 0, -1))
     x(f"UPDATE licenses SET {', '.join(k + '=?' for k in fields)} WHERE code=?", (*fields.values(), lic["code"]))
     log(f"licenses: {lic['code']} edited")
     return 200, {"ok": True}

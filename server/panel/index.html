@@ -667,7 +667,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     }
   });
   // "Editează": every field of a license, its computers and its open sessions in one dialog.
-  var editCode = null;
+  var editCode = null, editSeen = null;
   function editField(id) { return document.getElementById(id); }
   function isoDay(ts) {
     var d = new Date(ts * 1000), two = function (n) { return ("0" + n).slice(-2); };
@@ -718,6 +718,9 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     editField("le-months-wrap").style.display = activated ? "none" : "";
     editField("le-expires").value = l.expires ? isoDay(l.expires) : "";
     editField("le-months").value = l.months || 0;
+    editField("le-months").max = Math.max(120, l.months || 0);
+    editField("le-months").disabled = activated;
+    editSeen = { starts: l.starts, expires: l.expires, day: editField("le-expires").value };
     renderLicenseEditLists();
     editField("lic-edit").showModal();
   }
@@ -725,13 +728,20 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
   editField("lic-edit").addEventListener("close", function () { editCode = null; });
   editField("lic-edit-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    post("license/edit", {
+    var body = {
       code: editCode, client: editField("le-client").value.trim(), note: editField("le-note").value.trim(),
       seats: Number(editField("le-seats").value), sessions: Number(editField("le-sessions").value),
       mbps: editField("le-mbps").value.trim(), peer_control: editField("le-peer").checked, permanent: editField("le-perm").checked,
-      peer_max: Number(editField("le-peer-max").value), expires: editField("le-expires").value,
-      months: Number(editField("le-months").value)
-    }).then(function () { toast("Licență salvată"); editField("lic-edit").close(); load(); })
+      peer_max: Number(editField("le-peer-max").value), months: Number(editField("le-months").value),
+      seen_starts: editSeen.starts, seen_expires: editSeen.expires
+    };
+    // Only a date the operator changed is sent, as the end of that day in the operator's time zone.
+    var day = editField("le-expires").value;
+    if (day !== editSeen.day) {
+      body.expires = day;
+      if (day) body.tz = new Date(day + "T23:59:59").getTimezoneOffset();
+    }
+    post("license/edit", body).then(function () { toast("Licență salvată"); editField("lic-edit").close(); load(); })
       .catch(function (err) { toast("Eroare: " + err.message); });
   });
   editField("lic-edit").addEventListener("click", function (e) {
