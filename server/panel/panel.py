@@ -36,7 +36,7 @@ import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import backup
 import ed25519
@@ -1380,6 +1380,12 @@ class PanelHandler(BaseHTTPRequestHandler):
         m = re.search(r"^(.*?/portal)(/.*)?$", path)
         # The operator panel's own /api/license/portal action is not the portal.
         if not m or "/api/" in m.group(1):
+            # The public site forwards /portal/* matched case-insensitively and after
+            # decoding %XX (/PORTAL/, /portal%2F/); never let those reach the panel.
+            n = re.search(r"^(.*?/portal)(/.*)?$", unquote(path).lower())
+            if n and "/api/" not in n.group(1):
+                self.reply(404, "inexistent")
+                return True
             return False
         prefix, rest = m.group(1), m.group(2) or ""
         if not rest:
