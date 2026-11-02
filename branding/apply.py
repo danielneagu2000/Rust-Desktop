@@ -250,10 +250,17 @@ def update_patches(cfg):
     return [
         ("libs/hbb_common/src/lib.rs", r'(const URL: &str = ")[^"]*(";\n\n    use sysinfo::System;)',
          lambda m: f'{m.group(1)}{cfg["API_SERVER"]}/version/latest{m.group(2)}'),
-        ("src/updater.rs", r'(if owner != ")[^"]*("\n\s*\|\| repo != ")[^"]*(")',
+        ("src/updater/artifact.rs", r'(if owner != ")[^"]*("\n\s*\|\| repo != ")[^"]*(")',
          lambda m: f"{m.group(1)}{owner}{m.group(2)}{repo}{m.group(3)}"),
         # The updater test's accepted URL has to name the same repository as the check above.
-        ("src/updater.rs", r'("https://github\.com/)[^/"]+/[^/"]+(/releases/download/1\.4\.0/rustdesk-1\.4\.0-x86_64\.dmg")',
+        ("src/updater/artifact.rs", r'("https://github\.com/)[^/"]+/[^/"]+(/releases/download/1\.4\.0/rustdesk-1\.4\.0-x86_64\.dmg")',
+         lambda m: f"{m.group(1)}{owner}/{repo}{m.group(2)}"),
+        # The release the server names, and where its update-manifest.json and installers are.
+        ("src/updater/artifact.rs", r'(format!\("https://github\.com/)[^/"]+/[^/"]+(/releases/download/\{release_id\}/"\))',
+         lambda m: f"{m.group(1)}{owner}/{repo}{m.group(2)}"),
+        ("src/common.rs", r'\["[^"]+", "[^"]+"(, "releases", "tag", release_id)',
+         lambda m: f'["{owner}", "{repo}"{m.group(1)}', 2),
+        ("src/common.rs", r'(let update_url = "https://github\.com/)[^/"]+/[^/"]+(/releases/tag/v1\.4\.6";)',
          lambda m: f"{m.group(1)}{owner}/{repo}{m.group(2)}"),
         # Upstream skips update checks for renamed (custom) clients; this one has its own feed.
         ("src/common.rs", r"(pub fn check_software_update\(\) \{\n)(?:    if is_custom_client\(\) \{\n        return;\n    \}\n)?",

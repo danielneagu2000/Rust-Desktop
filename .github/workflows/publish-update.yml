@@ -40,7 +40,7 @@ jobs:
           import hashlib, json, os, re, sys
           base, tag = sys.argv[1], sys.argv[2]
           b = re.escape(base)
-          files = {}
+          files, sizes = {}, {}
           for name in sorted(os.listdir("assets")):
               path = os.path.join("assets", name)
               if name.startswith(f"rustdesk-{tag}-"):
@@ -56,10 +56,12 @@ jobs:
               os.rename(path, os.path.join("assets", new))
               with open(os.path.join("assets", new), "rb") as f:
                   files[new] = hashlib.sha256(f.read()).hexdigest()
+              sizes[new] = os.path.getsize(os.path.join("assets", new))
           if not any(n.endswith("-x86_64.exe") for n in files):
               sys.exit("Windows x86_64 installer missing from the release")
           with open("assets/update-manifest.json", "w") as f:
-              json.dump({"tag": tag, "base": base, "files": files}, f, indent=1)
+              # sizes: the 1.5.1-3+ updater checks each download against its SHA-256 and size.
+              json.dump({"tag": tag, "base": base, "files": files, "sizes": sizes}, f, indent=1)
           print("\n".join(sorted(files)))
           EOF
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber assets/*
