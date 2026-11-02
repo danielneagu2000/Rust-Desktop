@@ -2620,7 +2620,8 @@ def restore_live(blob):
             for suffix in ("-wal", "-shm"):
                 (DATA_DIR / ("panel.sqlite3" + suffix)).unlink(missing_ok=True)
             backup._atomic_write(DB_FILE, contents["panel.sqlite3"])
-            DB = db()
+            # A backup from an older panel may lack newer tables (e.g. peer_targets).
+            init_db()
             DB.executemany("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", [(r_["key"], r_["value"]) for r_ in settings])
             restored.append("licențe, istoric, dispozitive")
     if "panel.sqlite3" in contents:
