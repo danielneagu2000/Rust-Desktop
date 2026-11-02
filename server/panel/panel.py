@@ -26,6 +26,7 @@ import hmac
 import ipaddress
 import json
 import os
+import posixpath
 import re
 import socket
 import struct
@@ -1380,10 +1381,11 @@ class PanelHandler(BaseHTTPRequestHandler):
         m = re.search(r"^(.*?/portal)(/.*)?$", path)
         # The operator panel's own /api/license/portal action is not the portal.
         if not m or "/api/" in m.group(1):
-            # The public site forwards /portal/* matched case-insensitively and after
-            # decoding %XX (/PORTAL/, /portal%2F/); never let those reach the panel.
-            n = re.search(r"^(.*?/portal)(/.*)?$", unquote(path).lower())
-            if n and "/api/" not in n.group(1):
+            # The public site forwards /portal/* matched the way Caddy does: decoded, lowercased,
+            # slashes merged and dot segments removed (/PORTAL/, /portal%2F/, /api/../portal/).
+            # Never let those reach the panel.
+            clean = posixpath.normpath("/" + re.sub(r"/+", "/", unquote(path).lower()).lstrip("/"))
+            if clean == "/portal" or clean.startswith("/portal/"):
                 self.reply(404, "inexistent")
                 return True
             return False
