@@ -742,7 +742,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       if (day) body.tz = new Date(day + "T23:59:59").getTimezoneOffset();
     }
     post("license/edit", body).then(function () { toast("Licență salvată"); editField("lic-edit").close(); load(); })
-      .catch(function (err) { toast("Eroare: " + err.message); });
+      .catch(function (err) { toast("Eroare: " + err.message); load(); });
   });
   editField("lic-edit").addEventListener("click", function (e) {
     var b = e.target.closest("[data-edit-release]");
