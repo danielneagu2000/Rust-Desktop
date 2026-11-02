@@ -47,7 +47,9 @@
     if (f.facebook_url) badges.push('<a class="ft-fb" href="' + href(f.facebook_url) + '" rel="noopener">' + FB + "Facebook</a>");
 
     var legal = (f.legal || []).map(link);
-    legal.push('<a href="/confidentialitate.html">Confidențialitate RDN Remote</a>');
+    legal.push(document.documentElement.lang === "en"
+      ? '<a href="/en/privacy.html">RDN Remote privacy</a>'
+      : '<a href="/confidentialitate.html">Confidențialitate RDN Remote</a>');
     legal.push('<span>Bazat pe <a href="https://github.com/rustdesk/rustdesk" rel="noopener">RustDesk</a> (AGPL-3.0)</span>');
 
     el.innerHTML =

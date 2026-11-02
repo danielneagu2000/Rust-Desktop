@@ -492,7 +492,7 @@
 
 <footer class="rdn-footer" id="site-footer"></footer>
 
-<script src="/footer.js?v=3" defer></script>
+<script src="/footer.js?v=4" defer></script>
 <script src="/site.js?v=3" defer></script>
 <script>
 (function () {
@@ -506,6 +506,12 @@
   var NAMES = { windows: "Windows", macos: "macOS", linux: "Linux", android: "Android" };
   var ORDER = ["windows", "macos", "linux", "android"];
   var PRIMARY = { windows: "win-x64", macos: "mac-arm64", linux: "deb-x64", android: "apk-universal" };
+  // downloads.json carries the Romanian labels (server/web/update_downloads.py).
+  var LABELS = {
+    "win-x64-msi": "Windows, MSI installer (for administrators)", "win-arm64": "Windows on ARM",
+    "appimage-x64": "Any distribution (AppImage)", "apk-armv7": "Android ARMv7 (older phones)", "source": "Source code (.zip)"
+  };
+  function label(it) { return LABELS[it.key] || it.label; }
   function esc(v) {
     return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -529,7 +535,7 @@
     document.getElementById("grid").innerHTML = order.map(function (p) {
       var list = items.filter(function (it) { return it.platform === p; });
       var rows = list.length ? list.map(function (it) {
-        return '<div class="file"><span class="l">' + esc(it.label) + '<span class="s">' + esc(mb(it.size)) + "</span></span>" +
+        return '<div class="file"><span class="l">' + esc(label(it)) + '<span class="s">' + esc(mb(it.size)) + "</span></span>" +
           '<a class="btn sm" href="' + esc(abs(it.file)) + '" download>Download</a></div>';
       }).join("") : '<div class="none">Coming soon</div>';
       return '<article class="os glass-card' + (p === os ? " current" : "") + '">' + (p === os ? '<span class="badge">Your system</span>' : "") +
@@ -542,7 +548,7 @@
       text.textContent = "Download for " + NAMES[os];
       var extra = os === "macos" && byKey["mac-x64"] && main.key === "mac-arm64"
         ? ' · Intel Mac? <a href="' + esc(abs(byKey["mac-x64"].file)) + '" download>download here</a>' : "";
-      meta.innerHTML = esc(main.label) + " · " + esc(mb(main.size)) + " · version " + esc(m.version) + extra;
+      meta.innerHTML = esc(label(main)) + " · " + esc(mb(main.size)) + " · version " + esc(m.version) + extra;
     } else if (items.length) {
       cta.classList.remove("disabled"); cta.removeAttribute("download"); cta.href = "/en/download/";
       text.textContent = os === "ios" ? "See the available versions" : "Choose your system";
