@@ -3551,7 +3551,11 @@ mod tests {
         assert!(UserDefaultConfig::read("c") == "a");
         assert!(UserDefaultConfig::read("b") == "c");
         assert!(UserDefaultConfig::read("d") == "c");
-        DEFAULT_DISPLAY_SETTINGS.write().unwrap().clear();
+        // Keep the build's own display defaults (branding sets view_style); other tests read them.
+        DEFAULT_DISPLAY_SETTINGS
+            .write()
+            .unwrap()
+            .retain(|k, _| k != "b" && k != "c");
         OVERWRITE_DISPLAY_SETTINGS.write().unwrap().clear();
         LOCAL_CONFIG.write().unwrap().options.clear();
     }
