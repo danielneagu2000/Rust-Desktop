@@ -609,6 +609,14 @@ De știut:
   descrierea le listează pe cele pe care RustDesk le-a schimbat, ca să le portăm manual.
 - Ramura `upstream-rustdesk` conține sursele RustDesk neschimbate, câte un commit pe
   versiune; nu lucra pe ea.
+- **O singură dată, înainte de prima preluare:** workflow-ul are nevoie de un token cu
+  dreptul de a scrie fișiere de workflow (cel implicit al GitHub nu-l are, iar ramurile noi
+  conțin fișierele `.github/` ale RustDesk). Pe GitHub: Settings (contul tău) → Developer
+  settings → Personal access tokens → **Fine-grained tokens** → Generate new token, doar
+  pentru repo-ul `Rust-Desktop`, cu permisiunile **Contents** și **Workflows** pe „Read and
+  write”. Apoi în repo: Settings → Secrets and variables → Actions → New repository secret,
+  numele `RUSTDESK_SYNC_TOKEN`, valoarea = token-ul. Fără el, rularea se oprește cu
+  „GitHub refused the push”. Când token-ul expiră, generezi altul și actualizezi secretul.
 
 ## Licență
 
