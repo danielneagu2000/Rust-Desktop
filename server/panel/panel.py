@@ -597,7 +597,7 @@ def issue_token(uuid, lic):
     bandwidth = int(lic.get("bandwidth") or 0)
     # w=1: the license allows a permanent password on its computers (src/license.rs).
     permanent = 1 if lic.get("permanent") else 0
-    key = (uuid, lic["code"], expires, bandwidth, permanent)
+    key = (uuid, lic["code"], expires, bandwidth, permanent, lic["client"] or "")
     cached = _TOKEN_CACHE.get(key)
     now = time.time()
     if cached and now - cached[1] < 3600:

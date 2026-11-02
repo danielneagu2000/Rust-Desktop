@@ -28,6 +28,10 @@ py() {
 }
 
 mkdir -p data
+# Înainte de oprirea serverului: o arhivă greșită nu lasă serverul oprit.
+echo "==> Verific backup-ul"
+py check /backup.tar.gz
+
 if [[ -s data/id_ed25519 ]]; then
   echo "==> Backup al stării curente (pentru siguranță)"
   py create --data /data --env /server/.env --out /data/backups --label inainte-de-restaurare

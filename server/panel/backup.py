@@ -219,10 +219,15 @@ def main():
     r.add_argument("archive")
     r.add_argument("--data", required=True)
     r.add_argument("--env")
+    k = sub.add_parser("check")
+    k.add_argument("archive")
     args = ap.parse_args()
     try:
         if args.cmd == "create":
             print(create(args.data, args.env, args.out, args.label))
+        elif args.cmd == "check":
+            m, _ = read(args.archive)
+            print("Backup valid, din", time.strftime("%Y-%m-%d %H:%M", time.localtime(m["created"])))
         else:
             m = restore(args.archive, args.data, args.env)
             print("Restaurat backup-ul din", time.strftime("%Y-%m-%d %H:%M", time.localtime(m["created"])),
