@@ -33,8 +33,6 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-          # The new branches carry upstream's workflow files, which github.token may not push.
-          token: ${{ secrets.RUSTDESK_SYNC_TOKEN || github.token }}
 
       - name: Find the RustDesk release
         id: release
@@ -75,7 +73,18 @@ jobs:
 
       - name: Push branches
         if: steps.sync.outputs.proposed == 'true'
+        env:
+          SYNC_TOKEN: ${{ secrets.RUSTDESK_SYNC_TOKEN }}
         run: |
+          # The new branches carry upstream's workflow files, which github.token may not push.
+          # The token is given to this one command only, never written to .git/config where the
+          # earlier steps (pip, branding/apply.py on upstream code) could read it.
+          if [[ -n "$SYNC_TOKEN" ]]; then
+            export GIT_CONFIG_COUNT=2 \
+              GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0= \
+              GIT_CONFIG_KEY_1=http.https://github.com/.extraheader \
+              GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)"
+          fi
           git push origin upstream-rustdesk "rustdesk-sync/${{ steps.release.outputs.tag }}" || {
             echo "::error::GitHub refused the push. Add the RUSTDESK_SYNC_TOKEN secret (GHID.md, Actualizare la o versiune nouă RustDesk)."
             exit 1
