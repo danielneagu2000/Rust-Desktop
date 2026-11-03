@@ -15,10 +15,9 @@ on:
         description: "RustDesk tag (e.g. 1.5.1); empty = latest stable release"
         required: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+# The job that runs code from the new RustDesk release (pip, branding/apply.py on the trial
+# merge) gets no token that can write; the job that pushes runs nothing from it.
+permissions: {}
 
 concurrency:
   group: rustdesk-sync
@@ -27,12 +26,18 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      proposed: ${{ steps.sync.outputs.proposed }}
+      tag: ${{ steps.release.outputs.tag }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Find the RustDesk release
         id: release
@@ -71,40 +76,101 @@ jobs:
           bash .github/scripts/sync-rustdesk.sh "${{ steps.release.outputs.tag }}" \
             "${{ steps.upstream.outputs.sha }}" "$RUNNER_TEMP/rustdesk" "$RUNNER_TEMP/report.md"
 
-      - name: Push branches
-        if: steps.sync.outputs.proposed == 'true'
-        env:
-          SYNC_TOKEN: ${{ secrets.RUSTDESK_SYNC_TOKEN }}
-        run: |
-          # The new branches carry upstream's workflow files, which github.token may not push.
-          # The token is given to this one command only, never written to .git/config where the
-          # earlier steps (pip, branding/apply.py on upstream code) could read it.
-          if [[ -n "$SYNC_TOKEN" ]]; then
-            export GIT_CONFIG_COUNT=2 \
-              GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0= \
-              GIT_CONFIG_KEY_1=http.https://github.com/.extraheader \
-              GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)"
-          fi
-          git push origin upstream-rustdesk "rustdesk-sync/${{ steps.release.outputs.tag }}" || {
-            echo "::error::GitHub refused the push. Add the RUSTDESK_SYNC_TOKEN secret (GHID.md, Actualizare la o versiune nouă RustDesk)."
-            exit 1
-          }
-
-      - name: Open pull request
+      - name: Bundle the new branches
         if: steps.sync.outputs.proposed == 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          git bundle create "$RUNNER_TEMP/out/sync.bundle" upstream-rustdesk "rustdesk-sync/$TAG" --not --remotes=origin
+          cp "$RUNNER_TEMP/report.md" "$RUNNER_TEMP/out/report.md"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.sync.outputs.proposed == 'true'
+        with:
+          name: rustdesk-sync
+          path: ${{ runner.temp }}/out/
+          retention-days: 7
+
+  publish:
+    needs: sync
+    if: needs.sync.outputs.proposed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.sync.outputs.tag }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rustdesk-sync
+          path: ${{ runner.temp }}/sync
+
+      # The sync job ran the new release's code, so the bundle is checked before anything is
+      # pushed: only the two branches, both on one new commit on top of the previous import,
+      # and no change under .github (a workflow there would run with this repository's secrets).
+      - name: Check the bundle
+        id: check
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid tag '$TAG'"; exit 1; }
+          B="$RUNNER_TEMP/sync/sync.bundle"
+          git bundle verify -q "$B"
+          HEADS="$(git bundle list-heads "$B" | awk '{print $2}' | sort | paste -sd ' ')"
+          if [[ "$HEADS" != "refs/heads/rustdesk-sync/$TAG refs/heads/upstream-rustdesk" ]]; then
+            echo "::error::Unexpected branches in the bundle: $HEADS"; exit 1
+          fi
+          git fetch -q "$B" "refs/heads/upstream-rustdesk:refs/sync/upstream" "refs/heads/rustdesk-sync/$TAG:refs/sync/proposal"
+          NEW="$(git rev-parse refs/sync/upstream)"
+          [[ "$(git rev-parse refs/sync/proposal)" == "$NEW" ]] || { echo "::error::The two branches differ"; exit 1; }
+          if git rev-parse -q --verify refs/remotes/origin/upstream-rustdesk >/dev/null; then
+            BASE="$(git rev-parse refs/remotes/origin/upstream-rustdesk)"
+          else
+            BASE="$(git log --format=%H --grep='^Import RustDesk ' --reverse origin/master | head -n 1)"
+          fi
+          PARENTS="$(git rev-list --parents -n 1 "$NEW" | cut -d' ' -f2-)"
+          [[ "$PARENTS" == "$BASE" ]] || { echo "::error::$NEW is not one commit on top of $BASE"; exit 1; }
+          if ! git diff --quiet "$BASE" "$NEW" -- .github .gitmodules; then
+            echo "::error::The import changes .github or .gitmodules"; exit 1
+          fi
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Push branches
+        env:
+          SYNC_TOKEN: ${{ secrets.RUSTDESK_SYNC_TOKEN || github.token }}
+          NEW: ${{ steps.check.outputs.new }}
+        run: |
+          # The new branches carry upstream's workflow files, which github.token may not push.
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)"
+          git -c core.hooksPath=/dev/null push --no-verify origin \
+            "$NEW:refs/heads/upstream-rustdesk" "$NEW:refs/heads/rustdesk-sync/$TAG" || {
+            echo "::error::GitHub refused the push. Add the RUSTDESK_SYNC_TOKEN secret (GHID.md, Actualizare la o versiune nouă RustDesk)."
+            exit 1
+          }
+
+      - name: Open pull request
+        run: |
+          set -euo pipefail
           TITLE="Actualizare RustDesk $TAG"
-          if gh pr create --base master --head "rustdesk-sync/$TAG" --title "$TITLE" \
-               --body-file "$RUNNER_TEMP/report.md"; then
+          REPORT="$RUNNER_TEMP/sync/report.md"
+          if gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "rustdesk-sync/$TAG" \
+               --title "$TITLE" --body-file "$REPORT"; then
             exit 0
           fi
           echo "::warning::Actions may not open pull requests here (Settings → Actions → General); opening an issue instead."
           {
             echo "Deschide pull request-ul de aici: ${{ github.server_url }}/${{ github.repository }}/compare/master...rustdesk-sync/$TAG?expand=1"
             echo
-            cat "$RUNNER_TEMP/report.md"
+            cat "$REPORT"
           } > "$RUNNER_TEMP/issue.md"
-          gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/issue.md"
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/issue.md"

@@ -84,7 +84,7 @@ if [[ -n "$CONFLICTS" ]]; then
 elif grep -q '=CHANGE_ME' "$WT/branding/brand.env"; then
   BRANDING="Branding-ul nu e configurat încă (CHANGE_ME în branding/brand.env); nu l-am verificat."
 else
-  if LOG="$(cd "$WT" && python3 branding/apply.py 2>&1)"; then
+  if LOG="$(cd "$WT" && env -u GH_TOKEN python3 -P branding/apply.py 2>&1)"; then
     BRANDING="Branding-ul se aplică fără erori peste versiunea nouă (se reaplică automat după merge)."
   else
     BRANDING="**Branding-ul NU se mai aplică** peste versiunea nouă; trebuie adaptat branding/apply.py:"$'\n```\n'"$LOG"$'\n```'
