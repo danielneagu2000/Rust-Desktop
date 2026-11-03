@@ -717,7 +717,8 @@ def activate(v, src_ip):
             ACT_FAILS[src_ip] = (window, fails + 1)
             if len(ACT_FAILS) > 10000:
                 ACT_FAILS.clear()
-        log(f"licenses: activation refused for {normalize_code(v.get('code'))[:40]} on "
+        # Only the end of what was typed: a mistyped code (no prefix, lowercase) is still a real one.
+        log(f"licenses: activation refused for …{normalize_code(v.get('code'))[-5:]} on "
             f"{as_text(v.get('id'), 40)} ({src_ip}): {msg}")
         return {"error": msg}
 
@@ -1488,7 +1489,7 @@ class PanelHandler(BaseHTTPRequestHandler):
             with AUTH_LOCK:
                 fails += 1
                 AUTH_FAILS[key] = (fails, now + lock_seconds if fails >= max_fails else 0)
-            log(f"portal: failed login for {email!r} from {ip}")
+            log(f"portal: failed login for {email if '@' in email else '(not an e-mail)'!r} from {ip}")
             return page("E-mail sau parolă greșită.")
         if not portal_user(rows[0]["id"]):
             return page("Licența organizației este suspendată. Contactează RDN Network Data.")
@@ -2670,6 +2671,9 @@ def restore_live(blob):
             init_db()
             DB.executemany("INSERT OR REPLACE INTO settings(key, value) VALUES(?,?)", [(r_["key"], r_["value"]) for r_ in settings])
             restored.append("licențe, istoric, dispozitive")
+    # Also a login that finished during the swap: it read its user id from the old database.
+    with AUTH_LOCK:
+        PORTAL_SESSIONS.clear()
     if "panel.sqlite3" in contents:
         # The blocklist lives in the panel database; make hbbr match the restored one.
         if blocked_before:
