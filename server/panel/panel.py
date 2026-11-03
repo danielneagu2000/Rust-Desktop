@@ -666,12 +666,22 @@ def hbbs_only_key(raw_uuid):
     return keys[0] if len(keys) == 1 else None
 
 
+def hbbs_first_key(raw_uuid):
+    """The key of the first ID hbbs registered for this computer (raw uuid), which a later
+    registration can't displace: hbbs keeps created_at when an ID's key changes."""
+    rows = hbbs_rows("SELECT pk, created_at FROM peer WHERE uuid = ? ORDER BY created_at LIMIT 2", (raw_uuid,)) or []
+    if not rows or (len(rows) == 2 and rows[0][1] == rows[1][1]) or len(as_bytes(rows[0][0])) != 32:
+        return None
+    return as_bytes(rows[0][0])
+
+
 def check_device_key(uuid, device_id, auth, act):
     """Whether a request for computer `uuid` comes from that computer, judged by the device key that
     signed it. Returns (who, key, own):
     - who "key": signed with the key bound to the computer's activation (act["pk"]); or, while it
-      is not bound, with the only key hbbs has for this uuid; or with the uuid itself, which is the
-      device key on Android and iOS (hbb_common::get_uuid). `key` is the key to keep.
+      is not bound, with the only key hbbs has for this uuid (with require_signed_apps on, the key
+      it registered first); or with the uuid itself, which is the device key on Android and iOS
+      (hbb_common::get_uuid). `key` is the key to keep.
     - who "old": no signature (apps before 1.5.1-4), or one that can't be checked, on a computer
       whose activation is not bound to a key; refused with require_signed_apps on.
     - who None: anything else. Someone who knows a computer's uuid can no longer speak for it once
@@ -696,10 +706,10 @@ def check_device_key(uuid, device_id, auth, act):
         if sig and (bound == own or _verify(bound, msg, sig)):
             return "key", bound, own
         return None, None, own
-    only = hbbs_only_key(raw_uuid)
+    only = hbbs_only_key(raw_uuid) or (hbbs_first_key(raw_uuid) if conf("require_signed_apps") else None)
     if only and sig and (only == own or _verify(only, msg, sig)):
         return "key", only, own
-    if act and conf("require_signed_apps"):
+    if conf("require_signed_apps"):
         return None, None, own
     return "old", None, own
 
@@ -718,7 +728,7 @@ def bind_device_key(uuid, device_id, key, own):
 REFUSED_LOGGED = {}
 
 
-def log_refused(uuid, device_id, src_ip, what):
+def log_refused(uuid, device_id, src_ip, what, why="not signed with the key of the computer's activation"):
     """One line per computer and hour: the computer may keep retrying."""
     now = time.time()
     if now - REFUSED_LOGGED.get(uuid, 0) < 3600:
@@ -726,8 +736,7 @@ def log_refused(uuid, device_id, src_ip, what):
     if len(REFUSED_LOGGED) > 10000:
         REFUSED_LOGGED.clear()
     REFUSED_LOGGED[uuid] = now
-    log(f"licenses: {what} for {as_text(device_id, 40)} ({src_ip}) refused: not signed with the key of the "
-        "computer's activation")
+    log(f"licenses: {what} for {as_text(device_id, 40)} ({src_ip}) refused: {why}")
 
 
 def recheck_activations():
@@ -885,6 +894,13 @@ def activate(v, src_ip, auth=(None, b"")):
     uuid = str(v.get("uuid") or "")
     if not re.fullmatch(r"[A-Za-z0-9+/=]{8,100}", uuid):
         return fail(t("Date lipsă de la aplicație", "Missing data from the app"))
+    try:
+        raw_uuid = base64.b64decode(uuid, validate=True)
+    except ValueError:
+        raw_uuid = b""
+    # One text per computer: activations are kept by this text, hbbs compares the bytes.
+    if base64.b64encode(raw_uuid).decode() != uuid:
+        return fail(t("Date lipsă de la aplicație", "Missing data from the app"))
     code = normalize_code(v.get("code"))
     if not uuid:
         return fail(t("Date lipsă de la aplicație", "Missing data from the app"))
@@ -906,13 +922,18 @@ def activate(v, src_ip, auth=(None, b"")):
                       "The license has expired. Contact RDN Network Data to renew it."))
     act = activation_of(uuid)
     who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act)
-    if who is None and act and act["code"] == code and own and own == hbbs_only_key(base64.b64decode(uuid)):
-        # The same code again from a reinstalled app, whose new key is now the only one hbbs has.
+    if who is None and act and act["code"] == code and own and own in (hbbs_only_key(raw_uuid), hbbs_first_key(raw_uuid)):
+        # The same code again from a reinstalled app, whose new key hbbs has for its first ID.
         who, key = "key", own
     if who is None:
         if auth[0] is None:
             return fail(t("Actualizează aplicația RDN Remote la ultima versiune și reîncearcă.",
                           "Update RDN Remote to the latest version and try again."))
+        if not act:
+            return fail(t("Serverul nu poate verifica încă acest calculator. Reîncearcă peste un minut; dacă tot nu "
+                          "merge, contactează RDN Network Data.",
+                          "The server can't verify this computer yet. Try again in a minute; if it still fails, "
+                          "contact RDN Network Data."))
         return fail(t("Calculatorul are deja o licență activată din altă instalare a aplicației. Introdu codul "
                       "acelei licențe sau contactează RDN Network Data.",
                       "This computer already has a license activated from another installation of the app. "
@@ -945,12 +966,16 @@ def heartbeat(v, src_ip, auth=(None, b"")):
     if not uuid:
         return {}
     act = activation_of(uuid)
-    if auth[0] is not None and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE:
+    stale = auth[0] is not None and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE
+    if stale:
         # A replayed old request, or a clock far off: counts as not signed.
         auth = (None, b"")
     who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act) if act else ("old", None, None)
     if who is None:
-        log_refused(uuid, v.get("id"), src_ip, "heartbeat")
+        if stale:
+            log_refused(uuid, v.get("id"), src_ip, "heartbeat", "its clock is more than 7 days off")
+        else:
+            log_refused(uuid, v.get("id"), src_ip, "heartbeat")
         return {}
     if who == "key" and act:
         bind_device_key(uuid, as_text(v.get("id"), 40), key, own)
