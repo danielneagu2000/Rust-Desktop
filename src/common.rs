@@ -1508,7 +1508,13 @@ async fn tcp_proxy_request(
     timeout(overall_timeout, async {
         let mut conn = socket_client::connect_tcp(&*tcp_addr, CONNECT_TIMEOUT).await?;
         let key = crate::get_key(true).await;
-        secure_tcp_silent(&mut conn, &key).await?;
+        // RDN Remote: license activations and heartbeats come this way when HTTPS fails; never
+        // send them, or accept an answer, without the server's signed key exchange.
+        if crate::is_custom_client() {
+            secure_tcp_required(&mut conn, &key).await?;
+        } else {
+            secure_tcp_silent(&mut conn, &key).await?;
+        }
 
         let mut req = HttpProxyRequest::new();
         req.method = method.to_uppercase();
