@@ -110,16 +110,18 @@ pub(super) fn verified_update_artifact_from_release_page_url(
         format!("https://github.com/danielneagu2000/Rust-Desktop/releases/download/{release_id}/");
     // RDN Remote: this repository's releases carry update-manifest.json, written by
     // .github/workflows/publish-update.yml, instead of RustDesk-signed metadata.
-    if let Ok(manifest) =
-        fetch_update_sidecar_bytes(&format!("{expected_artifact_url_prefix}update-manifest.json"))
-    {
-        return artifact_from_update_manifest(
-            &manifest,
-            &release_id,
-            &display_version,
-            &expected_artifact_url_prefix,
-            query,
-        );
+    let manifest_url = format!("{expected_artifact_url_prefix}update-manifest.json");
+    match fetch_update_sidecar_bytes(&manifest_url) {
+        Ok(manifest) => {
+            return artifact_from_update_manifest(
+                &manifest,
+                &release_id,
+                &display_version,
+                &expected_artifact_url_prefix,
+                query,
+            );
+        }
+        Err(e) => hbb_common::log::warn!("Failed to download {}: {}", manifest_url, e),
     }
     let metadata_url = format!("{expected_artifact_url_prefix}rustdesk-update.json");
     let signature_url = format!("{metadata_url}.sig");

@@ -1145,6 +1145,11 @@ fn clear_software_update_url() {
 fn process_software_update_check_response(bytes: Bytes) -> ResultType<()> {
     let resp: hbb_common::VersionCheckResponse = serde_json::from_slice(&bytes)?;
     let response_url = resp.url;
+    // RDN Remote: the server answers {"url": ""} until it has a published release.
+    if response_url.is_empty() {
+        clear_software_update_url();
+        return Ok(());
+    }
     let release_id = release_id_from_update_url(&response_url)?;
     let latest_release_version = display_version_from_release_id(&release_id)?;
 
@@ -3154,6 +3159,12 @@ mod tests {
     fn accepts_rdn_release_revisions() {
         assert_eq!(display_version_from_release_id("1.5.1-2").unwrap(), "1.5.1-2");
         assert!(get_version_number("1.5.1-3") > get_version_number("1.5.1-2"));
+    }
+
+    #[test]
+    fn empty_update_url_means_no_update() {
+        assert!(process_software_update_check_response(Bytes::from_static(br#"{"url": ""}"#)).is_ok());
+        assert!(SOFTWARE_UPDATE_URL.lock().unwrap().is_empty());
     }
 
     #[test]
