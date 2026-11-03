@@ -430,8 +430,10 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    // On Linux with forced updates the card has no close button; isCardClosed can only come
+    // from the SELinux tip shown under it.
     if (updateUrl.isNotEmpty &&
-        !isCardClosed) {
+        (!isCardClosed || (isLinux && isOptionFixed(kOptionAllowAutoUpdate)))) {
       final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
       String btnText = isToUpdate ? 'Update' : 'Download';
       GestureTapCallback onPressed = () async {

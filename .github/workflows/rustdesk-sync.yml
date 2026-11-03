@@ -139,9 +139,12 @@ jobs:
           fi
           PARENTS="$(git rev-list --parents -n 1 "$NEW" | cut -d' ' -f2-)"
           [[ "$PARENTS" == "$BASE" ]] || { echo "::error::$NEW is not one commit on top of $BASE"; exit 1; }
-          # The next sync reads the imported version from this subject.
+          # The next sync reads the imported version from this subject; TAG comes from the sync
+          # job, so the tag and its commit are looked up again at RustDesk.
+          UP="$(git ls-remote https://github.com/rustdesk/rustdesk "refs/tags/$TAG^{}" "refs/tags/$TAG" | sort -k2 -r | head -n 1 | cut -f1)"
+          [[ "$UP" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::RustDesk has no tag $TAG"; exit 1; }
           SUBJECT="$(git log -1 --format=%s "$NEW")"
-          if [[ ! "$SUBJECT" =~ ^Import\ RustDesk\ ([0-9.]+)\ \(upstream\ [0-9a-f]{40}\)$ || "${BASH_REMATCH[1]}" != "$TAG" ]]; then
+          if [[ "$SUBJECT" != "Import RustDesk $TAG (upstream $UP)" ]]; then
             echo "::error::Unexpected commit message: $SUBJECT"; exit 1
           fi
           if ! git diff --quiet "$BASE" "$NEW" -- .github .gitmodules; then
