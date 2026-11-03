@@ -449,7 +449,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           btnText,
           onPressed,
           // Forced updates (AUTO_UPDATE=FORCE in branding/brand.env): the card stays until updated.
-          closeButton: !isOptionFixed(kOptionAllowAutoUpdate),
+          // On macOS it can be closed for this session: it hides the Screen Recording,
+          // Accessibility and daemon cards, and the daemon's updater installs the release itself.
+          closeButton: isMacOS || !isOptionFixed(kOptionAllowAutoUpdate),
           help: null,
           link: null);
     }
