@@ -107,7 +107,7 @@ def log(msg):
     # Messages carry text sent by anyone (device IDs, codes): no line breaks or terminal escapes.
     msg = re.sub(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]", "?", str(msg))
     # A license code grants seats: only its last group goes to the log, enough to tell codes apart.
-    msg = re.sub(r"\bRDN-(?:[A-Z0-9]{4,5}-){2,4}([A-Z0-9]{4,5})\b", r"RDN-…-\1", msg)
+    msg = re.sub(r"\bRDN(?:-?[A-Z0-9]){8,}\b", lambda m: "RDN-…-" + m.group().replace("-", "")[-5:], msg)
     print(time.strftime("%Y-%m-%d %H:%M:%S"), msg, flush=True)
 
 
@@ -572,18 +572,22 @@ def id_belongs_to(device_id, uuid):
     (peer.uuid, raw bytes; the app sends it base64-encoded); an ID it does not know, or a database
     that cannot be read, is accepted as before."""
     try:
-        claimed = base64.b64decode(uuid, validate=True)
         con = sqlite3.connect(f"file:{DATA_DIR / 'db_v2.sqlite3'}?mode=ro", uri=True, timeout=2)
         try:
             row = con.execute("SELECT uuid FROM peer WHERE id = ?", (device_id,)).fetchone()
         finally:
             con.close()
-    except (ValueError, sqlite3.Error):
+    except sqlite3.Error:
         return True
     registered = row[0] if row else None
+    if not registered:
+        return True
     if isinstance(registered, str):
         registered = registered.encode()
-    return not registered or bytes(registered) == claimed
+    try:
+        return bytes(registered) == base64.b64decode(str(uuid or ""), validate=True)
+    except ValueError:
+        return False
 
 
 def normalize_code(raw):
@@ -1514,6 +1518,7 @@ class PanelHandler(BaseHTTPRequestHandler):
             body, name = report_csv((query.get("month") or [""])[0], user["code"])
             if not body:
                 return self.reply(400, "lună invalidă")
+            name = name.replace(user["code"], user["code"][-5:])
             return self.reply(200, body, "text/csv; charset=utf-8",
                               headers=[("Content-Disposition", f'attachment; filename="{name}"')])
         if rest.startswith("/api/"):
@@ -2649,6 +2654,9 @@ def restore_live(blob):
         return 409, {"error": "Backup-ul este de pe un server cu altă cheie. Pentru restaurare completă "
                               "(cheie, ID-uri, licențe) rulează pe server: sudo ./server/restore.sh <fișier>"}
     safety = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "inainte-de-restaurare")
+    # Portal sessions hold user ids of the database about to be replaced.
+    with AUTH_LOCK:
+        PORTAL_SESSIONS.clear()
     blocked_before = [r_["ip"] for r_ in q("SELECT ip FROM blocklist")]
     restored = []
     settings = q("SELECT key, value FROM settings")
@@ -2670,8 +2678,6 @@ def restore_live(blob):
         restored.append("IP-uri blocate")
     _TOKEN_CACHE.clear()
     _PASS_CACHE.clear()
-    with AUTH_LOCK:
-        PORTAL_SESSIONS.clear()
     log(f"backup: restored {manifest.get('created')} (safety copy {safety.name})")
     return 200, {"ok": True, "restored": restored, "created": manifest.get("created"), "safety": safety.name}
 
