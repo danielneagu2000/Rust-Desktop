@@ -168,6 +168,10 @@ fn artifact_from_update_manifest(
     let Some(&size) = manifest.sizes.get(&file_name).filter(|size| **size > 0) else {
         bail!("update-manifest.json has no size for {}", file_name);
     };
+    // The macOS root updater compares this with the DMG's CFBundleShortVersionString, which is
+    // the pubspec version (1.5.1) without the release revision.
+    #[cfg(target_os = "macos")]
+    let version = version.split_once('-').map_or(version, |(base, _)| base);
     Ok(VerifiedUpdateArtifact {
         version: version.to_owned(),
         url: format!("{url_prefix}{file_name}"),

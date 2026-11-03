@@ -301,6 +301,18 @@ def update_patches(cfg):
         ("flutter/lib/mobile/pages/connection_page.dart",
          r"if \((?:!bind\.isCustomClient\(\) && )?!isIOS\)(\n\s*Obx\(\(\) => _buildUpdateUI)",
          lambda m: f"if (!isIOS){m.group(1)}"),
+        # The update check that fills those cards (and the macOS auto-update option) is
+        # skipped for renamed clients upstream; without it no card ever shows.
+        ("flutter/lib/common.dart",
+         r"(void checkUpdate\(\) \{\n  if \(!isWeb\) \{\n    )(?:if \(!bind\.isCustomClient\(\)\) )?\{\n",
+         lambda m: f"{m.group(1)}{{\n"),
+        ("flutter/lib/desktop/pages/desktop_setting_page.dart",
+         r"(bind\.mainIsInstalledDaemon\(prompt: false\))(?: && !bind\.isCustomClient\(\))?\);",
+         lambda m: f"{m.group(1)});"),
+        # The in-app "Update" button installs an MSI over an MSI install, like the background updater.
+        ("src/flutter_ffi.rs",
+         r"(let update_msi = crate::platform::windows::is_msi_installed\(\)\?)(?: && !crate::is_custom_client\(\))?;",
+         lambda m: f"{m.group(1)};"),
         # Licenses issued by the panel (src/license.rs).
         ("src/license.rs", r"pub const REQUIRED: bool = (?:true|false);",
          lambda m: f"pub const REQUIRED: bool = {'true' if cfg['LICENSE_REQUIRED'] == 'Y' else 'false'};"),
