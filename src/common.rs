@@ -1314,7 +1314,12 @@ fn get_api_server_(api: String, custom: String) -> String {
     if !api.is_empty() {
         return api.to_owned();
     }
-    let s0 = get_custom_rendezvous_server(custom);
+    // Nor may an ID server in the Windows file name (get_api_server clears one typed by hand).
+    let s0 = if crate::is_custom_client() && custom.is_empty() {
+        String::new()
+    } else {
+        get_custom_rendezvous_server(custom)
+    };
     if !s0.is_empty() {
         let s = crate::increase_port(&s0, -2);
         if s == s0 {

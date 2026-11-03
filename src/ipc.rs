@@ -379,6 +379,8 @@ pub enum Data {
     Options(Option<HashMap<String, String>>),
     NatType(Option<i32>),
     ConfirmedKey(Option<(Vec<u8>, Vec<u8>)>),
+    /// The key pair the heartbeat signs with, confirmed by hbbs or not (crate::license).
+    DeviceKey(Option<(Vec<u8>, Vec<u8>)>),
     RawMessage(Vec<u8>),
     Socks(Option<config::Socks5Server>),
     FS(FS),
@@ -913,6 +915,13 @@ async fn handle(data: Data, stream: &mut Connection) {
                 None
             };
             allow_err!(stream.send(&Data::ConfirmedKey(out)).await);
+        }
+        Data::DeviceKey(None) => {
+            allow_err!(
+                stream
+                    .send(&Data::DeviceKey(Some(Config::get_key_pair())))
+                    .await
+            );
         }
         Data::Socks(s) => match s {
             None => {

@@ -1056,7 +1056,7 @@ impl Connection {
                 _ = conn.file_timer.tick() => {
                     if !conn.read_jobs.is_empty() {
                         conn.send_to_cm(ipc::Data::FileTransferLog(("transfer".to_string(), fs::serialize_transfer_jobs(&conn.read_jobs))));
-                        conn.bandwidth.wait(crate::license::FILE_BLOCK).await;
+                        let before: u64 = conn.read_jobs.iter().map(|j| j.transferred()).sum();
                         match fs::handle_read_jobs(&mut conn.read_jobs, &mut conn.stream).await {
                             Ok(log) => {
                                 if !log.is_empty() {
@@ -1067,6 +1067,12 @@ impl Connection {
                                 conn.on_close(&err.to_string(), false).await;
                                 break;
                             }
+                        }
+                        // Charged after the send, with its size: a job waiting for the peer's
+                        // answer sends nothing, and the computer's other sessions share the limit.
+                        let sent = conn.read_jobs.iter().map(|j| j.transferred()).sum::<u64>().saturating_sub(before);
+                        if sent > 0 {
+                            conn.bandwidth.wait(sent as usize).await;
                         }
                     } else {
                         conn.file_timer = crate::rustdesk_interval(time::interval_at(Instant::now() + SEC30, SEC30));

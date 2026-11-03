@@ -266,8 +266,11 @@ async fn start_hbbs_sync_async() {
                         if let Some(strict) = rsp.remove("license_strict") {
                             crate::license::store_strict(strict.as_i64() == Some(1));
                         }
-                        if let Some(pass_key) = rsp.remove("license_pass_key") {
-                            crate::license::store_pass_key(pass_key.as_i64() == Some(1));
+                        // Every heartbeat the panel accepts has "lockout"; one without the setting is
+                        // from a panel rolled back to before it, whose passes name no key.
+                        let pass_key = rsp.remove("license_pass_key");
+                        if pass_key.is_some() || rsp.contains_key("lockout") {
+                            crate::license::store_pass_key(pass_key.and_then(|k| k.as_i64()) == Some(1));
                         }
                         crate::license::set_disconnect_reason(
                             rsp.remove("disconnect_reason").as_ref().and_then(|r| r.as_str()).unwrap_or_default(),

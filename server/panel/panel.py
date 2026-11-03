@@ -657,23 +657,30 @@ def activation_of(uuid):
     return rows[0] if rows else None
 
 
+def hbbs_only_key(raw_uuid):
+    """The key hbbs has for this computer (raw uuid) when all its IDs there have that one key. Two
+    keys mean a reinstall that lost its key, a cloned computer, or someone else's app that took
+    this uuid; none of them can be told from the computer itself."""
+    keys = {as_bytes(r[0]) for r in hbbs_rows("SELECT pk FROM peer WHERE uuid = ?", (raw_uuid,)) or []}
+    keys = [k for k in keys if len(k) == 32]
+    return keys[0] if len(keys) == 1 else None
+
+
 def check_device_key(uuid, device_id, auth, act):
     """Whether a request for computer `uuid` comes from that computer, judged by the device key that
     signed it. Returns (who, key, own):
-    - who "key": signed with the key bound to the computer's activation (act["pk"]) or with the key
-      hbbs has for the ID the activation names, which replaces the bound one after a reinstall. An
-      activation not bound yet takes the key of the request's ID, when hbbs has no other ID for
-      this uuid and the activation names no ID of this computer. `key` is the key to keep.
+    - who "key": signed with the key bound to the computer's activation (act["pk"]); or, while it
+      is not bound, with the only key hbbs has for this uuid; or with the uuid itself, which is the
+      device key on Android and iOS (hbb_common::get_uuid). `key` is the key to keep.
     - who "old": no signature (apps before 1.5.1-4), or one that can't be checked, on a computer
-      whose activation is not bound to a key; refused for activated computers with
-      require_signed_apps on.
+      whose activation is not bound to a key; refused with require_signed_apps on.
     - who None: anything else. Someone who knows a computer's uuid can no longer speak for it once
-      its activation is bound to a key.
+      its activation is bound to a key; a bound key changes only by entering the license's code.
     `own` is the key of the request's ID at hbbs when the request carries its signature, else None."""
     sig, msg = auth
     bound = act["pk"] if act else None
     if sig is None:
-        if bound or (act and conf("require_signed_apps")):
+        if bound or conf("require_signed_apps"):
             return None, None, None
         return "old", None, None
     try:
@@ -683,14 +690,15 @@ def check_device_key(uuid, device_id, auth, act):
         return None, None, None
     own = hbbs_key(device_id, raw_uuid)
     own = own if own and sig and _verify(own, msg, sig) else None
-    anchor = hbbs_key(act["device_id"], raw_uuid) if act else None
-    for key in (bound, anchor):
-        if key and sig and (key == own or _verify(key, msg, sig)):
-            return "key", key, own
-    if bound or anchor:
+    if sig and len(raw_uuid) == 32 and _verify(raw_uuid, msg, sig):
+        return "key", raw_uuid, own
+    if bound:
+        if sig and (bound == own or _verify(bound, msg, sig)):
+            return "key", bound, own
         return None, None, own
-    if own and len(hbbs_ids(raw_uuid)) == 1:
-        return "key", own, own
+    only = hbbs_only_key(raw_uuid)
+    if only and sig and (only == own or _verify(only, msg, sig)):
+        return "key", only, own
     if act and conf("require_signed_apps"):
         return None, None, own
     return "old", None, own
@@ -898,8 +906,8 @@ def activate(v, src_ip, auth=(None, b"")):
                       "The license has expired. Contact RDN Network Data to renew it."))
     act = activation_of(uuid)
     who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act)
-    if who is None and act and act["code"] == code and own:
-        # The same code again from a reinstalled app, whose new key hbbs has for its ID.
+    if who is None and act and act["code"] == code and own and own == hbbs_only_key(base64.b64decode(uuid)):
+        # The same code again from a reinstalled app, whose new key is now the only one hbbs has.
         who, key = "key", own
     if who is None:
         if auth[0] is None:
@@ -937,9 +945,10 @@ def heartbeat(v, src_ip, auth=(None, b"")):
     if not uuid:
         return {}
     act = activation_of(uuid)
-    who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act)
-    if who == "key" and auth[0] and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE:
-        who = None
+    if auth[0] is not None and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE:
+        # A replayed old request, or a clock far off: counts as not signed.
+        auth = (None, b"")
+    who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act) if act else ("old", None, None)
     if who is None:
         log_refused(uuid, v.get("id"), src_ip, "heartbeat")
         return {}
@@ -956,6 +965,7 @@ def heartbeat(v, src_ip, auth=(None, b"")):
     out = {}
     app_fails, app_seconds = lockout("app")
     out["lockout"] = [app_fails, app_seconds // 60]
+    out["license_pass_key"] = conf("require_signed_apps")
     pending = q("SELECT conn_id FROM pending_disconnect WHERE uuid=?", (uuid,))
     if pending:
         out["disconnect"] = [p["conn_id"] for p in pending]
@@ -972,7 +982,6 @@ def heartbeat(v, src_ip, auth=(None, b"")):
             pass_key = base64.b64encode(key).decode() if who == "key" else None
             out["license_pass"] = issue_pass(device_id, lic, pass_key) if id_belongs_to(device_id, uuid) else ""
             out["license_strict"] = 1 if conf("require_controller_license") else 0
-            out["license_pass_key"] = conf("require_signed_apps")
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
         # Licensed builds drop their token and block themselves; close what is open unless it is
@@ -989,7 +998,8 @@ def heartbeat(v, src_ip, auth=(None, b"")):
 
 def sysinfo(v, src_ip, auth=(None, b"")):
     uuid = as_text(v.get("uuid"), 100)
-    if uuid and check_device_key(uuid, as_text(v.get("id"), 40), auth, activation_of(uuid))[0]:
+    act = activation_of(uuid) if uuid else None
+    if uuid and (not act or check_device_key(uuid, as_text(v.get("id"), 40), auth, act)[0]):
         x(
             """INSERT INTO devices(uuid, device_id, last_seen, src_ip, hostname, os, username, cpu, memory)
                VALUES(?,?,?,?,?,?,?,?,?)

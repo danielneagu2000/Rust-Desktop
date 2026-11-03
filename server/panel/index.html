@@ -690,7 +690,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         devs.map(function (a) {
           return "<tr><td>" + (a.online ? pill("online", "ok") : pill("offline", "mute")) + '</td><td class="mono">' + esc(a.device_id || "?") +
             "</td><td>" + esc(a.alias || a.hostname || "") + "</td><td>" + esc(a.activated ? day(a.activated) : "—") +
-            "</td><td>" + (a.pk ? pill("legată", "ok") : pill("aplicație veche", "mute")) +
+            "</td><td>" + (a.pk ? pill("legată", "ok") : pill("nelegată", "mute")) +
             '</td><td><button type="button" class="small danger" data-edit-release="' + esc(a.uuid) + '">Eliberează locul</button></td></tr>';
         }).join("") + "</tbody></table>"
       : '<p class="sub">Niciun calculator activat cu acest cod.</p>';

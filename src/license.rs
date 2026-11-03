@@ -147,7 +147,7 @@ fn proof_ok(pass: &Pass, lr: &LoginRequest, challenge: &str, own_id: &str) -> bo
 
 /// Signs an outgoing login with this device's key (UI process), for passes that name it.
 pub async fn sign_login(lr: &mut LoginRequest, challenge: &str) {
-    if !REQUIRED || lr.rdn_pass.is_empty() {
+    if !REQUIRED || verify_pass(&lr.rdn_pass).map_or(true, |p| p.k.is_empty()) {
         return;
     }
     match device_secret_key().await {
@@ -157,7 +157,11 @@ pub async fn sign_login(lr: &mut LoginRequest, challenge: &str) {
                 .to_vec()
                 .into();
         }
-        None => log::warn!("No device key to sign the login with"),
+        None => hbb_common::throttled_log!(
+            crate::common::API_LOG_INTERVAL,
+            warn,
+            "No device key to sign the login with"
+        ),
     }
 }
 
@@ -175,19 +179,17 @@ pub async fn sign_login_msg(mut msg: Message, challenge: &str) -> Message {
     msg
 }
 
-/// The key this device registered at hbbs. The UI process asks the service for it, whose
-/// config holds the key on desktop.
+/// The key this device signs its heartbeats with, which the panel puts in its pass. The UI
+/// process asks the service for it, whose config holds the key on desktop.
 async fn device_secret_key() -> Option<sign::SecretKey> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let key_pair = Some(Config::get_key_pair());
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let key_pair = {
         let mut conn = crate::ipc::connect(1000, "").await.ok()?;
-        conn.send(&crate::ipc::Data::ConfirmedKey(None))
-            .await
-            .ok()?;
+        conn.send(&crate::ipc::Data::DeviceKey(None)).await.ok()?;
         match conn.next_timeout(1000).await {
-            Ok(Some(crate::ipc::Data::ConfirmedKey(key_pair))) => key_pair,
+            Ok(Some(crate::ipc::Data::DeviceKey(key_pair))) => key_pair,
             _ => None,
         }
     };
@@ -415,9 +417,6 @@ pub fn lockout() -> Option<(i32, i32)> {
     (attempts > 0 && minutes > 0).then_some((attempts, minutes))
 }
 
-/// Upper bound of one file transfer block (BUF_SIZE in base::fs), charged per block sent.
-pub const FILE_BLOCK: usize = 128 * 1024;
-
 /// Outgoing limit (kbit/s) from this computer's license; 0 = unlimited.
 fn bandwidth_kbps() -> u32 {
     if !REQUIRED {
@@ -543,6 +542,10 @@ mod tests {
     fn signed_requests_verify_with_the_device_key() {
         let (pk, sk) = sign::gen_keypair();
         let header = request_signature("/api/heartbeat", "{\"a\":1}", &sk.0);
+        if !REQUIRED {
+            assert!(header.is_empty());
+            return;
+        }
         let sig = header.strip_prefix("X-RDN-Signature: ").unwrap();
         let sig = sign::Signature::from_bytes(&crate::decode64(sig).unwrap()).unwrap();
         let msg = [REQUEST_PREFIX, b"/api/heartbeat", b"\0", b"{\"a\":1}"].concat();
@@ -552,16 +555,16 @@ mod tests {
 
     #[tokio::test]
     async fn parallel_connections_share_the_computer_limit() {
-        // 8 kbit/s = 1000 bytes/s: 400 bytes take 0.4 s, of which a connection on its own waits
-        // 0.4 s - BURST = 0.2 s. Sharing the schedule, the second waits behind the first: 0.4 s.
+        // 8 kbit/s = 1000 bytes/s: 400 bytes take 0.4 s, of which a connection waits all but
+        // BURST = 0.2 s. On one schedule the two take 0.8 s - BURST; on their own, 0.2 s each.
         let throttle = || Throttle {
             kbps: 8,
             checked: Some(Instant::now()),
         };
         let (mut a, mut b) = (throttle(), throttle());
-        a.wait(400).await;
         let started = Instant::now();
+        a.wait(400).await;
         b.wait(400).await;
-        assert!(started.elapsed() >= Duration::from_millis(350));
+        assert!(started.elapsed() >= Duration::from_millis(550));
     }
 }
