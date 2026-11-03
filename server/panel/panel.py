@@ -1383,8 +1383,10 @@ class PanelHandler(BaseHTTPRequestHandler):
         if not m or "/api/" in m.group(1):
             # The public site forwards /portal/* matched the way Caddy does: decoded, lowercased,
             # slashes merged and dot segments removed (/PORTAL/, /portal%2F/, /api/../portal/).
-            # Never let those reach the panel.
-            clean = posixpath.normpath("/" + re.sub(r"/+", "/", unquote(path).lower()).lstrip("/"))
+            # Never let those reach the panel. The raw path, as Caddy sees it: urlparse() drops a
+            # last ";..." segment part, so /PORTAL/..; would look like /portal/.. here.
+            raw = self.path.split("?", 1)[0]
+            clean = posixpath.normpath("/" + re.sub(r"/+", "/", unquote(raw).lower()).lstrip("/"))
             if clean == "/portal" or clean.startswith("/portal/"):
                 self.reply(404, "inexistent")
                 return True
