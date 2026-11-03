@@ -208,7 +208,8 @@ async fn start_hbbs_sync_async() {
                             }
                         }
                     }
-                    match crate::post_request(url.replace("heartbeat", "sysinfo"), v, "").await {
+                    let header = crate::license::request_signature("/api/sysinfo", &v, &Config::get_key_pair().0);
+                    match crate::post_request(url.replace("heartbeat", "sysinfo"), v, &header).await {
                         Ok(x)  => {
                             if x == "SYSINFO_UPDATED" {
                                 info_uploaded = InfoUploaded::uploaded(url.clone(), id.clone(), sys_username);
@@ -242,7 +243,10 @@ async fn start_hbbs_sync_async() {
                 }
                 let modified_at = LocalConfig::get_option("strategy_timestamp").parse::<i64>().unwrap_or(0);
                 v["modified_at"] = json!(modified_at);
-                let response = crate::post_request(url.clone(), v.to_string(), "").await;
+                v["ts"] = json!(crate::license::request_time());
+                let body = v.to_string();
+                let header = crate::license::request_signature("/api/heartbeat", &body, &Config::get_key_pair().0);
+                let response = crate::post_request(url.clone(), body, &header).await;
                 if let Err(err) = &response {
                     hbb_common::throttled_log!(API_LOG_INTERVAL, warn, "Heartbeat failed: {err:?}");
                 }
@@ -261,6 +265,9 @@ async fn start_hbbs_sync_async() {
                         }
                         if let Some(strict) = rsp.remove("license_strict") {
                             crate::license::store_strict(strict.as_i64() == Some(1));
+                        }
+                        if let Some(pass_key) = rsp.remove("license_pass_key") {
+                            crate::license::store_pass_key(pass_key.as_i64() == Some(1));
                         }
                         crate::license::set_disconnect_reason(
                             rsp.remove("disconnect_reason").as_ref().and_then(|r| r.as_str()).unwrap_or_default(),

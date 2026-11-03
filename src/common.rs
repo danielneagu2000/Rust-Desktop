@@ -1284,6 +1284,13 @@ pub fn get_api_server(api: String, custom: String) -> String {
     if Config::no_register_device() {
         return "".to_owned();
     }
+    // Branded apps have one license server, the built-in API server: an ID server typed by hand
+    // must not move it to http://<that host>:21114, which has no TLS.
+    let custom = if crate::is_custom_client() {
+        String::new()
+    } else {
+        custom
+    };
     let mut res = get_api_server_(api, custom);
     if res.ends_with('/') {
         res.pop();
@@ -3309,6 +3316,20 @@ mod tests {
             get_api_server_("".to_owned(), "2001:db8::1".to_owned()),
             "http://[2001:db8::1]:21114"
         );
+    }
+
+    #[test]
+    fn branded_api_server_ignores_a_hand_typed_id_server() {
+        if !crate::is_custom_client() {
+            return;
+        }
+        let built_in = get_api_server("".to_owned(), "".to_owned());
+        let typed = get_api_server("".to_owned(), "203.0.113.7".to_owned());
+        assert_eq!(typed, built_in);
+        assert!(!built_in.contains("203.0.113.7"));
+        let api = "https://api.example.com".to_owned();
+        let set = get_api_server(api.clone(), "203.0.113.7".to_owned());
+        assert_eq!(set, api);
     }
 
     #[test]

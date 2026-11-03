@@ -89,6 +89,8 @@ message LoginRequest {
   // RDN Remote: pass of the controlling app (src/license.rs). A high number so a field
   // upstream adds later never collides with it.
   string rdn_pass = 1001;
+  // Signature of this login with the device key the pass names (sign_login in src/license.rs).
+  bytes rdn_proof = 1002;
 }
 
 message Terminal {

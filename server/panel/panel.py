@@ -130,7 +130,8 @@ def db():
         conn.execute("ALTER TABLE licenses ADD COLUMN permanent INTEGER DEFAULT 0")
     # Organization portal: names and rights per device (set by the client's administrator).
     acols = {r[1] for r in conn.execute("PRAGMA table_info(activations)")}
-    for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1")):
+    for col, ddl in (("alias", "TEXT"), ("can_control", "INTEGER DEFAULT 1"), ("accept_external", "INTEGER DEFAULT 1"),
+                     ("pk", "TEXT")):
         if acols and col not in acols:
             conn.execute(f"ALTER TABLE activations ADD COLUMN {col} {ddl}")
     return conn
@@ -179,7 +180,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS activations (
             uuid TEXT PRIMARY KEY, code TEXT, device_id TEXT, hostname TEXT,
             activated REAL, last_seen REAL,
-            alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1
+            alias TEXT, can_control INTEGER DEFAULT 1, accept_external INTEGER DEFAULT 1, pk TEXT
         );
         CREATE TABLE IF NOT EXISTS shop_orders (
             order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, new_codes TEXT, extended TEXT, message TEXT,
@@ -512,16 +513,34 @@ TOKEN_PREFIX = b"\x00RDN-LICENSE-1\x00"
 # without one ("peer_control"), which then accept it; with "require_controller_license" on,
 # computers with a license accept only apps that send a pass. Peers see it, so it holds only
 # the device ID: the license token names the machine uuid, which is all the API asks for
-# before handing out that machine's license.
+# before handing out that machine's license. Once the device's activation is bound to its key
+# (check_device_key), the pass also names that key (k) and the app signs every login with it
+# (sign_login in src/license.rs): a pass copied from a login is then of no use on its own.
 PASS_PREFIX = b"\x00RDN-PASS-1\x00"
 PASS_TTL = 86400
+# Apps from 1.5.1-4 sign what they post to /api/heartbeat, /api/sysinfo and /api/license/activate
+# with the device key hbbs knows their ID by: X-RDN-Signature over SIG_PREFIX + path + NUL + body
+# (signed_request in src/license.rs). A heartbeat body carries its time ("ts"), so a copy of one
+# stops working after SIG_MAX_AGE.
+SIG_PREFIX = b"\x00RDN-API-1\x00"
+SIG_HEADER = "X-RDN-Signature"
+SIG_MAX_AGE = TOKEN_TTL
 try:  # libsodium (constant time) when the image provides it; see panel/Dockerfile
+    import nacl.exceptions
     import nacl.signing
 
     def _sign(seed, msg):
         return nacl.signing.SigningKey(seed).sign(msg).signature
+
+    def _verify(public, msg, signature):
+        try:
+            nacl.signing.VerifyKey(public).verify(msg, signature)
+            return True
+        except (nacl.exceptions.CryptoError, ValueError, TypeError):
+            return False
 except ImportError:
     _sign = ed25519.sign
+    _verify = ed25519.verify
 PERIODS = (0, 1, 3, 6, 9, 12)
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 _SIGNING_SEED = None
@@ -590,6 +609,136 @@ def id_belongs_to(device_id, uuid):
         return False
 
 
+def hbbs_rows(sql, args):
+    """Rows of hbbs' database, or None when it can't be read."""
+    try:
+        con = sqlite3.connect(f"file:{DATA_DIR / 'db_v2.sqlite3'}?mode=ro", uri=True, timeout=2)
+        try:
+            return con.execute(sql, args).fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return None
+
+
+def as_bytes(v):
+    return v.encode() if isinstance(v, str) else bytes(v or b"")
+
+
+def hbbs_key(device_id, raw_uuid):
+    """The key hbbs registered this ID with, when it registered the ID for this computer (raw uuid).
+    hbbs lets a registered ID change its key only from the same uuid and IP address."""
+    rows = hbbs_rows("SELECT uuid, pk FROM peer WHERE id = ?", (device_id,)) if device_id else None
+    if not rows or as_bytes(rows[0][0]) != raw_uuid or len(as_bytes(rows[0][1])) != 32:
+        return None
+    return as_bytes(rows[0][1])
+
+
+def hbbs_ids(raw_uuid):
+    rows = hbbs_rows("SELECT id FROM peer WHERE uuid = ?", (raw_uuid,))
+    return [r[0] for r in rows or []]
+
+
+def request_auth(headers, path, raw):
+    """(signature, signed bytes) of an API request; the signature is None when there is none (apps
+    before 1.5.1-4) and b"" when it is malformed."""
+    sig = headers.get(SIG_HEADER)
+    if sig is None:
+        return None, b""
+    try:
+        sig = base64.b64decode(sig.strip(), validate=True)
+    except ValueError:
+        sig = b""
+    return (sig if len(sig) == 64 else b""), SIG_PREFIX + path.encode() + b"\x00" + raw
+
+
+def activation_of(uuid):
+    rows = q("SELECT code, device_id, pk FROM activations WHERE uuid = ?", (uuid,))
+    return rows[0] if rows else None
+
+
+def check_device_key(uuid, device_id, auth, act):
+    """Whether a request for computer `uuid` comes from that computer, judged by the device key that
+    signed it. Returns (who, key, own):
+    - who "key": signed with the key bound to the computer's activation (act["pk"]) or with the key
+      hbbs has for the ID the activation names, which replaces the bound one after a reinstall. An
+      activation not bound yet takes the key of the request's ID, when hbbs has no other ID for
+      this uuid and the activation names no ID of this computer. `key` is the key to keep.
+    - who "old": no signature (apps before 1.5.1-4), or one that can't be checked, on a computer
+      whose activation is not bound to a key; refused for activated computers with
+      require_signed_apps on.
+    - who None: anything else. Someone who knows a computer's uuid can no longer speak for it once
+      its activation is bound to a key.
+    `own` is the key of the request's ID at hbbs when the request carries its signature, else None."""
+    sig, msg = auth
+    bound = act["pk"] if act else None
+    if sig is None:
+        if bound or (act and conf("require_signed_apps")):
+            return None, None, None
+        return "old", None, None
+    try:
+        raw_uuid = base64.b64decode(uuid, validate=True)
+        bound = base64.b64decode(bound, validate=True) if bound else None
+    except ValueError:
+        return None, None, None
+    own = hbbs_key(device_id, raw_uuid)
+    own = own if own and sig and _verify(own, msg, sig) else None
+    anchor = hbbs_key(act["device_id"], raw_uuid) if act else None
+    for key in (bound, anchor):
+        if key and sig and (key == own or _verify(key, msg, sig)):
+            return "key", key, own
+    if bound or anchor:
+        return None, None, own
+    if own and len(hbbs_ids(raw_uuid)) == 1:
+        return "key", own, own
+    if act and conf("require_signed_apps"):
+        return None, None, own
+    return "old", None, own
+
+
+def bind_device_key(uuid, device_id, key, own):
+    """Keeps the key that signed for this computer's activation, and the request's ID when hbbs
+    registered it with that key: the ID the portal and session limits count for the license."""
+    b64 = base64.b64encode(key).decode()
+    if own == key:
+        x("UPDATE activations SET pk=?, device_id=? WHERE uuid=? AND (pk IS NOT ? OR device_id IS NOT ?)",
+          (b64, device_id, uuid, b64, device_id))
+    else:
+        x("UPDATE activations SET pk=? WHERE uuid=? AND pk IS NOT ?", (b64, uuid, b64))
+
+
+REFUSED_LOGGED = {}
+
+
+def log_refused(uuid, device_id, src_ip, what):
+    """One line per computer and hour: the computer may keep retrying."""
+    now = time.time()
+    if now - REFUSED_LOGGED.get(uuid, 0) < 3600:
+        return
+    if len(REFUSED_LOGGED) > 10000:
+        REFUSED_LOGGED.clear()
+    REFUSED_LOGGED[uuid] = now
+    log(f"licenses: {what} for {as_text(device_id, 40)} ({src_ip}) refused: not signed with the key of the "
+        "computer's activation")
+
+
+def recheck_activations():
+    """Activations made before the ID check (1.5.1-3) may name an ID hbbs registered for another computer;
+    the portal and the session limits would count that computer's sessions for the license. Such an ID
+    becomes the one hbbs has for this computer, or none when it has none or several."""
+    for a in q("SELECT uuid, device_id FROM activations WHERE device_id IS NOT NULL AND device_id != ''"):
+        if id_belongs_to(a["device_id"], a["uuid"]):
+            continue
+        try:
+            ids = hbbs_ids(base64.b64decode(a["uuid"], validate=True))
+        except ValueError:
+            ids = []
+        new = ids[0] if len(ids) == 1 else ""
+        x("UPDATE activations SET device_id=? WHERE uuid=? AND device_id=?", (new, a["uuid"], a["device_id"]))
+        log(f"licenses: an activation named {a['device_id']}, which hbbs registered for another computer; "
+            f"it now names {new or 'no ID'}")
+
+
 def normalize_code(raw):
     """Accept codes typed in lowercase, without dashes or with spaces."""
     code = re.sub(r"[^A-Z0-9]", "", str(raw or "").upper())
@@ -647,18 +796,21 @@ def issue_token(uuid, lic):
     return token
 
 
-def issue_pass(device_id, lic):
+def issue_pass(device_id, lic, device_key=None):
     seed = signing_seed()
     if not seed or not device_id:
         return ""
     expires, peer = lic["expires"], 1 if lic["peer_control"] else 0
-    key = (device_id, lic["code"], expires, peer)
+    key = (device_id, lic["code"], expires, peer, device_key)
     cached = _PASS_CACHE.get(key)
     now = time.time()
     if cached and now - cached[1] < 3600:
         return cached[0]
     exp = now + PASS_TTL if expires is None else min(expires, now + PASS_TTL)
-    payload = PASS_PREFIX + json.dumps({"i": device_id, "e": int(exp), "p": peer}, separators=(",", ":")).encode()
+    claims = {"i": device_id, "e": int(exp), "p": peer}
+    if device_key:
+        claims["k"] = device_key
+    payload = PASS_PREFIX + json.dumps(claims, separators=(",", ":")).encode()
     token = base64.b64encode(_sign(seed, payload) + payload).decode()
     if len(_PASS_CACHE) > 5000:
         _PASS_CACHE.clear()
@@ -694,7 +846,7 @@ def controller_licensed(uuid, conn_id):
     return controller_license(s["peer_id"]) is not None
 
 
-def activate(v, src_ip):
+def activate(v, src_ip, auth=(None, b"")):
     now = time.time()
     # The app sends its language; older apps send nothing and keep the Romanian messages.
     en = not str(v.get("lang") or "ro").lower().startswith("ro")
@@ -744,6 +896,19 @@ def activate(v, src_ip):
     if lic["expires"] is not None and lic["expires"] <= now:
         return fail(t("Licența a expirat. Contactează RDN Network Data pentru prelungire.",
                       "The license has expired. Contact RDN Network Data to renew it."))
+    act = activation_of(uuid)
+    who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act)
+    if who is None and act and act["code"] == code and own:
+        # The same code again from a reinstalled app, whose new key hbbs has for its ID.
+        who, key = "key", own
+    if who is None:
+        if auth[0] is None:
+            return fail(t("Actualizează aplicația RDN Remote la ultima versiune și reîncearcă.",
+                          "Update RDN Remote to the latest version and try again."))
+        return fail(t("Calculatorul are deja o licență activată din altă instalare a aplicației. Introdu codul "
+                      "acelei licențe sau contactează RDN Network Data.",
+                      "This computer already has a license activated from another installation of the app. "
+                      "Enter that license's code or contact RDN Network Data."))
     with DB_LOCK:
         already = DB.execute("SELECT 1 FROM activations WHERE uuid=? AND code=?", (uuid, code)).fetchone()
         used = DB.execute("SELECT COUNT(*) FROM activations WHERE code=?", (code,)).fetchone()[0]
@@ -760,15 +925,26 @@ def activate(v, src_ip):
                activated=excluded.activated, last_seen=excluded.last_seen""",
             (uuid, code, as_text(v.get("id"), 40), as_text(v.get("hostname"), 100), now, now),
         )
+    if who == "key":
+        bind_device_key(uuid, as_text(v.get("id"), 40), key, own)
     lic = q("SELECT * FROM licenses WHERE code = ?", (code,))[0]
     log(f"licenses: {code} activated on {as_text(v.get('id'), 40)} ({src_ip})")
     return {"license": issue_token(uuid, lic), "expires": int(lic["expires"] or 0), "client": lic["client"]}
 
 
-def heartbeat(v, src_ip):
+def heartbeat(v, src_ip, auth=(None, b"")):
     uuid = as_text(v.get("uuid"), 100)
     if not uuid:
         return {}
+    act = activation_of(uuid)
+    who, key, own = check_device_key(uuid, as_text(v.get("id"), 40), auth, act)
+    if who == "key" and auth[0] and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE:
+        who = None
+    if who is None:
+        log_refused(uuid, v.get("id"), src_ip, "heartbeat")
+        return {}
+    if who == "key" and act:
+        bind_device_key(uuid, as_text(v.get("id"), 40), key, own)
     conns = v.get("conns") or []
     conns = [c for c in conns if isinstance(c, int)][:100]
     x(
@@ -793,8 +969,10 @@ def heartbeat(v, src_ip):
         if token:
             out["license"] = token
             device_id = as_text(v.get("id"), 40)
-            out["license_pass"] = issue_pass(device_id, lic) if id_belongs_to(device_id, uuid) else ""
+            pass_key = base64.b64encode(key).decode() if who == "key" else None
+            out["license_pass"] = issue_pass(device_id, lic, pass_key) if id_belongs_to(device_id, uuid) else ""
             out["license_strict"] = 1 if conf("require_controller_license") else 0
+            out["license_pass_key"] = conf("require_signed_apps")
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
         # Licensed builds drop their token and block themselves; close what is open unless it is
@@ -809,9 +987,9 @@ def heartbeat(v, src_ip):
     return out
 
 
-def sysinfo(v, src_ip):
+def sysinfo(v, src_ip, auth=(None, b"")):
     uuid = as_text(v.get("uuid"), 100)
-    if uuid:
+    if uuid and check_device_key(uuid, as_text(v.get("id"), 40), auth, activation_of(uuid))[0]:
         x(
             """INSERT INTO devices(uuid, device_id, last_seen, src_ip, hostname, os, username, cpu, memory)
                VALUES(?,?,?,?,?,?,?,?,?)
@@ -877,11 +1055,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self.reply(400, {"error": "bad json"})
         if not isinstance(v, dict):
             return self.reply(400, {"error": "bad json"})
+        auth = request_auth(self.headers, path, raw)
         try:
             if path == "/version/latest":
                 return self.reply(200, latest_release() or {"url": ""})
             if path == "/api/license/activate":
-                return self.reply(200, activate(v, src_ip))
+                return self.reply(200, activate(v, src_ip, auth))
             if path == "/api/audit/conn":
                 ingest_conn(v, src_ip)
                 return self.reply(200)
@@ -892,9 +1071,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ingest_file(v, src_ip)
                 return self.reply(200)
             if path == "/api/heartbeat":
-                return self.reply(200, heartbeat(v, src_ip))
+                return self.reply(200, heartbeat(v, src_ip, auth))
             if path == "/api/sysinfo":
-                return self.reply(200, sysinfo(v, src_ip))
+                return self.reply(200, sysinfo(v, src_ip, auth))
         except Exception as e:  # keep the listener alive; the client retries 5xx
             log(f"ingest error on {path}: {e!r}")
             return self.reply(500, {"error": "internal"})
@@ -2226,6 +2405,9 @@ CONFIG = {
     "retention_days": ("int", RETENTION_DAYS, 7, 3650),
     # Computers with a license accept only apps that prove a license of their own (a pass).
     "require_controller_license": ("bool", 0),
+    # Licenses only for apps that sign with their device key (1.5.1-4 and later), and passes only
+    # when bound to that key (check_device_key, issue_pass).
+    "require_signed_apps": ("bool", 0),
     "shop_statuses": ("set", "processing,completed", tuple(SHOP_STATUSES)),
     "shop_renew": ("bool", 1),
     "shop_quantity": ("choice", "sessions", ("sessions", "seats", "months", "none")),
@@ -2696,6 +2878,7 @@ def housekeeping():
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
             x("DELETE FROM peer_targets WHERE last < ?", (time.time() - PEER_WINDOW,))
+            recheck_activations()
             # The audit API is public: cap what unauthenticated posts can grow to.
             for table, order in (("sessions", "started"), ("alarms", "ts"), ("devices", "last_seen")):
                 x(f"DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} "

@@ -2,7 +2,8 @@
 
 Used to sign license tokens with the rendezvous server's key (data/id_ed25519), which
 clients verify with libsodium's crypto_sign_open. Signing is not constant-time; the
-panel signs a few tokens per minute on a machine the operator controls.
+panel signs a few tokens per minute on a machine the operator controls. verify() checks
+the device-key signatures apps put on their requests when PyNaCl is not installed.
 """
 
 import hashlib
@@ -87,3 +88,37 @@ def sign(seed, msg):
     k = _hash_int(big_r + pub + msg) % _Q
     s = (r + k * a) % _Q
     return big_r + int.to_bytes(s, 32, "little")
+
+
+def _decompress(s):
+    if len(s) != 32:
+        return None
+    y = int.from_bytes(s, "little")
+    sign = y >> 255
+    y &= (1 << 255) - 1
+    if y >= _P:
+        return None
+    x2 = (y * y - 1) * _inv(_D * y * y + 1) % _P
+    if x2 == 0:
+        return None if sign else (0, y, 1, 0)
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P != 0:
+        x = x * _SQRT_M1 % _P
+    if (x * x - x2) % _P != 0:
+        return None
+    if (x & 1) != sign:
+        x = _P - x
+    return (x, y, 1, x * y % _P)
+
+
+def verify(public, msg, signature):
+    """True when signature is a valid detached Ed25519 signature of msg by the 32-byte public key."""
+    if len(public) != 32 or len(signature) != 64:
+        return False
+    a, r = _decompress(public), _decompress(signature[:32])
+    s = int.from_bytes(signature[32:], "little")
+    if a is None or r is None or s >= _Q:
+        return False
+    h = _hash_int(signature[:32] + public + msg) % _Q
+    left, right = _mul(s, _G), _add(r, _mul(h, a))
+    return (left[0] * right[2] - right[0] * left[2]) % _P == 0 and (left[1] * right[2] - right[1] * left[2]) % _P == 0

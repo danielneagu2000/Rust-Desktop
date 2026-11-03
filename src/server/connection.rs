@@ -1896,6 +1896,19 @@ impl Connection {
             return true;
         }
         self.awaiting_2fa = false;
+        // The license, or its permanent password, may have been revoked while the login waited
+        // for approval or the 2FA code.
+        if let Err(msg) = crate::license::login_check(&self.lr, &self.hash.challenge) {
+            self.send_login_error(msg).await;
+            return false;
+        }
+        if self.conn_audit_primary_auth == ConnAuditPrimaryAuth::PermanentPassword
+            && !crate::license::permanent_password_allowed()
+        {
+            self.send_login_error(crate::client::LOGIN_MSG_PASSWORD_WRONG)
+                .await;
+            return false;
+        }
         // The later check also covers revocation while connection setup awaits.
         if !self.check_trusted_device().await {
             return false;
@@ -2919,7 +2932,7 @@ impl Connection {
             if !self.check_login_scope(&lr).await {
                 return false;
             }
-            if let Err(msg) = crate::license::login_check(&lr.rdn_pass, &lr.my_id) {
+            if let Err(msg) = crate::license::login_check(&lr, &self.hash.challenge) {
                 self.send_login_error(msg).await;
                 return false;
             }
@@ -3164,7 +3177,7 @@ impl Connection {
             #[cfg(feature = "flutter")]
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(lr) = _s.lr.clone().take() {
-                if let Err(msg) = crate::license::login_check(&lr.rdn_pass, &lr.my_id) {
+                if let Err(msg) = crate::license::login_check(&lr, &self.hash.challenge) {
                     self.send_login_error(msg).await;
                     return false;
                 }

@@ -4823,6 +4823,8 @@ async fn send_login(
         .read()
         .unwrap()
         .create_login_msg(os_username, os_password, password);
+    let challenge = lc.read().unwrap().hash.challenge.clone();
+    let msg_out = crate::license::sign_login_msg(msg_out, &challenge).await;
     let msg_out = trust.login(msg_out).await?;
     peer.send(&msg_out).await
 }
@@ -4898,6 +4900,8 @@ async fn send_switch_login_request(
         ),
         ..Default::default()
     });
+    let challenge = lc.read().unwrap().hash.challenge.clone();
+    let msg_out = crate::license::sign_login_msg(msg_out, &challenge).await;
     allow_err!(peer.send(&msg_out).await);
 }
 
