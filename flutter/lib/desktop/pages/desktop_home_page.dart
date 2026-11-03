@@ -443,7 +443,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           handleUpdate(updateUrl);
         };
       }
-      return buildInstallCard(
+      final card = buildInstallCard(
           "Status",
           "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
           btnText,
@@ -454,6 +454,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           closeButton: isMacOS || !isOptionFixed(kOptionAllowAutoUpdate),
           help: null,
           link: null);
+      // Linux keeps the card, which cannot be closed, but its Wayland/SELinux warnings still show.
+      if (isLinux && isOptionFixed(kOptionAllowAutoUpdate)) {
+        return Column(mainAxisSize: MainAxisSize.min, children: [card, buildHelpCards('')]);
+      }
+      return card;
     }
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
