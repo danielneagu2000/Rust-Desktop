@@ -106,6 +106,8 @@ def body_length(headers, limit):
 def log(msg):
     # Messages carry text sent by anyone (device IDs, codes): no line breaks or terminal escapes.
     msg = re.sub(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]", "?", str(msg))
+    # A license code grants seats: only its last group goes to the log, enough to tell codes apart.
+    msg = re.sub(r"\bRDN-(?:[A-Z0-9]{4,5}-){2,4}([A-Z0-9]{4,5})\b", r"RDN-…-\1", msg)
     print(time.strftime("%Y-%m-%d %H:%M:%S"), msg, flush=True)
 
 
@@ -559,6 +561,31 @@ def new_code():
     return "RDN-" + "-".join(groups)
 
 
+def mask_code(code):
+    """A license code shortened for people who must recognise it but not use it."""
+    code = str(code or "")
+    return code if len(code) <= 10 else f"{code[:4]}…{code[-5:]}"
+
+
+def id_belongs_to(device_id, uuid):
+    """False when hbbs registered this RustDesk ID for another computer. hbbs keeps one uuid per ID
+    (peer.uuid, raw bytes; the app sends it base64-encoded); an ID it does not know, or a database
+    that cannot be read, is accepted as before."""
+    try:
+        claimed = base64.b64decode(uuid, validate=True)
+        con = sqlite3.connect(f"file:{DATA_DIR / 'db_v2.sqlite3'}?mode=ro", uri=True, timeout=2)
+        try:
+            row = con.execute("SELECT uuid FROM peer WHERE id = ?", (device_id,)).fetchone()
+        finally:
+            con.close()
+    except (ValueError, sqlite3.Error):
+        return True
+    registered = row[0] if row else None
+    if isinstance(registered, str):
+        registered = registered.encode()
+    return not registered or bytes(registered) == claimed
+
+
 def normalize_code(raw):
     """Accept codes typed in lowercase, without dashes or with spaces."""
     code = re.sub(r"[^A-Z0-9]", "", str(raw or "").upper())
@@ -701,6 +728,10 @@ def activate(v, src_ip):
     rows = q("SELECT * FROM licenses WHERE code = ?", (code,))
     if not rows:
         return fail(t("Cod de licență invalid", "Invalid license code"))
+    # The portal attributes sessions to a license by this ID: never let a computer claim another's.
+    if not id_belongs_to(as_text(v.get("id"), 40), uuid):
+        return fail(t("ID-ul acestui calculator nu corespunde serverului. Repornește aplicația și reîncearcă.",
+                      "This computer's ID does not match the server. Restart the app and try again."))
     lic = rows[0]
     if lic["revoked"]:
         return fail(t("Licența a fost revocată. Contactează RDN Network Data.",
@@ -756,7 +787,8 @@ def heartbeat(v, src_ip):
         token = issue_token(uuid, lic)
         if token:
             out["license"] = token
-            out["license_pass"] = issue_pass(as_text(v.get("id"), 40), lic)
+            device_id = as_text(v.get("id"), 40)
+            out["license_pass"] = issue_pass(device_id, lic) if id_belongs_to(device_id, uuid) else ""
             out["license_strict"] = 1 if conf("require_controller_license") else 0
             x("UPDATE activations SET last_seen=? WHERE uuid=?", (time.time(), uuid))
     elif LICENSE_REQUIRED and signing_seed():
@@ -836,7 +868,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             v = json.loads(raw or b"{}")
-        except ValueError:
+        except (ValueError, RecursionError):
             return self.reply(400, {"error": "bad json"})
         if not isinstance(v, dict):
             return self.reply(400, {"error": "bad json"})
@@ -1502,7 +1534,7 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(413, {"error": "bad or too large body"})
         try:
             v = json.loads(self.rfile.read(length) or b"{}")
-        except ValueError:
+        except (ValueError, RecursionError):
             return self.reply(400, {"error": "bad json"})
         if not isinstance(v, dict):
             return self.reply(400, {"error": "bad json"})
@@ -1567,7 +1599,7 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(413, {"error": "bad or too large body"})
         try:
             v = json.loads(self.rfile.read(length) or b"{}")
-        except ValueError:
+        except (ValueError, RecursionError):
             return self.reply(400, {"error": "bad json"})
         if action == "block":
             ip = valid_ip(v.get("ip"))
@@ -1997,7 +2029,7 @@ def portal_state(user):
         d["conns"] = json.loads(d["conns"] or "[]") if d["online"] else []
     since = now - 30 * 86400
     sessions = q(
-        """SELECT s.id, s.uuid, s.conn_id, s.authed, s.ended, s.peer_id, s.peer_name, s.conn_type, s.files,
+        """SELECT s.id, s.conn_id, s.authed, s.ended, s.peer_id, s.peer_name, s.conn_type, s.files,
                   s.remote_ip, COALESCE(td.hostname, ta.hostname) AS target_name, s.device_id AS target_id,
                   (ta.uuid IS NOT NULL) AS incoming, (pa.uuid IS NOT NULL) AS outgoing
            FROM sessions s
@@ -2014,7 +2046,8 @@ def portal_state(user):
         "now": now,
         "me": {"id": user["id"], "email": user["email"], "name": user["name"], "role": user["role"]},
         "org": {
-            "client": lic["client"], "code": lic["code"], "status": license_status(lic, now),
+            "client": lic["client"], "status": license_status(lic, now),
+            "code": lic["code"] if user["role"] == "admin" else mask_code(lic["code"]),
             "expires": lic["expires"], "seats": lic["seats"], "used": len(devices),
             "sessions": lic.get("sessions") or 0, "bandwidth": lic.get("bandwidth") or 0,
         },
@@ -2495,7 +2528,8 @@ def shop_order(order):
                 x("INSERT INTO shop_licenses(code, email, product, created) VALUES(?,?,?,?)", (code, email, pid, now))
                 new_codes.append(code)
             codes.append(code)
-            notes.append(fill_template(template, {"cod": code, "produs": product["name"], "luni": months_text(months),
+            notes.append(fill_template(template, {"cod": mask_code(code) if prev else code,
+                                                  "produs": product["name"], "luni": months_text(months),
                                                   "client": client, "comanda": order_id, "site": site, "email": email}))
         if not codes:
             x("UPDATE shop_orders SET error=? WHERE order_id=?", ("; ".join(errors) or "niciun produs RDN Remote", order_id))
@@ -2636,6 +2670,8 @@ def restore_live(blob):
         restored.append("IP-uri blocate")
     _TOKEN_CACHE.clear()
     _PASS_CACHE.clear()
+    with AUTH_LOCK:
+        PORTAL_SESSIONS.clear()
     log(f"backup: restored {manifest.get('created')} (safety copy {safety.name})")
     return 200, {"ok": True, "restored": restored, "created": manifest.get("created"), "safety": safety.name}
 
