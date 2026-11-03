@@ -286,9 +286,11 @@ def update_patches(cfg):
          lambda m: f"{m.group(1)}{display};"),
         # Desktop "new version" card: shown for this client too, links to its own site/releases.
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
-         r"if \((?:!bind\.isCustomClient\(\) &&\n\s*)?updateUrl\.isNotEmpty &&\n(\s*)!isCardClosed"
+         r"if \((?:!bind\.isCustomClient\(\) &&\n\s*)?updateUrl\.isNotEmpty &&\n(\s*)"
+         r"(?:!isCardClosed|\(!isCardClosed \|\| \(isLinux && isOptionFixed\(kOptionAllowAutoUpdate\)\)\))"
          r"(?: &&\n\s*bind\.mainUriPrefixSync\(\)\.contains\('rustdesk'\))?\) \{",
-         lambda m: f"if (updateUrl.isNotEmpty &&\n{m.group(1)}!isCardClosed) {{"),
+         lambda m: f"if (updateUrl.isNotEmpty &&\n{m.group(1)}"
+                   "(!isCardClosed || (isLinux && isOptionFixed(kOptionAllowAutoUpdate)))) {"),
         ("flutter/lib/desktop/pages/desktop_home_page.dart",
          r"(final Uri url = Uri\.parse\(')[^']*('\);\n\s*await launchUrl\(url\);)",
          lambda m: f"{m.group(1)}{web}/{m.group(2)}"),
