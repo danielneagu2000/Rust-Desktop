@@ -1773,6 +1773,14 @@ async fn post_request_(
     danger_accept_invalid_cert: Option<bool>,
     original_danger_accept_invalid_cert: Option<bool>,
 ) -> ResultType<reqwest::Response> {
+    // RDN Remote: the app's own API server has a valid certificate, and license activations and
+    // heartbeats go through here, so never retry without certificate checks. A proxy whose CA the
+    // system trusts still works through the native-tls retry.
+    let (danger_accept_invalid_cert, original_danger_accept_invalid_cert) = if crate::is_custom_client() {
+        (Some(false), Some(false))
+    } else {
+        (danger_accept_invalid_cert, original_danger_accept_invalid_cert)
+    };
     let mut req = create_http_client_async(
         tls_type.unwrap_or(TlsType::Rustls),
         danger_accept_invalid_cert.unwrap_or(false),
