@@ -214,7 +214,7 @@ def as_text(v, limit=200):
 def as_int(v):
     try:
         return int(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -706,7 +706,7 @@ def check_device_key(uuid, device_id, auth, act):
         if sig and (bound == own or _verify(bound, msg, sig)):
             return "key", bound, own
         return None, None, own
-    only = hbbs_only_key(raw_uuid) or (hbbs_first_key(raw_uuid) if conf("require_signed_apps") else None)
+    only = (hbbs_only_key(raw_uuid) or (hbbs_first_key(raw_uuid) if conf("require_signed_apps") else None)) if sig else None
     if only and sig and (only == own or _verify(only, msg, sig)):
         return "key", only, own
     if conf("require_signed_apps"):
@@ -750,7 +750,8 @@ def recheck_activations():
             ids = hbbs_ids(base64.b64decode(a["uuid"], validate=True))
         except ValueError:
             ids = []
-        new = ids[0] if len(ids) == 1 else ""
+        # NULL, not "": sessions with an empty peer ID would count for the license.
+        new = ids[0] if len(ids) == 1 else None
         x("UPDATE activations SET device_id=? WHERE uuid=? AND device_id=?", (new, a["uuid"], a["device_id"]))
         log(f"licenses: an activation named {a['device_id']}, which hbbs registered for another computer; "
             f"it now names {new or 'no ID'}")
@@ -966,7 +967,7 @@ def heartbeat(v, src_ip, auth=(None, b"")):
     if not uuid:
         return {}
     act = activation_of(uuid)
-    stale = auth[0] is not None and abs(time.time() - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE
+    stale = auth[0] is not None and abs(int(time.time()) - (as_int(v.get("ts")) or 0)) > SIG_MAX_AGE
     if stale:
         # A replayed old request, or a clock far off: counts as not signed.
         auth = (None, b"")
