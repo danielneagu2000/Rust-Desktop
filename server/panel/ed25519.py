@@ -111,13 +111,19 @@ def _decompress(s):
     return (x, y, 1, x * y % _P)
 
 
+def _small(p):
+    """A point of order 1 to 8, which libsodium refuses: any signature can be made to verify with one."""
+    q = _mul(8, p)
+    return q[0] % _P == 0 and (q[1] - q[2]) % _P == 0
+
+
 def verify(public, msg, signature):
     """True when signature is a valid detached Ed25519 signature of msg by the 32-byte public key."""
     if len(public) != 32 or len(signature) != 64:
         return False
     a, r = _decompress(public), _decompress(signature[:32])
     s = int.from_bytes(signature[32:], "little")
-    if a is None or r is None or s >= _Q:
+    if a is None or r is None or s >= _Q or _small(a) or _small(r):
         return False
     h = _hash_int(signature[:32] + public + msg) % _Q
     left, right = _mul(s, _G), _add(r, _mul(h, a))

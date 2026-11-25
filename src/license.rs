@@ -127,12 +127,16 @@ fn proof_message(lr: &LoginRequest, challenge: &str) -> Vec<u8> {
 }
 
 /// A pass with a device key counts only with that key's signature of this login, made for this
-/// computer: its ID, or an address when the controlling app dialed one.
+/// computer: its ID, or an address when the controlling app dialed one (the same tests the app
+/// uses to dial directly, so an ID registered with a dot or a NUL in it doesn't pass for one).
 fn proof_ok(pass: &Pass, lr: &LoginRequest, challenge: &str, own_id: &str) -> bool {
     if pass.k.is_empty() {
         return Config::get_option(OPTION_PASS_KEY) != "Y";
     }
-    if lr.username != own_id && !lr.username.contains(['.', ':']) {
+    if lr.username != own_id
+        && !hbb_common::is_ip_str(&lr.username)
+        && !hbb_common::is_domain_port_str(&lr.username)
+    {
         return false;
     }
     let pk = crate::decode64(&pass.k)
@@ -536,6 +540,23 @@ mod tests {
             .to_vec()
             .into();
         assert!(proof_ok(&pass, &by_ip, "abc123", "111222333"));
+        // Relayed by the computer it was made for: a NUL in its challenge moves the ID field, or
+        // its ID has a dot in it. Neither is an address.
+        for (challenge, username) in [("abc123\0.", "111222333"), ("abc123", "abc.def1")] {
+            let mut relayed = login(None, challenge);
+            relayed.username = username.to_owned();
+            relayed.rdn_proof = sign::sign_detached(&proof_message(&relayed, challenge), &sk)
+                .to_bytes()
+                .to_vec()
+                .into();
+            let mut at_other = relayed.clone();
+            at_other.username = if challenge.contains('\0') {
+                ".\0111222333".to_owned()
+            } else {
+                username.to_owned()
+            };
+            assert!(!proof_ok(&pass, &at_other, "abc123", "999888777"));
+        }
     }
 
     #[test]
