@@ -606,7 +606,7 @@ mod tests {
         b.wait_file(400).await;
         assert!(started.elapsed() >= Duration::from_millis(550));
         let started = Instant::now();
-        screen.wait(400).await;
-        assert!(started.elapsed() < Duration::from_millis(550));
+        screen.wait(150).await;
+        assert!(started.elapsed() < Duration::from_millis(100));
     }
 }

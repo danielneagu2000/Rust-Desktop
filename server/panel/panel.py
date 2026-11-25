@@ -743,6 +743,7 @@ def recheck_activations():
     """Activations made before the ID check (1.5.1-3) may name an ID hbbs registered for another computer;
     the portal and the session limits would count that computer's sessions for the license. Such an ID
     becomes the one hbbs has for this computer, or none when it has none or several."""
+    x("UPDATE activations SET device_id=NULL WHERE device_id=''")
     for a in q("SELECT uuid, device_id FROM activations WHERE device_id IS NOT NULL AND device_id != ''"):
         if id_belongs_to(a["device_id"], a["uuid"]):
             continue
@@ -953,7 +954,7 @@ def activate(v, src_ip, auth=(None, b"")):
                VALUES(?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET code=excluded.code,
                device_id=excluded.device_id, hostname=excluded.hostname,
                activated=excluded.activated, last_seen=excluded.last_seen""",
-            (uuid, code, as_text(v.get("id"), 40), as_text(v.get("hostname"), 100), now, now),
+            (uuid, code, as_text(v.get("id"), 40) or None, as_text(v.get("hostname"), 100), now, now),
         )
     if who == "key":
         bind_device_key(uuid, as_text(v.get("id"), 40), key, own)
