@@ -1072,7 +1072,7 @@ impl Connection {
                         // answer sends nothing, and the computer's other sessions share the limit.
                         let sent = conn.read_jobs.iter().map(|j| j.transferred()).sum::<u64>().saturating_sub(before);
                         if sent > 0 {
-                            conn.bandwidth.wait(sent as usize).await;
+                            conn.bandwidth.wait_file(sent as usize).await;
                         }
                     } else {
                         conn.file_timer = crate::rustdesk_interval(time::interval_at(Instant::now() + SEC30, SEC30));

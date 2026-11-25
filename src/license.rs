@@ -431,19 +431,10 @@ fn bandwidth_kbps() -> u32 {
         .unwrap_or(0)
 }
 
-/// When the computer's sending schedule ends. One schedule for all its connections, as the limit
-/// is for the computer: parallel sessions and file transfers share it.
-static NEXT_SEND: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
-
-/// Books `cost` of sending time at the end of the computer's schedule; returns how far from now
-/// the booking ends.
-fn reserve(cost: Duration) -> Duration {
-    let now = Instant::now();
-    let mut next = NEXT_SEND.lock().unwrap();
-    let end = next.map_or(now, |n| n.max(now)) + cost;
-    *next = Some(end);
-    end.saturating_duration_since(now)
-}
+/// When the computer's file transfers may send next. Their blocks share one schedule, as the
+/// limit is the computer's and parallel transfers would each get all of it; screen and sound keep
+/// each connection's own, so a file block never holds up another session's input.
+static FILES_NEXT: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
 
 /// Paces what a connection sends (screen, sound, files) to the license's bandwidth limit.
 /// Waiting before a send is what a slower link would do, so the video quality control
@@ -452,6 +443,7 @@ fn reserve(cost: Duration) -> Duration {
 pub struct Throttle {
     kbps: u32,
     checked: Option<Instant>,
+    next: Option<Instant>,
 }
 
 impl Throttle {
@@ -469,8 +461,31 @@ impl Throttle {
         if kbps == 0 {
             return;
         }
+        let now = Instant::now();
         let cost = Duration::from_secs_f64(bytes as f64 * 8.0 / (kbps as f64 * 1000.0));
-        let ahead = reserve(cost);
+        let next = self.next.map_or(now, |n| n.max(now)) + cost;
+        self.next = Some(next);
+        let ahead = next.saturating_duration_since(now);
+        if ahead > Self::BURST {
+            tokio::time::sleep(ahead - Self::BURST).await;
+        }
+    }
+
+    /// `wait` for a file block just sent, on this connection's schedule and on the one the
+    /// computer's file transfers share.
+    pub async fn wait_file(&mut self, bytes: usize) {
+        let kbps = self.limit();
+        if kbps == 0 {
+            return;
+        }
+        let now = Instant::now();
+        let cost = Duration::from_secs_f64(bytes as f64 * 8.0 / (kbps as f64 * 1000.0));
+        let book = |next: &mut Option<Instant>| {
+            let end = next.map_or(now, |n| n.max(now)) + cost;
+            *next = Some(end);
+            end.saturating_duration_since(now)
+        };
+        let ahead = book(&mut self.next).max(book(&mut *FILES_NEXT.lock().unwrap()));
         if ahead > Self::BURST {
             tokio::time::sleep(ahead - Self::BURST).await;
         }
@@ -481,7 +496,8 @@ impl Throttle {
             self.kbps = bandwidth_kbps();
             self.checked = Some(Instant::now());
             if self.kbps == 0 {
-                *NEXT_SEND.lock().unwrap() = None;
+                self.next = None;
+                *FILES_NEXT.lock().unwrap() = None;
             }
         }
         self.kbps
@@ -575,17 +591,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parallel_connections_share_the_computer_limit() {
+    async fn parallel_file_transfers_share_the_computer_limit() {
         // 8 kbit/s = 1000 bytes/s: 400 bytes take 0.4 s, of which a connection waits all but
-        // BURST = 0.2 s. On one schedule the two take 0.8 s - BURST; on their own, 0.2 s each.
+        // BURST = 0.2 s. Two transfers on one schedule take 0.8 s - BURST; on their own, 0.2 s
+        // each. The screen of another session keeps its own schedule.
         let throttle = || Throttle {
             kbps: 8,
             checked: Some(Instant::now()),
+            next: None,
         };
-        let (mut a, mut b) = (throttle(), throttle());
+        let (mut a, mut b, mut screen) = (throttle(), throttle(), throttle());
         let started = Instant::now();
-        a.wait(400).await;
-        b.wait(400).await;
+        a.wait_file(400).await;
+        b.wait_file(400).await;
         assert!(started.elapsed() >= Duration::from_millis(550));
+        let started = Instant::now();
+        screen.wait(400).await;
+        assert!(started.elapsed() < Duration::from_millis(550));
     }
 }
