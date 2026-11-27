@@ -109,6 +109,9 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
   </div>
 </header>
 <main>
+  <div class="card" id="protect-banner" style="display:none;border-color:var(--bad)"><p class="hint" style="border:0;margin:0">
+    <b style="color:var(--bad)">Mod de protecție activ</b> <span id="protect-text"></span>
+    <button class="small" type="button" id="protect-off" style="margin-left:8px">Oprește acum</button></p></div>
   <div class="tiles" id="tiles"></div>
   <nav id="tabs">
     <button data-tab="conns" class="on">Istoric conexiuni</button>
@@ -170,6 +173,14 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       </form>
       <div class="scroll"><table><thead><tr><th>IP</th><th>Unde</th><th class="num">Încercări</th><th>Blocat până la</th>
         <th><button class="small" type="button" data-unlock="*">Deblochează toate</button></th></tr></thead><tbody id="t-lockouts"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Blocare automată și mod de protecție</h2>
+      <form id="protect-form" style="padding:12px 16px;display:grid;gap:10px">
+        <label class="sw"><input type="checkbox" id="auto_ban"> Blocare automată: o adresă blocată de 3 ori în 30 de zile (de regulile de mai sus sau de comenzi din shop cu semnătură greșită) e blocată 1 zi, apoi 3 zile, o săptămână și o lună; 3 adrese blocate din aceeași rețea blochează rețeaua. Adresele de la care ai intrat în panou și shopul nu se blochează niciodată. Blocările rămân și după repornire.</label>
+        <label class="sw"><input type="checkbox" id="protect_mode"> Mod de protecție: la 30 de încercări greșite de pe cel puțin 5 adrese în 15 minute, activările de licențe și comenzile din shop așteaptă; modul se oprește singur la 15 minute după ultimul val, iar comenzile oprite de el se procesează atunci automat. Calculatoarele cu licență merg normal.</label>
+        <div><button class="primary" type="submit">Salvează</button> <span class="sub" id="protect-state"></span></div>
+      </form>
     </div>
     <div class="card">
       <h2>Blocate automat de calculatoare (anti brute-force)</h2>
@@ -246,6 +257,8 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         <label>Trimite codul după (minute; 0 = imediat, 300 = 5 ore) <input type="number" id="shop_note_delay_minutes" min="0" max="10080" required style="width:110px"></label>
         <label class="sw"><input type="checkbox" id="shop_revoke_refund"> La comandă rambursată sau anulată: anulează codul netrimis, dezactivează codul trimis și retrage lunile adăugate la o prelungire</label>
         <label>Adresa site-ului din mesaj ({site}): <input type="text" id="shop_site_url" placeholder="implicit: https://domeniul-serverului/" style="width:320px"></label>
+        <div><b>Pune în așteptarea aprobării comenzile:</b> <span id="shop-holds"></span></div>
+        <label>Limita zilnică (licențe create sau prelungite din shop în 24 de ore) <input type="number" id="shop_daily_cap" min="1" max="1000" required style="width:110px"></label>
         <div><button class="primary" type="submit">Salvează regulile</button></div>
       </form>
     </div>
@@ -268,6 +281,11 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       </form>
     </div>
     <div class="card">
+      <h2>Comenzi în așteptarea aprobării</h2>
+      <p class="hint">Comenzi ajunse într-o stare plătită care arată ciudat (regulile de mai sus). Licența se creează doar după ce aprobi; o comandă anulată sau rambursată între timp în shop se respinge singură.</p>
+      <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Produse</th><th>Total</th><th>Plată</th><th>De ce așteaptă</th><th></th></tr></thead><tbody id="t-shop-pending"></tbody></table></div>
+    </div>
+    <div class="card">
       <h2>Comenzi</h2>
       <div class="scroll"><table><thead><tr><th>Comandă</th><th>Client</th><th>Stare comandă</th><th>Coduri</th><th>Trimitere</th><th>Acțiuni</th></tr></thead><tbody id="t-shop-orders"></tbody></table></div>
     </div>
@@ -286,7 +304,41 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         <label class="sw"><input type="checkbox" id="require_signed_apps"> Licențe doar pentru aplicațiile RDN Remote care semnează cu cheia calculatorului (1.5.1-4 sau mai nouă): aplicațiile mai vechi nu mai primesc licența, iar calculatoarele refuză pass-urile fără cheie. Cine cunoaște doar codul unic al unui calculator nu-i mai poate folosi licența. Pornește-o după ce toate calculatoarele cu licență au aplicația nouă: <span id="signed-acts">—</span>.</label>
         <div><button class="primary" type="submit">Salvează</button> <span class="sub">Sesiunile noi folosesc imediat noile durate; cele deschise își păstrează expirarea. Inactivitate 0 = fără deconectare.</span></div>
       </form>
-      <p class="hint" style="border-top:1px solid var(--line);border-bottom:0">Blocările după încercări greșite se setează în tab-ul <b>IP-uri blocate</b>, iar legătura cu shopul în tab-ul <b>Shop</b>. Parola și 2FA-ul acestui panou rămân în <span class="mono">server/.env</span> (pe server).</p>
+      <p class="hint" style="border-top:1px solid var(--line);border-bottom:0">Blocările după încercări greșite se setează în tab-ul <b>IP-uri blocate</b>, iar legătura cu shopul în tab-ul <b>Shop</b>.</p>
+    </div>
+    <div class="card">
+      <h2>Contul panoului</h2>
+      <p class="hint" id="account-state"></p>
+      <form class="add" id="account-form" autocomplete="off">
+        <input type="password" id="acc-current" placeholder="Parola actuală" required autocomplete="current-password">
+        <input type="password" id="acc-new" placeholder="Parola nouă (minim 12 caractere)" required minlength="12" autocomplete="new-password">
+        <input type="password" id="acc-new2" placeholder="Parola nouă, încă o dată" required minlength="12" autocomplete="new-password">
+        <input type="text" id="acc-code" placeholder="Cod Google Authenticator" inputmode="numeric" maxlength="7" style="width:200px">
+        <button class="primary" type="submit">Schimbă parola</button>
+      </form>
+      <p class="hint">Parola se păstrează doar criptată (hash), în baza de date a panoului. După ce o schimbi aici, parola din <span class="mono">server/.env</span> nu mai e valabilă; dacă o schimbi tu acolo, devine ea parola panoului la repornire.
+        Telefon pierdut: pe server, în folderul serverului, rulează <span class="mono">sudo touch server/data/resetare-acces</span>; la următoarea intrare, după parolă, panoul îți cere o cheie Google Authenticator nouă.</p>
+    </div>
+    <div class="card">
+      <h2>Alerte pe e-mail</h2>
+      <p class="hint">Panoul trimite un e-mail la: intrare în panou de la o adresă nouă, adrese blocate (încercări greșite, blocare automată), pornirea și oprirea modului de protecție, comenzi din shop în așteptarea aprobării sau cu semnătură greșită, schimbarea parolei sau a cheii Google Authenticator și backup automat eșuat. Cel mult un e-mail la 10 minute pentru același subiect.</p>
+      <form id="alert-form" style="padding:12px 16px;display:grid;gap:10px;max-width:640px" autocomplete="off">
+        <label>Trimite alertele la (mai multe adrese, separate prin virgulă) <input type="text" id="alert_email" placeholder="office@rdndata.ro" style="width:100%"></label>
+        <label>Server SMTP <input type="text" id="smtp_host" placeholder="mail.rdndata.ro" style="width:260px"></label>
+        <label>Port <input type="number" id="smtp_port" min="1" max="65535" required style="width:110px">
+          <select id="smtp_security" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit">
+            <option value="starttls">STARTTLS (de obicei portul 587)</option><option value="ssl">SSL/TLS (de obicei portul 465)</option>
+            <option value="none">Fără criptare (nerecomandat)</option></select></label>
+        <label>Utilizator SMTP <input type="text" id="smtp_user" placeholder="alerte@rdndata.ro" style="width:260px"></label>
+        <label>Expeditor (gol = utilizatorul) <input type="text" id="smtp_from" placeholder="alerte@rdndata.ro" style="width:260px"></label>
+        <div><button class="primary" type="submit">Salvează</button></div>
+      </form>
+      <form class="add" id="smtp-pass-form" autocomplete="off">
+        <input type="password" id="smtp-pass" placeholder="Parola SMTP (gol = șterge)" autocomplete="new-password" style="width:260px">
+        <button class="primary" type="submit">Salvează parola</button>
+        <button type="button" id="smtp-test">Trimite un e-mail de test</button>
+        <span class="sub" id="smtp-state"></span>
+      </form>
     </div>
   </section>
 
@@ -308,7 +360,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       <h2>Backup</h2>
       <p class="hint">Un backup conține cheia serverului, ID-urile înregistrate, licențele, istoricul, IP-urile blocate și setările (server/.env).
         Se face automat zilnic (se păstrează ultimele 14). <strong>Descarcă periodic un backup pe alt dispozitiv</strong>: cele de aici se pierd dacă se strică discul serverului.
-        Fișierul conține cheia privată a serverului și parola panoului; păstrează-l în siguranță.</p>
+        Un backup descărcat e criptat cu parola pe care o alegi la descărcare; fără ea nu se poate restaura, așa că păstreaz-o separat.</p>
       <form class="add" id="backup-now"><button class="primary" type="submit">Creează backup acum</button></form>
       <div class="scroll"><table><thead><tr><th>Fișier</th><th>Tip</th><th>Creat</th><th class="num">Mărime</th><th></th></tr></thead><tbody id="t-backups"></tbody></table></div>
     </div>
@@ -317,11 +369,12 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       <p class="hint">Din panou se restaurează licențele, istoricul, dispozitivele și IP-urile blocate, pe același server (aceeași cheie).
         Înainte, panoul face automat un backup al stării curente.</p>
       <form class="add" id="restore-form">
-        <input type="file" id="restore-file" accept=".gz,application/gzip" required>
+        <input type="file" id="restore-file" accept=".gz,.enc,application/gzip,application/octet-stream" required>
+        <input type="password" id="restore-pass" placeholder="Parola backup-ului descărcat" autocomplete="off">
         <button class="danger" type="submit">Restaurează</button>
       </form>
       <p class="hint">Restaurare completă (server nou, disc defect, cheie pierdută): copiază backup-ul pe server și rulează
-        <span class="mono">sudo ./server/restore.sh /cale/backup.tar.gz</span>. Pe un calculator nou rulează întâi <span class="mono">install.sh</span>.</p>
+        <span class="mono">sudo ./server/restore.sh /cale/backup.tar.gz.enc</span> (cere parola backup-ului). Pe un calculator nou rulează întâi <span class="mono">install.sh</span>.</p>
     </div>
   </section>
 </main>
@@ -507,11 +560,29 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
           ';white-space:normal;max-width:320px">' + esc(o.error) + "</div>" : "") +
         "</td><td>" + (o.codes ? sendPill(o) : "—") + '</td><td style="white-space:normal;min-width:220px">' + acts.join(" ") + "</td></tr>";
     }, 6);
+    var sec = data.security || {}, pr = sec.protect || {};
+    document.getElementById("protect-banner").style.display = pr.active ? "" : "none";
+    if (pr.active) document.getElementById("protect-text").textContent = "din " + when(pr.since) + ", cel puțin până la " + when(pr.until) +
+      ": activările de licențe și comenzile din shop așteaptă; se oprește singur la 15 minute după ultimul val de încercări greșite.";
+    document.getElementById("protect-state").textContent = pr.active ? "Activ acum, până la " + when(pr.until) : "Inactiv acum.";
+    var acc = sec.account || {};
+    document.getElementById("account-state").textContent = (acc.password_changed ? "Parola a fost schimbată din panou." :
+      "Parola panoului e încă cea din server/.env; schimb-o aici, ca să rămână doar criptată.") + " Google Authenticator: " +
+      (acc.totp ? (acc.totp_in_panel ? "configurat din panou." : "cheia din server/.env.") : "neconfigurat (se cere la următoarea intrare).");
+    document.getElementById("smtp-state").textContent = sec.smtp_password_set ? "Parola SMTP e salvată." : "Fără parolă SMTP.";
+    rows("t-shop-pending", sh.pending || [], function (o) {
+      return '<tr><td class="mono">#' + o.order_id + '<div class="sub">' + esc(when(o.received)) + "</div></td><td>" + esc(o.client || "") +
+        '<div class="sub">' + esc(o.email || "") + '</div></td><td style="white-space:normal">' + esc((o.items || []).join(", ")) +
+        '</td><td class="num">' + esc(o.total || "") + " " + esc(o.currency || "") + "</td><td>" + esc(o.payment || "—") +
+        '</td><td style="white-space:normal;max-width:280px">' + (o.reasons || []).map(function (r) { return pill(r, "warn"); }).join(" ") +
+        '</td><td style="white-space:nowrap"><button class="small primary" data-pending="approve" data-order="' + o.order_id + '">Aprobă</button> ' +
+        '<button class="small danger" data-pending="reject" data-order="' + o.order_id + '">Respinge</button></td></tr>';
+    }, 7);
     var cf = data.config;
     var acts = [].concat.apply([], (data.licenses || []).map(function (l) { return l.devices || []; }));
     document.getElementById("signed-acts").textContent = acts.filter(function (a) { return a.pk; }).length + " din " +
       acts.length + " calculatoare cu licență o au acum";
-    ["settings-form", "shop-rules-form", "shop-notes-form"].forEach(function (fid) {
+    ["settings-form", "shop-rules-form", "shop-notes-form", "protect-form", "alert-form"].forEach(function (fid) {
       var form = document.getElementById(fid);
       if (form.dataset.dirty) return;
       form.querySelectorAll("input[id],select[id],textarea[id]").forEach(function (el) {
@@ -525,6 +596,10 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         return '<label class="sw" style="margin-right:12px"><input type="checkbox" data-status="' + esc(k) + '"' +
           (cf.shop_statuses.indexOf(k) >= 0 ? " checked" : "") + "> " + esc(sh.statuses[k]) + "</label>";
       }).join("");
+      document.getElementById("shop-holds").innerHTML = Object.keys(sh.hold_rules || {}).map(function (k) {
+        return '<label class="sw" style="margin-right:12px"><input type="checkbox" data-hold="' + esc(k) + '"' +
+          (cf.shop_hold.indexOf(k) >= 0 ? " checked" : "") + "> " + esc(sh.hold_rules[k]) + "</label>";
+      }).join("");
     }
     var lk = data.lockouts, lockForm = document.getElementById("lock-form");
     if (!lockForm.dataset.dirty) {
@@ -533,9 +608,11 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         document.getElementById("lock-" + k + "-minutes").value = lk.settings[k].minutes;
       });
     }
-    var LOCK_KINDS = { panel: "Panou", portal: "Portal", activation: "Cod de licență" };
+    var LOCK_KINDS = { panel: "Panou", portal: "Portal", activation: "Cod de licență", ban: "Blocare automată" };
     rows("t-lockouts", lk.blocked, function (r) {
-      return "<tr><td>" + ip(r.ip) + "</td><td>" + esc(LOCK_KINDS[r.kind] || r.kind) + '</td><td class="num">' + r.fails +
+      return "<tr><td>" + (r.kind === "ban" && r.ip.indexOf("/") >= 0 ? '<span class="mono">' + esc(r.ip) + "</span>" : ip(r.ip)) + "</td><td>" +
+        esc(LOCK_KINDS[r.kind] || r.kind) + (r.reason ? '<div class="sub" style="white-space:normal">' + esc(r.reason) +
+        " (a " + r.fails + "-a oară)</div>" : "") + '</td><td class="num">' + r.fails +
         "</td><td>" + esc(when(r.until)) + '</td><td><button class="small" data-unlock="' + esc(r.ip) + '">Deblochează</button></td></tr>';
     }, 5);
     rows("t-clientblocks", data.client_blocks, function (r) {
@@ -612,8 +689,8 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         var kinds = { auto: "automat", manual: "manual", "inainte-de-restaurare": "înainte de restaurare" };
         rows("t-backups", d.backups || [], function (b) {
           return '<tr><td class="mono">' + esc(b.name) + "</td><td>" + esc(kinds[b.label] || b.label) + "</td><td>" + esc(when(b.created)) +
-            '</td><td class="num">' + esc(size(b.size)) + '</td><td style="white-space:nowrap"><a class="small" style="text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:8px" href="' +
-            base + "api/backup/download?name=" + encodeURIComponent(b.name) + '">Descarcă</a> <button class="small danger" data-del-backup="' + esc(b.name) + '">Șterge</button></td></tr>';
+            '</td><td class="num">' + esc(size(b.size)) + '</td><td style="white-space:nowrap"><button class="small" data-dl-backup="' + esc(b.name) +
+            '">Descarcă (criptat)</button> <button class="small danger" data-del-backup="' + esc(b.name) + '">Șterge</button></td></tr>';
         }, 5);
       }).catch(function () {});
   }
@@ -833,6 +910,25 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
       .catch(function (err) { toast("Eroare: " + err.message); });
   });
   document.getElementById("t-backups").addEventListener("click", function (e) {
+    var dl = e.target.closest("[data-dl-backup]");
+    if (dl) {
+      var pw = prompt("Parola cu care se criptează backup-ul (minim 12 caractere). Fără ea nu se poate restaura; păstreaz-o separat de fișier.");
+      if (pw === null) return;
+      if (pw.length < 12) { toast("Parola trebuie să aibă cel puțin 12 caractere"); return; }
+      if (prompt("Scrie parola încă o dată:") !== pw) { toast("Parolele nu coincid"); return; }
+      fetch(base + "api/backup/download", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Panel": "1" },
+        body: JSON.stringify({ name: dl.dataset.dlBackup, password: pw })
+      }).then(function (r) {
+        if (!r.ok) return r.json().then(function (j) { throw new Error(j.error || r.status); });
+        return r.blob();
+      }).then(function (blob) {
+        var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = dl.dataset.dlBackup + ".enc";
+        document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        toast("Backup descărcat, criptat");
+      }).catch(function (err) { toast("Eroare: " + err.message); });
+      return;
+    }
     var b = e.target.closest("[data-del-backup]"); if (!b) return;
     if (!confirm("Ștergi definitiv backup-ul " + b.dataset.delBackup + "?")) return;
     post("backup/delete", { name: b.dataset.delBackup }).then(function () { toast("Backup șters"); loadBackups(); })
@@ -844,11 +940,13 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     if (!f) return;
     if (!confirm("Restaurezi datele panoului din " + f.name + "? Licențele și istoricul actuale vor fi înlocuite (se face întâi un backup de siguranță).")) return;
     fetch(base + "api/backup/restore", {
-      method: "POST", credentials: "same-origin", headers: { "X-Panel": "1", "Content-Type": "application/octet-stream" }, body: f
+      method: "POST", credentials: "same-origin", body: f,
+      headers: { "X-Panel": "1", "Content-Type": "application/octet-stream",
+                 "X-Backup-Password": encodeURIComponent(document.getElementById("restore-pass").value) }
     }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; }); })
       .then(function (j) {
         toast("Restaurat: " + j.restored.join(", ") + " (backup din " + new Date(j.created * 1000).toLocaleString("ro-RO") + ")");
-        document.getElementById("restore-file").value = ""; load(); loadBackups();
+        document.getElementById("restore-file").value = ""; document.getElementById("restore-pass").value = ""; load(); loadBackups();
       }).catch(function (err) { alert("Restaurare eșuată: " + err.message); });
   });
   document.getElementById("tabs").addEventListener("click", function (e) {
@@ -940,6 +1038,42 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
   });
   configForm("shop-rules-form", function (body) {
     body.shop_statuses = Array.prototype.map.call(document.querySelectorAll("#shop-statuses input:checked"), function (el) { return el.dataset.status; });
+    body.shop_hold = Array.prototype.map.call(document.querySelectorAll("#shop-holds input:checked"), function (el) { return el.dataset.hold; });
+  });
+  configForm("protect-form");
+  configForm("alert-form");
+  document.getElementById("protect-off").addEventListener("click", function () {
+    if (!confirm("Oprești modul de protecție acum? Comenzile oprite de el se procesează imediat.")) return;
+    post("security/protect_off", {}).then(function () { toast("Mod de protecție oprit"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.getElementById("smtp-pass-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    post("security/smtp_password", { password: document.getElementById("smtp-pass").value })
+      .then(function () { document.getElementById("smtp-pass").value = ""; toast("Parola SMTP salvată"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.getElementById("smtp-test").addEventListener("click", function () {
+    post("security/test_email", {}).then(function () { toast("E-mailul de test a plecat"); })
+      .catch(function (err) { alert(err.message); });
+  });
+  document.getElementById("account-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var nw = document.getElementById("acc-new").value;
+    if (nw !== document.getElementById("acc-new2").value) { toast("Parolele noi nu coincid"); return; }
+    post("account/password", { current: document.getElementById("acc-current").value, new: nw, code: document.getElementById("acc-code").value })
+      .then(function () {
+        ["acc-current", "acc-new", "acc-new2", "acc-code"].forEach(function (id) { document.getElementById(id).value = ""; });
+        toast("Parola panoului a fost schimbată; celelalte sesiuni s-au închis"); load();
+      }).catch(function (err) { toast("Eroare: " + err.message); });
+  });
+  document.body.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-pending]"); if (!el) return;
+    var act = el.dataset.pending, oid = Number(el.dataset.order);
+    if (!confirm((act === "approve" ? "Aprobi comanda #" + oid + "? Se creează licența și codul pleacă la client."
+                                     : "Respingi comanda #" + oid + "? Nu se creează nicio licență.") )) return;
+    post("shop/" + act, { order_id: oid }).then(function (r) { toast(act === "approve" ? "Aprobată: " + (r.result || "") : "Respinsă"); load(); })
+      .catch(function (err) { toast("Eroare: " + err.message); load(); });
   });
   var prodForm = document.getElementById("shop-products-form");
   prodForm.addEventListener("input", function () { prodForm.dataset.dirty = "1"; });

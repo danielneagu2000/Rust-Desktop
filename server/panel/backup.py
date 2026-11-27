@@ -15,6 +15,10 @@ server runs is consistent.
 
   python3 backup.py create  --data DATA_DIR --env ENV_FILE --out DIR
   python3 backup.py restore ARCHIVE --data DATA_DIR --env ENV_FILE   (server stopped)
+  RDN_BACKUP_PASSWORD=... python3 backup.py decrypt IN OUT            (needs PyNaCl)
+
+A backup downloaded from the panel is encrypted with a password chosen at download
+(encrypt / decrypt below: Argon2id and XSalsa20-Poly1305 from PyNaCl).
 """
 
 import argparse
@@ -24,6 +28,7 @@ import json
 import os
 import socket
 import sqlite3
+import struct
 import sys
 import tarfile
 import tempfile
@@ -36,6 +41,44 @@ PLAIN = ("id_ed25519", "id_ed25519.pub", "blocklist.txt")
 ENV_NAME = "server.env"
 ALLOWED = set(SQLITE) | set(PLAIN) | {ENV_NAME, "manifest.json"}
 MAX_MEMBER = 512 * 1024 * 1024
+ENC_MAGIC = b"RDN-BACKUP-ENC-1\n"
+ENC_OPS, ENC_MEM = 3, 64 * 1024 * 1024
+MIN_PASSWORD = 12
+
+
+def is_encrypted(blob):
+    return bytes(blob[:len(ENC_MAGIC)]) == ENC_MAGIC
+
+
+def _key(password, salt, ops, mem):
+    from nacl import pwhash, secret
+    return pwhash.argon2id.kdf(secret.SecretBox.KEY_SIZE, password.encode(), salt, opslimit=ops, memlimit=mem)
+
+
+def encrypt(blob, password):
+    """The archive encrypted with password, for a download kept off the server."""
+    if len(password) < MIN_PASSWORD:
+        raise ValueError(f"parola trebuie să aibă cel puțin {MIN_PASSWORD} caractere")
+    from nacl import pwhash, secret, utils
+    salt = utils.random(pwhash.argon2id.SALTBYTES)
+    box = secret.SecretBox(_key(password, salt, ENC_OPS, ENC_MEM))
+    return ENC_MAGIC + struct.pack(">IQ", ENC_OPS, ENC_MEM) + salt + box.encrypt(bytes(blob))
+
+
+def decrypt(blob, password):
+    """The archive inside an encrypted download; an archive that is not encrypted unchanged."""
+    if not is_encrypted(blob):
+        return blob
+    from nacl import exceptions, pwhash, secret
+    off = len(ENC_MAGIC)
+    ops, mem = struct.unpack(">IQ", bytes(blob[off:off + 12]))
+    salt = bytes(blob[off + 12:off + 12 + pwhash.argon2id.SALTBYTES])
+    if not (1 <= ops <= 10 and 8 * 1024 * 1024 <= mem <= 1024 * 1024 * 1024) or not password:
+        raise ValueError("backup criptat: parolă lipsă sau fișier deteriorat")
+    try:
+        return secret.SecretBox(_key(password, salt, ops, mem)).decrypt(bytes(blob[off + 12 + len(salt):]))
+    except exceptions.CryptoError:
+        raise ValueError("parolă greșită sau fișier deteriorat") from None
 
 
 def _sqlite_copy(src, dst):
@@ -92,6 +135,8 @@ def create(data_dir, env_file, out_dir, label="manual"):
 
 def read(archive):
     """Validate an archive (path or bytes); return (manifest, {name: bytes})."""
+    if isinstance(archive, (bytes, bytearray)) and is_encrypted(archive):
+        raise ValueError("backup-ul este criptat: introdu parola cu care a fost descărcat")
     fileobj = io.BytesIO(archive) if isinstance(archive, (bytes, bytearray)) else open(archive, "rb")
     contents = {}
     try:
@@ -221,9 +266,17 @@ def main():
     r.add_argument("--env")
     k = sub.add_parser("check")
     k.add_argument("archive")
+    d = sub.add_parser("decrypt")
+    d.add_argument("archive")
+    d.add_argument("out")
     args = ap.parse_args()
     try:
-        if args.cmd == "create":
+        if args.cmd == "decrypt":
+            blob = Path(args.archive).read_bytes()
+            plain = decrypt(blob, os.environ.get("RDN_BACKUP_PASSWORD", ""))
+            _atomic_write(args.out, plain)
+            print("Backup decriptat" if is_encrypted(blob) else "Backup-ul nu era criptat")
+        elif args.cmd == "create":
             print(create(args.data, args.env, args.out, args.label))
         elif args.cmd == "check":
             m, _ = read(args.archive)

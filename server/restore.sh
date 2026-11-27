@@ -22,6 +22,21 @@ fi
 ARCHIVE="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 command -v docker >/dev/null 2>&1 || { echo "Docker lipsește: rulează întâi sudo ./install.sh <domeniu>" >&2; exit 1; }
 
+# Un backup descărcat din panou e criptat cu parola aleasă la descărcare; îl decriptează
+# imaginea panoului (are PyNaCl), într-un fișier temporar din data/, șters la final.
+if [[ "$(head -c 16 "$ARCHIVE")" == "RDN-BACKUP-ENC-1" ]]; then
+  docker image inspect rdn-panel:local >/dev/null 2>&1 || docker compose build panel
+  read -rsp "Parola backup-ului: " RDN_BACKUP_PASSWORD; echo
+  export RDN_BACKUP_PASSWORD
+  mkdir -p data
+  PLAIN="$PWD/data/restore-decriptat.tar.gz"
+  trap 'rm -f "$PLAIN"' EXIT
+  docker run --rm -e RDN_BACKUP_PASSWORD -v "$PWD/panel:/app:ro,z" -v "$PWD/data:/data:z" \
+    -v "$ARCHIVE:/backup.enc:ro,z" rdn-panel:local python /app/backup.py decrypt /backup.enc /data/restore-decriptat.tar.gz
+  unset RDN_BACKUP_PASSWORD
+  ARCHIVE="$PLAIN"
+fi
+
 py() {
   docker run --rm -v "$PWD/panel:/app:ro,z" -v "$PWD/data:/data:z" -v "$PWD:/server:z" \
     -v "$ARCHIVE:/backup.tar.gz:ro,z" python:3.12-alpine python /app/backup.py "$@"

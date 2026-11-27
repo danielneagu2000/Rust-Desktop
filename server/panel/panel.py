@@ -7,7 +7,7 @@ Two HTTP listeners, standard library only:
   their API server resolves to this host (the default for clients built from this
   repo and for any client whose ID server is set to this host):
   /api/audit/conn, /api/audit/alarm, /api/audit/file, /api/heartbeat, /api/sysinfo.
-* Dashboard (default 127.0.0.1:21120), protected by a login page (password + optional authenticator code): connection
+* Dashboard (default 127.0.0.1:21120), protected by a login page (password + authenticator code): connection
   history with IPs, brute-force statistics, client-side alarms, online devices,
   and a server blocklist enforced by hbbr for relayed connections.
 
@@ -17,7 +17,10 @@ PANEL_PORT, API_BIND, API_PORT, DATA_DIR, RETENTION_DAYS, HBBR_ADMIN.
 
 import base64
 import calendar
+import collections
 import csv
+import email.message
+import email.utils
 import io
 import datetime
 import secrets
@@ -27,8 +30,11 @@ import ipaddress
 import json
 import os
 import posixpath
+import queue
 import re
+import smtplib
 import socket
+import ssl
 import struct
 import sqlite3
 import sys
@@ -37,7 +43,7 @@ import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import backup
 import ed25519
@@ -134,6 +140,9 @@ def db():
                      ("pk", "TEXT")):
         if acols and col not in acols:
             conn.execute(f"ALTER TABLE activations ADD COLUMN {col} {ddl}")
+    scols = {r[1] for r in conn.execute("PRAGMA table_info(shop_orders)")}
+    if scols and "processed" not in scols:
+        conn.execute("ALTER TABLE shop_orders ADD COLUMN processed REAL")
     return conn
 
 
@@ -184,9 +193,18 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS shop_orders (
             order_id INTEGER PRIMARY KEY, status TEXT, email TEXT, client TEXT, codes TEXT, new_codes TEXT, extended TEXT, message TEXT,
-            note_sent INTEGER DEFAULT 0, note_due REAL, cancelled INTEGER DEFAULT 0, error TEXT, created REAL, updated REAL
+            note_sent INTEGER DEFAULT 0, note_due REAL, cancelled INTEGER DEFAULT 0, error TEXT, created REAL, updated REAL,
+            processed REAL
         );
         CREATE TABLE IF NOT EXISTS shop_licenses (code TEXT PRIMARY KEY, email TEXT, product TEXT, created REAL);
+        CREATE TABLE IF NOT EXISTS shop_pending (
+            order_id INTEGER PRIMARY KEY, received REAL, updated REAL, reasons TEXT, payload TEXT,
+            decision TEXT DEFAULT '', decided REAL
+        );
+        CREATE TABLE IF NOT EXISTS ip_strikes (ip TEXT, ts REAL, reason TEXT);
+        CREATE INDEX IF NOT EXISTS ip_strikes_ip ON ip_strikes(ip, ts);
+        CREATE TABLE IF NOT EXISTS ip_bans (ip TEXT PRIMARY KEY, net TEXT, until REAL, level INTEGER, reason TEXT, created REAL);
+        CREATE TABLE IF NOT EXISTS admin_ips (ip TEXT PRIMARY KEY, first REAL, last REAL);
         CREATE TABLE IF NOT EXISTS portal_users (
             id INTEGER PRIMARY KEY, code TEXT, email TEXT UNIQUE, name TEXT, pw_hash TEXT,
             role TEXT DEFAULT 'admin', created REAL, last_login REAL
@@ -882,6 +900,14 @@ def activate(v, src_ip, auth=(None, b"")):
             left = window + lock_seconds - now
             return {"error": t(f"Prea multe încercări. Reîncearcă peste {minutes_text(left)}.",
                                f"Too many attempts. Try again in {minutes_text_en(left)}.")}
+    ban = banned(src_ip)
+    if ban:
+        return {"error": t(f"Adresa ta e blocată după prea multe încercări greșite, încă {minutes_text(ban - now)}.",
+                           f"Your address is blocked after too many wrong attempts, for {minutes_text_en(ban - now)}.")}
+    if protection_active(now) and not admin_ip_trusted(src_ip):
+        left = (as_int(setting("protect_until", "0")) or now) - now
+        return {"error": t(f"Serverul de licențe se apără acum de un atac. Reîncearcă peste {minutes_text(left)}.",
+                           f"The license server is fending off an attack. Try again in {minutes_text_en(left)}.")}
 
     def fail(msg):
         with ACT_LOCK:
@@ -891,6 +917,9 @@ def activate(v, src_ip, auth=(None, b"")):
         # Only the end of what was typed: a mistyped code (no prefix, lowercase) is still a real one.
         log(f"licenses: activation refused for …{normalize_code(v.get('code'))[-5:]} on "
             f"{as_text(v.get('id'), 40)} ({src_ip}): {msg}")
+        note_failure(src_ip)
+        if fails + 1 >= max_fails:
+            strike(src_ip, "coduri de licență greșite")
         return {"error": msg}
 
     uuid = str(v.get("uuid") or "")
@@ -1179,6 +1208,7 @@ def lockout_state():
     for kind in LOCKOUT_DEFAULTS:
         f, sec = lockout(kind)
         settings[kind] = {"fails": f, "minutes": sec // 60}
+    blocked += bans_state()
     return {"settings": settings, "blocked": sorted(blocked, key=lambda b: -b["until"])}
 
 
@@ -1208,12 +1238,418 @@ def lockout_action(action, v):
         with ACT_LOCK:
             for key in [k for k in ACT_FAILS if not ip or k == ip]:
                 del ACT_FAILS[key]
+        bans_clear(ip)
         log(f"panel: lockouts cleared for {ip or 'all addresses'}")
         return 200, {"ok": True}
     return 404, {"error": "unknown action"}
+
+
+# ---------------------------------------------------------------- alerts by e-mail
+
+ALERT_QUEUE = queue.Queue(maxsize=200)
+ALERT_LAST = {}  # subject -> (last sent, alerts held back since)
+ALERT_LOCK = threading.Lock()
+ALERT_EVERY = 600
+
+
+def alert_recipients():
+    return [a.strip() for a in conf("alert_email").split(",") if a.strip()]
+
+
+def alert(subject, body):
+    """A security e-mail to alert_email, sent in the background: at most one per subject every
+    10 minutes, and the next one says how many were held back."""
+    if not (conf("smtp_host") and alert_recipients()):
+        return
+    now = time.time()
+    with ALERT_LOCK:
+        last, held = ALERT_LAST.get(subject, (0, 0))
+        if now - last < ALERT_EVERY:
+            ALERT_LAST[subject] = (last, held + 1)
+            return
+        if len(ALERT_LAST) > 1000:
+            ALERT_LAST.clear()
+        ALERT_LAST[subject] = (now, 0)
+    if held:
+        body += f"\n\nÎn cele {ALERT_EVERY // 60} minute dinainte au mai fost {held} alerte la fel, netrimise."
+    try:
+        ALERT_QUEUE.put_nowait((subject, body))
+    except queue.Full:
+        log("alerts: queue full, alert dropped")
+
+
+def smtp_send(subject, body):
+    """Sends one e-mail now; returns an error text or None."""
+    host, port, mode = conf("smtp_host"), conf("smtp_port"), conf("smtp_security")
+    user, sender, to = conf("smtp_user"), conf("smtp_from") or conf("smtp_user"), alert_recipients()
+    if not (host and sender and to):
+        return "Completează serverul SMTP, expeditorul și adresa pentru alerte"
+    msg = email.message.EmailMessage()
+    try:
+        msg["Subject"] = f"[RDN Remote] {subject}"
+        msg["From"] = sender
+        msg["To"] = ", ".join(to)
+        msg["Date"] = email.utils.formatdate(localtime=True)
+        msg.set_content(f"{body}\n\n--\nPanoul RDN Remote ({server_host() or socket.gethostname()})")
+        ctx = ssl.create_default_context()
+        smtp = smtplib.SMTP_SSL(host, port, timeout=20, context=ctx) if mode == "ssl" else smtplib.SMTP(host, port, timeout=20)
+        with smtp:
+            if mode == "starttls":
+                smtp.starttls(context=ctx)
+            if user:
+                smtp.login(user, setting("smtp_password"))
+            smtp.send_message(msg)
+        return None
+    except (OSError, smtplib.SMTPException, ValueError, UnicodeError) as e:
+        return f"E-mailul nu a plecat: {e}"[:300]
+
+
+def alert_sender():
+    while True:
+        subject, body = ALERT_QUEUE.get()
+        err = smtp_send(subject, body)
+        if err:
+            log(f"alerts: {err}")
+
+
+def security_action(action, v):
+    if action == "smtp_password":
+        password = str(v.get("password") or "")
+        if len(password) > 500:
+            return 400, {"error": "Parola e prea lungă"}
+        set_setting("smtp_password", password)
+        log("panel: SMTP password " + ("changed" if password else "cleared"))
+        return 200, {"ok": True}
+    if action == "test_email":
+        err = smtp_send("E-mail de test", "Alertele de securitate ale panoului RDN Remote ajung la această adresă.")
+        return (502, {"error": err}) if err else (200, {"ok": True})
+    if action == "protect_off":
+        with PROTECT_LOCK:
+            FAIL_EVENTS.clear()  # else the attack's last failures would switch it on again
+        set_setting("protect_until", "0")
+        protection_tick()
+        return 200, {"ok": True}
+    return 404, {"error": "unknown action"}
+
+
+def security_state():
+    return {
+        "protect": {"enabled": conf("protect_mode"), "active": protection_active(),
+                    "since": as_int(setting("protect_since", "0")) or 0, "until": as_int(setting("protect_until", "0")) or 0},
+        "smtp_password_set": bool(setting("smtp_password")),
+        "account": {"totp": bool(admin_totp_secret()), "totp_in_panel": bool(setting("admin_totp")),
+                    "password_changed": bool(setting("admin_pw_changed"))},
+    }
+
+
+# ---------------------------------------------------------------- automatic bans
+#
+# A lockout (panel, portal, license codes) or a forged shop webhook is a strike against the
+# address. Three strikes in 30 days ban it for a day, then 3 days, a week and a month; three
+# banned addresses in one network (/24, /64) ban the network. Bans are kept in the database, so
+# they outlive a restart. Addresses that logged in to this panel, and the shop's, are never banned.
+
+BAN_HOURS = (24, 72, 7 * 24, 30 * 24)
+BAN_STRIKES = 3
+BAN_NETWORK = 3
+STRIKE_WINDOW = 30 * 86400
+_SHOP_IPS = [0, set()]
+
+
+def net_of(ip):
+    addr = ipaddress.ip_address(ip)
+    return str(ipaddress.ip_network(f"{addr}/{24 if addr.version == 4 else 64}", strict=False))
+
+
+def admin_ip_trusted(ip):
+    return bool(ip) and bool(q("SELECT 1 FROM admin_ips WHERE ip = ?", (ip,)))
+
+
+def shop_ips():
+    """The shop's addresses (from its URL), refreshed every 10 minutes."""
+    now = time.time()
+    if now - _SHOP_IPS[0] > 600:
+        host = urlparse(setting("shop_url", "https://shop.rdndata.ro")).hostname or ""
+        try:
+            _SHOP_IPS[1] = {info[4][0] for info in socket.getaddrinfo(host, 443)} if host else set()
+        except OSError:
+            pass
+        _SHOP_IPS[0] = now
+    return _SHOP_IPS[1]
+
+
+def exempt(ip):
+    try:
+        return ipaddress.ip_address(ip).is_loopback or admin_ip_trusted(ip) or ip in shop_ips()
+    except ValueError:
+        return True
+
+
+def ban_until(ip):
+    """When the ban on ip or on its network ends; 0 when there is none."""
+    try:
+        net = "net:" + net_of(ip)
+    except ValueError:
+        return 0
+    rows = q("SELECT MAX(until) AS u FROM ip_bans WHERE ip IN (?, ?) AND until > ?", (ip, net, time.time()))
+    return rows[0]["u"] or 0
+
+
+def banned(ip):
+    return 0 if exempt(ip) else ban_until(ip)
+
+
+def ban(key, net, reason, now):
+    prev = q("SELECT level FROM ip_bans WHERE ip = ?", (key,))
+    level = (prev[0]["level"] if prev else 0) + 1
+    until = now + BAN_HOURS[min(level, len(BAN_HOURS)) - 1] * 3600
+    x("INSERT OR REPLACE INTO ip_bans(ip, net, until, level, reason, created) VALUES(?,?,?,?,?,?)",
+      (key, net, until, level, reason, now))
+    x("DELETE FROM ip_strikes WHERE ip = ?", (key,))
+    log(f"security: {key} banned until {time.strftime('%Y-%m-%d %H:%M', time.localtime(until))} (level {level}: {reason})")
+    alert("Adresă blocată automat", f"{key.replace('net:', 'Rețeaua ')} este blocată până la "
+          f"{time.strftime('%d.%m.%Y %H:%M', time.localtime(until))} (a {level}-a oară): {reason}.\n"
+          "O poți debloca din panou, tab-ul IP-uri blocate.")
+
+
+def strike(ip, reason):
+    if not conf("auto_ban") or exempt(ip):
+        return
+    now = time.time()
+    x("INSERT INTO ip_strikes(ip, ts, reason) VALUES(?,?,?)", (ip, now, reason))
+    n = q("SELECT COUNT(*) AS n FROM ip_strikes WHERE ip = ? AND ts > ?", (ip, now - STRIKE_WINDOW))[0]["n"]
+    if n < BAN_STRIKES or ban_until(ip) > now:
+        return
+    net = net_of(ip)
+    ban(ip, net, f"{n} blocări după încercări greșite ({reason})", now)
+    in_net = q("SELECT COUNT(*) AS n FROM ip_bans WHERE net = ? AND ip NOT LIKE 'net:%' AND until > ?", (net, now))[0]["n"]
+    if in_net >= BAN_NETWORK and ban_until("net:" + net) <= now:
+        ban("net:" + net, net, f"{in_net} adrese blocate în aceeași rețea", now)
+
+
+def bans_state():
+    now = time.time()
+    return [{"kind": "ban", "ip": r["ip"].replace("net:", ""), "key": r["ip"], "fails": r["level"], "until": r["until"],
+             "reason": r["reason"]} for r in q("SELECT * FROM ip_bans WHERE until > ? ORDER BY until DESC", (now,))]
+
+
+def bans_clear(ip):
+    if not ip:
+        x("DELETE FROM ip_bans")
+        x("DELETE FROM ip_strikes")
+        return
+    try:
+        keys = (ip, "net:" + str(ipaddress.ip_network(ip, strict=False)))
+    except ValueError:
+        keys = (ip, "net:" + ip)
+    x("DELETE FROM ip_bans WHERE ip IN (?, ?)", keys)
+    x("DELETE FROM ip_strikes WHERE ip = ?", (ip,))
+
+
+# ---------------------------------------------------------------- protection mode
+#
+# Many wrong codes, passwords or signatures from several addresses in a short time are an
+# attack: license activations and shop orders wait until it is over, and the mode ends by itself
+# 15 minutes after the last such burst. Computers that already have a license are not affected.
+
+PROTECT_WINDOW = 15 * 60
+PROTECT_FAILS = 30
+PROTECT_IPS = 5
+PROTECT_HOLD = 15 * 60
+FAIL_EVENTS = collections.deque(maxlen=5000)  # (time, ip) of recent failures
+PROTECT_LOCK = threading.Lock()
+
+
+def protection_active(now=None):
+    return bool(conf("protect_mode")) and (now or time.time()) < (as_int(setting("protect_until", "0")) or 0)
+
+
+def note_failure(ip):
+    if not conf("protect_mode") or exempt(ip):
+        return
+    now = time.time()
+    with PROTECT_LOCK:
+        FAIL_EVENTS.append((now, ip))
+        recent = [i for t, i in FAIL_EVENTS if t > now - PROTECT_WINDOW]
+        if len(recent) < PROTECT_FAILS or len(set(recent)) < PROTECT_IPS:
+            return
+        starting = not protection_active(now)
+        set_setting("protect_until", str(int(now + PROTECT_HOLD)))
+        if starting:
+            set_setting("protect_since", str(int(now)))
+    if starting:
+        log(f"security: protection mode on ({len(recent)} failures from {len(set(recent))} addresses in 15 minutes)")
+        alert("Mod de protecție pornit", f"{len(recent)} încercări greșite de pe {len(set(recent))} adrese în 15 minute. "
+              "Activările de licențe și comenzile din shop așteaptă până se termină atacul; modul se oprește singur "
+              "după 15 minute fără încercări de acest fel. Calculatoarele cu licență merg normal.")
+
+
+def protection_tick():
+    """Ends a protection mode whose time is up and lets through the orders it held."""
+    since = as_int(setting("protect_since", "0")) or 0
+    if not since or protection_active():
+        return
+    set_setting("protect_since", "0")
+    log("security: protection mode off")
+    alert("Mod de protecție oprit", "Atacul s-a oprit. Activările și comenzile din shop merg din nou normal.")
+    for row in q("SELECT * FROM shop_pending WHERE decision = '' AND reasons LIKE '%protectie%'"):
+        try:
+            order = json.loads(row["payload"])
+        except ValueError:
+            continue
+        log(f"shop: order {row['order_id']} after protection mode: {shop_order(order)}")
+
+
+# ---------------------------------------------------------------- panel account
+#
+# The panel's password is kept as a hash in the database. PANEL_PASSWORD (server/.env) sets it at
+# the first start, and again whenever it is changed in server/.env; after that it is changed from
+# the panel. Google Authenticator is required: without a key the panel asks to set one up at the
+# next login. The file RESET_FILE (created on the server) sets up a new key at the next login.
+
+RESET_FILE = DATA_DIR / "resetare-acces"
+
+
+def seed_admin():
+    if len(PANEL_PASSWORD) < 12:
+        return
+    if not setting("admin_pw_hash") or not pw_ok(PANEL_PASSWORD, setting("admin_env_fp")):
+        set_setting("admin_pw_hash", pw_hash(PANEL_PASSWORD))
+        set_setting("admin_env_fp", pw_hash(PANEL_PASSWORD))
+        set_setting("admin_pw_changed", "")
+        log("panel: password set from server/.env")
+
+
+def admin_password_ok(pwd):
+    return pw_ok(pwd, setting("admin_pw_hash"))
+
+
+def admin_totp_secret():
+    return setting("admin_totp") or ("" if setting("admin_totp_env_off") == "1" else PANEL_TOTP_SECRET)
+
+
+def new_totp_secret():
+    return base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+
+
+def account_action(action, v, ip, session):
+    if action != "password":
+        return 404, {"error": "unknown action"}
+    current, new = str(v.get("current") or ""), str(v.get("new") or "")
+    if not admin_password_ok(current) or (admin_totp_secret() and not totp_ok(v.get("code"))):
+        max_fails, lock_seconds = lockout("panel")
+        with AUTH_LOCK:
+            fails, _ = AUTH_FAILS.get(ip, (0, 0))
+            AUTH_FAILS[ip] = (fails + 1, time.time() + lock_seconds if fails + 1 >= max_fails else 0)
+        log(f"panel: password change refused (wrong password or code) from {ip}")
+        return 403, {"error": "Parola actuală sau codul din Google Authenticator este greșit"}
+    if not 12 <= len(new) <= 200 or new == current:
+        return 400, {"error": "Parola nouă trebuie să aibă între 12 și 200 de caractere și să difere de cea actuală"}
+    set_setting("admin_pw_hash", pw_hash(new))
+    set_setting("admin_pw_changed", str(int(time.time())))
+    with AUTH_LOCK:
+        for t in [t for t in PANEL_SESSIONS if t != session]:
+            del PANEL_SESSIONS[t]
+    log(f"panel: password changed from {ip}")
+    alert("Parola panoului a fost schimbată", f"Parola panoului a fost schimbată de la adresa {ip}. Celelalte sesiuni au fost închise.")
+    return 200, {"ok": True}
+
+
+# ---------------------------------------------------------------- shop orders held for approval
+
+SHOP_HOLD_RULES = {
+    "unpaid": "fără dată de plată",
+    "no_transaction": "fără cod de tranzacție de la plată",
+    "zero_total": "total 0 la produsele RDN Remote",
+    "not_checkout": "nu a fost plasată din pagina de comandă",
+    "daily_cap": "peste limita zilnică de licențe",
+}
+SHOP_HOLD_OTHER = {"protectie": "mod de protecție (atac în curs)"}
+
+
+def money(v):
+    try:
+        return float(str(v or "0").replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def shop_hold_reasons(order, items, now):
+    rules, reasons = conf("shop_hold"), []
+    if "unpaid" in rules and not (order.get("date_paid") or order.get("date_paid_gmt")):
+        reasons.append("unpaid")
+    if "no_transaction" in rules and not str(order.get("transaction_id") or "").strip():
+        reasons.append("no_transaction")
+    if "zero_total" in rules and sum(money(i.get("total")) for i in items) <= 0:
+        reasons.append("zero_total")
+    if "not_checkout" in rules and order.get("created_via") not in ("checkout", "store-api"):
+        reasons.append("not_checkout")
+    if "daily_cap" in rules:
+        done = sum(len([c for c in (r["codes"] or "").split(", ") if c])
+                   for r in q("SELECT codes FROM shop_orders WHERE processed > ?", (now - 86400,)))
+        if done + len(items) > conf("shop_daily_cap"):
+            reasons.append("daily_cap")
+    if protection_active(now):
+        reasons.append("protectie")
+    return reasons
+
+
+def shop_hold(order_id, order, reasons, client, email_addr, now):
+    labels = [SHOP_HOLD_RULES.get(r) or SHOP_HOLD_OTHER.get(r, r) for r in reasons]
+    fresh = not q("SELECT 1 FROM shop_pending WHERE order_id = ?", (order_id,))
+    x("""INSERT INTO shop_pending(order_id, received, updated, reasons, payload, decision) VALUES(?,?,?,?,?,'')
+         ON CONFLICT(order_id) DO UPDATE SET updated=excluded.updated, reasons=excluded.reasons, payload=excluded.payload""",
+      (order_id, now, now, ",".join(reasons), json.dumps(order)))
+    x("UPDATE shop_orders SET error=?, updated=? WHERE order_id=?", ("În așteptarea aprobării: " + "; ".join(labels), now, order_id))
+    if fresh:
+        log(f"shop: order {order_id} held for approval ({', '.join(reasons)})")
+        alert("Comandă în așteptarea aprobării",
+              f"Comanda #{order_id} ({client}, {email_addr}, {as_text(order.get('total'), 20)} {as_text(order.get('currency'), 5)}) "
+              f"așteaptă aprobarea ta în panou, tab-ul Shop: {'; '.join(labels)}.")
+    return "în așteptarea aprobării: " + ", ".join(reasons)
+
+
+def shop_pending_state():
+    out = []
+    for r in q("SELECT * FROM shop_pending WHERE decision = '' ORDER BY received DESC"):
+        try:
+            o = json.loads(r["payload"])
+        except ValueError:
+            o = {}
+        billing = o.get("billing") if isinstance(o.get("billing"), dict) else {}
+        out.append({
+            "order_id": r["order_id"], "received": r["received"],
+            "reasons": [SHOP_HOLD_RULES.get(x_) or SHOP_HOLD_OTHER.get(x_, x_) for x_ in (r["reasons"] or "").split(",") if x_],
+            "client": (as_text(billing.get("company"), 100) or " ".join(filter(None, [as_text(billing.get("first_name"), 60),
+                                                                                    as_text(billing.get("last_name"), 60)]))),
+            "email": as_text(billing.get("email"), 254), "total": as_text(o.get("total"), 20), "currency": as_text(o.get("currency"), 5),
+            "payment": as_text(o.get("payment_method_title"), 60), "status": as_text(o.get("status"), 30),
+            "items": [f"{as_text(i.get('name'), 80)} × {as_int(i.get('quantity')) or 1}"
+                      for i in o.get("line_items") or [] if isinstance(i, dict)],
+        })
+    return out
+
+
+def shop_decide(action, order_id):
+    """Approves or rejects an order held for approval; only one decision counts."""
+    now = time.time()
+    with SHOP_LOCK:
+        rows = q("SELECT * FROM shop_pending WHERE order_id = ? AND decision = ''", (order_id,))
+        if not rows:
+            return 409, {"error": "Comanda nu mai așteaptă aprobarea"}
+        x("UPDATE shop_pending SET decision=?, decided=? WHERE order_id=? AND decision=''",
+          ("approved" if action == "approve" else "rejected", now, order_id))
+        if action == "reject":
+            x("UPDATE shop_orders SET error=?, updated=? WHERE order_id=?", ("Respinsă din panou", now, order_id))
+            log(f"shop: order {order_id} rejected")
+            return 200, {"ok": True, "result": "respinsă"}
+        result = shop_order(json.loads(rows[0]["payload"]), approved=True)
+    log(f"shop: order {order_id} approved: {result}")
+    return 200, {"ok": True, "result": result}
+
+
 SESSION_COOKIE = "rdn_panel"
 PANEL_SESSIONS = {}  # token -> expiry
-TOTP_LAST = [0]  # last accepted time step; a code works only once
 LAST_ACTIVE = {}  # panel or portal session token -> time of the user's last activity
 
 
@@ -1234,13 +1670,15 @@ def idle_expired(token, active):
     return False
 
 
-def totp_ok(code, now=None):
-    """RFC 6238 (SHA-1, 30 s, 6 digits), accepting one step of clock drift."""
+def totp_ok(code, now=None, secret=None):
+    """RFC 6238 (SHA-1, 30 s, 6 digits), accepting one step of clock drift. A code works once,
+    also across restarts (admin_totp_last)."""
     code = re.sub(r"\s", "", str(code or ""))
-    if not re.fullmatch(r"\d{6}", code):
+    secret = re.sub(r"[\s=]", "", secret or admin_totp_secret()).upper()
+    if not re.fullmatch(r"\d{6}", code) or not secret:
         return False
     try:
-        key = base64.b32decode(PANEL_TOTP_SECRET + "=" * (-len(PANEL_TOTP_SECRET) % 8))
+        key = base64.b32decode(secret + "=" * (-len(secret) % 8))
     except ValueError:
         return False
     step = int(now if now is not None else time.time()) // 30
@@ -1250,9 +1688,9 @@ def totp_ok(code, now=None):
         value = (struct.unpack(">I", digest[off:off + 4])[0] & 0x7FFFFFFF) % 1000000
         if hmac.compare_digest(f"{value:06d}", code):
             with AUTH_LOCK:
-                if c <= TOTP_LAST[0]:
+                if c <= (as_int(setting("admin_totp_last", "0")) or 0):
                     return False
-                TOTP_LAST[0] = c
+                set_setting("admin_totp_last", str(c))
             return True
     return False
 
@@ -1304,7 +1742,7 @@ TOTP_FIELD = """<label for="c">Codul de 6 cifre</label>
 <p style="margin:12px 0 0;font-size:13px">Codul se schimbă la 30 de secunde. <a href="./">Înapoi la utilizator și parolă</a></p>"""
 PENDING_COOKIE = "rdn_panel_2fa"
 PENDING_TTL = 300
-PENDING_2FA = {}  # token -> expiry: user and password were right, the code is still due
+PENDING_2FA = {}  # token -> (expiry, key being set up or ""): user and password were right, the code is still due
 
 
 def totp_page(error=""):
@@ -1315,6 +1753,21 @@ def totp_page(error=""):
     if error:
         html = html.replace("<!--ERR-->", '<div class="err">' + error + "</div>")
     return html
+
+
+def enroll_page(secret, error=""):
+    """Setting up Google Authenticator after the password, when the panel has no key yet."""
+    html = totp_page(error)
+    groups = " ".join(secret[i:i + 4] for i in range(0, len(secret), 4))
+    uri = f"otpauth://totp/RDN%20Remote:{quote(PANEL_USER)}?secret={secret}&issuer=RDN%20Remote"
+    block = (f'<p style="margin:0 0 8px;font-size:14px">Intrarea în panou cere Google Authenticator. Pe telefon: '
+             f"<b>+</b> → <b>Introdu o cheie de configurare</b>, nume <b>RDN Remote</b>, tip <b>bazat pe timp</b>, cheia:</p>"
+             f'<p style="margin:0 0 6px;font-size:19px;font-weight:700;letter-spacing:.06em;user-select:all;'
+             f'font-family:ui-monospace,Consolas,monospace;word-break:break-all">{groups}</p>'
+             f'<p style="margin:0 0 14px;font-size:12px;word-break:break-all">Pe telefon poți deschide direct: <a href="{uri}">{uri}</a>. '
+             "Apoi scrie mai jos codul afișat de aplicație.</p>")
+    html = html.replace("<!--ERR-->", "<!--ERR-->" + block, 1) if "<!--ERR-->" in html else html.replace('<div class="err">', block + '<div class="err">', 1)
+    return html.replace(">Verifică și intră</button>", ">Activează și intră</button>")
 
 
 def login_page(error=""):
@@ -1447,6 +1900,7 @@ def state(search):
         "shop": shop_state(),
         "shop_codes": shop_codes(),
         "config": config_state(),
+        "security": security_state(),
         "devices": devices,
         "licenses": licenses,
         "licensing_ready": signing_seed() is not None,
@@ -1538,6 +1992,9 @@ class PanelHandler(BaseHTTPRequestHandler):
             fails, until = AUTH_FAILS.get(ip, (0, 0))
         if until > now:
             return self.reply(429, login_page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}."), html)
+        ban = banned(ip)
+        if ban:
+            return self.reply(429, login_page(f"Adresa ta e blocată după prea multe încercări greșite, încă {minutes_text(ban - now)}."), html)
         length = body_length(self.headers, 4096)
         if length is None:
             return self.reply(413, "body prea mare")
@@ -1548,33 +2005,50 @@ class PanelHandler(BaseHTTPRequestHandler):
             with AUTH_LOCK:
                 AUTH_FAILS[ip] = (fails + 1, now + lock_seconds if fails + 1 >= max_fails else 0)
             log(f"panel: failed login from {ip}")
+            note_failure(ip)
+            if fails + 1 >= max_fails:
+                strike(ip, "autentificare în panou")
+                alert("Încercări greșite în panou", f"Adresa {ip} a fost blocată după {fails + 1} încercări greșite de intrare în panou.")
             return self.reply(200, page(message), html)
 
         if "code" in form:
             pending = self.cookie(PENDING_COOKIE)
             with AUTH_LOCK:
-                expiry = PENDING_2FA.get(pending, 0) if pending else 0
+                expiry, enrolling = PENDING_2FA.get(pending, (0, "")) if pending else (0, "")
             if expiry <= now:
                 return self.reply(200, login_page("Verificarea a expirat. Autentifică-te din nou."), html)
-            if not totp_ok((form.get("code") or [""])[0]):
+            if not totp_ok((form.get("code") or [""])[0], secret=enrolling or None):
+                if enrolling:
+                    return failed(lambda m: enroll_page(enrolling, m), "Cod greșit. Verifică cheia introdusă în aplicație și codul afișat acum.")
                 return failed(totp_page, "Cod greșit sau expirat. Introdu codul afișat acum în aplicație.")
             with AUTH_LOCK:
                 PENDING_2FA.pop(pending, None)
+            if enrolling:
+                set_setting("admin_totp", enrolling)
+                log(f"panel: Google Authenticator set up from {ip}")
+                alert("Verificare în doi pași configurată", f"La panou a fost configurată o cheie nouă Google Authenticator, de la adresa {ip}.")
             return self.start_session(ip, now, secure, clear_pending=True)
 
         user = (form.get("user") or [""])[0]
         pwd = (form.get("password") or [""])[0]
-        ok = hmac.compare_digest(user.encode(), PANEL_USER.encode()) & hmac.compare_digest(pwd.encode(), PANEL_PASSWORD.encode())
+        ok = hmac.compare_digest(user.encode(), PANEL_USER.encode()) & admin_password_ok(pwd)
         if not ok:
             return failed(login_page, "Utilizator sau parolă greșită.")
-        if not PANEL_TOTP_SECRET:
-            return self.start_session(ip, now, secure)
+        if RESET_FILE.exists():
+            # Created on the server by someone who lost the phone: a new key is set up now.
+            x("DELETE FROM settings WHERE key = 'admin_totp'")
+            set_setting("admin_totp_env_off", "1")
+            RESET_FILE.unlink(missing_ok=True)
+            log(f"panel: Google Authenticator reset with {RESET_FILE.name} from {ip}")
+            alert("Verificarea în doi pași a fost resetată", f"Cheia Google Authenticator a panoului a fost resetată de pe server; "
+                  f"următoarea intrare (de la {ip}) configurează una nouă.")
+        enrolling = "" if admin_totp_secret() else new_totp_secret()
         token = secrets.token_urlsafe(32)
         with AUTH_LOCK:
-            for t in [t for t, e in PENDING_2FA.items() if e <= now]:
+            for t in [t for t, (e, _) in PENDING_2FA.items() if e <= now]:
                 del PENDING_2FA[t]
-            PENDING_2FA[token] = now + PENDING_TTL
-        return self.reply(200, totp_page(), html, headers=[
+            PENDING_2FA[token] = (now + PENDING_TTL, enrolling)
+        return self.reply(200, enroll_page(enrolling) if enrolling else totp_page(), html, headers=[
             ("Set-Cookie", f"{PENDING_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={PENDING_TTL}{secure}")])
 
     def start_session(self, ip, now, secure, clear_pending=False):
@@ -1586,6 +2060,10 @@ class PanelHandler(BaseHTTPRequestHandler):
                 del PANEL_SESSIONS[t]
             PANEL_SESSIONS[token] = now + ttl
         log(f"panel: login from {ip}")
+        if not admin_ip_trusted(ip):
+            alert("Intrare în panou de la o adresă nouă", f"Cineva a intrat în panou de la adresa {ip}, folosită acum prima dată. "
+                  "Dacă nu ai fost tu, schimbă parola panoului și resetează Google Authenticator.")
+        x("INSERT INTO admin_ips(ip, first, last) VALUES(?,?,?) ON CONFLICT(ip) DO UPDATE SET last=excluded.last", (ip, now, now))
         path = urlparse(self.path).path
         headers = [
             ("Location", path[: -len("login")] or "/"),
@@ -1598,6 +2076,8 @@ class PanelHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------ shop webhook
 
     def shop_webhook(self):
+        if banned(self.client_ip()):
+            return self.reply(403, {"error": "blocked"})
         length = body_length(self.headers, SHOP_MAX_BODY)
         if length is None:
             return self.reply(413, {"error": "too large"})
@@ -1612,7 +2092,12 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(200, {"ok": True})
         expected = base64.b64encode(hmac.new(secret.encode(), body, hashlib.sha256).digest()).decode()
         if not hmac.compare_digest(expected, self.headers.get("X-WC-Webhook-Signature", "")):
-            log(f"shop: webhook with a bad signature from {self.client_ip()}")
+            ip = self.client_ip()
+            log(f"shop: webhook with a bad signature from {ip}")
+            note_failure(ip)
+            strike(ip, "comandă din shop cu semnătură greșită")
+            alert("Comandă din shop cu semnătură greșită", f"Panoul a primit de la {ip} o comandă cu semnătura greșită și a refuzat-o. "
+                  "Dacă e shopul, verifică cheia secretă a webhook-ului.")
             return self.reply(401, {"error": "bad signature"})
         try:
             order = json.loads(body)
@@ -1693,6 +2178,9 @@ class PanelHandler(BaseHTTPRequestHandler):
             fails, until = AUTH_FAILS.get(key, (0, 0))
         if until > now:
             return page(f"Prea multe încercări greșite. Reîncearcă peste {minutes_text(until - now)}.")
+        ban = banned(ip)
+        if ban:
+            return page(f"Adresa ta e blocată după prea multe încercări greșite, încă {minutes_text(ban - now)}.")
         length = body_length(self.headers, 4096)
         if length is None:
             return self.reply(413, "body prea mare")
@@ -1706,6 +2194,9 @@ class PanelHandler(BaseHTTPRequestHandler):
                 fails += 1
                 AUTH_FAILS[key] = (fails, now + lock_seconds if fails >= max_fails else 0)
             log(f"portal: failed login for {email if '@' in email else '(not an e-mail)'!r} from {ip}")
+            note_failure(ip)
+            if fails >= max_fails:
+                strike(ip, "autentificare în portal")
             return page("E-mail sau parolă greșită.")
         if not portal_user(rows[0]["id"]):
             return page("Licența organizației este suspendată. Contactează RDN Network Data.")
@@ -1785,13 +2276,6 @@ class PanelHandler(BaseHTTPRequestHandler):
                               headers=[("Content-Disposition", f'attachment; filename="{name}"')])
         if url.path.endswith("/api/backups"):
             return self.reply(200, {"backups": list_backups(), "dir": str(BACKUP_DIR)})
-        if url.path.endswith("/api/backup/download"):
-            name = (parse_qs(url.query).get("name") or [""])[0]
-            path = BACKUP_DIR / name
-            if not re.fullmatch(rf"{backup.PREFIX}-[0-9]{{8}}-[0-9]{{6}}-[a-z-]+\.tar\.gz", name) or not path.is_file():
-                return self.reply(404, "backup inexistent")
-            return self.reply(200, path.read_bytes(), "application/gzip",
-                              headers=[("Content-Disposition", f'attachment; filename="{name}"')])
         self.reply(200, INDEX_HTML, "text/html; charset=utf-8")
 
     def do_POST(self):
@@ -1815,7 +2299,13 @@ class PanelHandler(BaseHTTPRequestHandler):
             length = body_length(self.headers, MAX_RESTORE)
             if not length:
                 return self.reply(413, {"error": "fișier prea mare sau gol"})
-            return self.reply(*restore_live(self.rfile.read(length)))
+            blob = self.rfile.read(length)
+            if backup.is_encrypted(blob):
+                try:
+                    blob = backup.decrypt(blob, unquote(self.headers.get("X-Backup-Password", "")))
+                except (ValueError, ImportError) as e:
+                    return self.reply(400, {"error": f"Backup criptat: {e}"})
+            return self.reply(*restore_live(blob))
         length = body_length(self.headers, MAX_BODY)
         if length is None:
             return self.reply(413, {"error": "bad or too large body"})
@@ -1856,6 +2346,25 @@ class PanelHandler(BaseHTTPRequestHandler):
             return self.reply(*config_action(v))
         if action.startswith("shop/"):
             return self.reply(*shop_settings_action(action[len("shop/"):], v))
+        if action.startswith("security/"):
+            return self.reply(*security_action(action[len("security/"):], v))
+        if action.startswith("account/"):
+            return self.reply(*account_action(action[len("account/"):], v, self.client_ip(), self.session_token()))
+        if action == "backup/download":
+            # Only encrypted: a copy that leaves the server needs the password chosen here.
+            name, password = as_text(v.get("name"), 100) or "", str(v.get("password") or "")
+            path = BACKUP_DIR / name
+            if not re.fullmatch(rf"{backup.PREFIX}-[0-9]{{8}}-[0-9]{{6}}-[a-z-]+\.tar\.gz", name) or not path.is_file():
+                return self.reply(404, {"error": "backup inexistent"})
+            try:
+                blob = backup.encrypt(path.read_bytes(), password)
+            except ImportError:
+                return self.reply(500, {"error": "Criptarea cere PyNaCl (imaginea Docker a panoului)"})
+            except ValueError as e:
+                return self.reply(400, {"error": str(e)})
+            log(f"backup: {name} downloaded (encrypted) from {self.client_ip()}")
+            return self.reply(200, blob, "application/octet-stream",
+                              headers=[("Content-Disposition", f'attachment; filename="{name}.enc"')])
         if action == "backup/create":
             try:
                 path = backup.create(DATA_DIR, ENV_FILE, BACKUP_DIR, "manual")
@@ -2407,7 +2916,7 @@ def portal_login_page(error=""):
 # WooCommerce REST API keys set, the code reaches the customer as a note on the order, which
 # WooCommerce e-mails; otherwise it waits in the panel's Shop tab.
 
-SHOP_LOCK = threading.Lock()
+SHOP_LOCK = threading.RLock()  # shop_decide holds it around shop_order
 SHOP_MIN_SECRET = 24
 SHOP_MAX_BODY = 1024 * 1024
 SHOP_DEFAULT_PRODUCTS = {
@@ -2455,6 +2964,19 @@ CONFIG = {
     "shop_note_new": ("text", SHOP_NOTE_NEW, 1, 3000),
     "shop_note_renew": ("text", SHOP_NOTE_RENEW, 1, 3000),
     "shop_note_footer": ("text", SHOP_NOTE_FOOTER, 0, 1000),
+    # Orders that reach a paid status but look odd wait for the operator (shop_hold_reasons).
+    "shop_hold": ("set", "unpaid,no_transaction,zero_total,not_checkout,daily_cap",
+                  ("unpaid", "no_transaction", "zero_total", "not_checkout", "daily_cap")),
+    "shop_daily_cap": ("int", 20, 1, 1000),
+    # Security e-mails (alert); the SMTP password is set apart (security_action) and never shown.
+    "alert_email": ("text", "", 0, 500),
+    "smtp_host": ("text", "", 0, 200),
+    "smtp_port": ("int", 587, 1, 65535),
+    "smtp_security": ("choice", "starttls", ("starttls", "ssl", "none")),
+    "smtp_user": ("text", "", 0, 200),
+    "smtp_from": ("text", "", 0, 200),
+    "auto_ban": ("bool", 1),
+    "protect_mode": ("bool", 1),
 }
 
 
@@ -2503,7 +3025,7 @@ def config_action(v):
         elif kind == "set":
             items = value if isinstance(value, list) else str(value or "").split(",")
             items = [str(i) for i in items if str(i)]
-            if not items or any(i not in spec[2] for i in items):
+            if (not items and key != "shop_hold") or any(i not in spec[2] for i in items):
                 return 400, {"error": "Alege cel puțin o stare a comenzii", "field": key}
             rows.append((key, ",".join(items)))
         elif kind == "choice":
@@ -2516,6 +3038,12 @@ def config_action(v):
                 return 400, {"error": f"Textul trebuie să aibă între {spec[2]} și {spec[3]} caractere", "field": key}
             if key == "shop_site_url" and text and not re.fullmatch(r"https?://\S+", text):
                 return 400, {"error": "Adresa site-ului trebuie să înceapă cu https://", "field": key}
+            if key == "alert_email" and text and not all(EMAIL_RE.fullmatch(a.strip()) for a in text.split(",")):
+                return 400, {"error": "Adresele pentru alerte, separate prin virgulă, trebuie să fie e-mailuri valide", "field": key}
+            if key == "smtp_from" and text and not EMAIL_RE.fullmatch(text):
+                return 400, {"error": "Expeditorul trebuie să fie o adresă de e-mail", "field": key}
+            if key in ("smtp_host", "smtp_user") and re.search(r"[\s\x00-\x1f]", text):
+                return 400, {"error": "Fără spații", "field": key}
             rows.append((key, text))
     for row in rows:
         set_setting(*row)
@@ -2552,6 +3080,8 @@ def shop_state():
         "products": shop_products(),
         "statuses": SHOP_STATUSES,
         "orders": q("SELECT * FROM shop_orders ORDER BY updated DESC LIMIT 200"),
+        "pending": shop_pending_state(),
+        "hold_rules": SHOP_HOLD_RULES,
     }
 
 
@@ -2604,6 +3134,8 @@ def shop_settings_action(action, v):
             return 400, {"error": "Adaugă cel puțin un produs"}
         set_setting("shop_products", json.dumps(products, ensure_ascii=False))
         return 200, {"ok": True}
+    if action in ("approve", "reject"):
+        return shop_decide(action, as_int(v.get("order_id")))
     order = q("SELECT * FROM shop_orders WHERE order_id = ?", (as_int(v.get("order_id")),))
     if action in ("resend", "reschedule", "mark_sent", "cancel", "deactivate") and (not order or not order[0]["codes"]):
         return 404, {"error": "Comandă inexistentă sau fără coduri"}
@@ -2682,8 +3214,9 @@ def shop_extend(code, months):
     log(f"licenses: {code} extended by {months} months (shop)")
 
 
-def shop_order(order):
-    """Handles one order from the webhook; returns a short status for the log."""
+def shop_order(order, approved=False):
+    """Handles one order from the webhook (or one the operator approved); returns a short status
+    for the log."""
     order_id = as_int(order.get("id"))
     status = as_text(order.get("status"), 30) or ""
     if not order_id:
@@ -2701,14 +3234,27 @@ def shop_order(order):
             if status in ("refunded", "cancelled") and seen[0]["status"] != status:
                 return shop_cancelled(seen[0], status)
             return "deja procesată"
+        pending = q("SELECT decision FROM shop_pending WHERE order_id = ?", (order_id,))
+        if pending and pending[0]["decision"] == "rejected":
+            x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
+            return "respinsă din panou"
         if not seen:
             x("INSERT INTO shop_orders(order_id, status, email, client, created, updated) VALUES(?,?,?,?,?,?)",
               (order_id, status, email, client, now, now))
         else:
             x("UPDATE shop_orders SET status=?, updated=? WHERE order_id=?", (status, now, order_id))
         if status not in conf("shop_statuses"):
+            if pending and pending[0]["decision"] == "" and status in ("refunded", "cancelled", "failed", "trash"):
+                x("UPDATE shop_pending SET decision='rejected', decided=? WHERE order_id=? AND decision=''", (now, order_id))
+                x("UPDATE shop_orders SET error=? WHERE order_id=?", (f"Comanda e {status} în shop; nu se mai aprobă", order_id))
+                return "anulată în shop înainte de aprobare"
             return f"în așteptare ({status})"
         products, quantity_mode = shop_products(), conf("shop_quantity")
+        items = [i for i in order.get("line_items") or [] if isinstance(i, dict) and str(as_int(i.get("product_id")) or "") in products]
+        if items and not approved:
+            reasons = shop_hold_reasons(order, items, now)
+            if reasons:
+                return shop_hold(order_id, order, reasons, client, email, now)
         site = conf("shop_site_url") or (f"https://{server_host()}/" if server_host() else "")
         codes, new_codes, extended, notes, errors = [], [], {}, [], []
         for item in order.get("line_items") or []:
@@ -2760,8 +3306,9 @@ def shop_order(order):
             x("UPDATE shop_orders SET error=? WHERE order_id=?", ("; ".join(errors) or "niciun produs RDN Remote", order_id))
             return "; ".join(errors) or "niciun produs RDN Remote"
         message = "\n\n".join(notes + ([conf("shop_note_footer")] if conf("shop_note_footer") else []))
-        x("UPDATE shop_orders SET codes=?, new_codes=?, extended=?, message=?, error=? WHERE order_id=?",
-          (", ".join(codes), ", ".join(new_codes), json.dumps(extended), message, "; ".join(errors), order_id))
+        x("UPDATE shop_orders SET codes=?, new_codes=?, extended=?, message=?, error=?, processed=? WHERE order_id=?",
+          (", ".join(codes), ", ".join(new_codes), json.dumps(extended), message, "; ".join(errors), now, order_id))
+        x("UPDATE shop_pending SET decision='auto', decided=? WHERE order_id=? AND decision=''", (now, order_id))
     delay = conf("shop_note_delay_minutes") * 60
     if conf("shop_send_note") and delay:
         x("UPDATE shop_orders SET note_due=? WHERE order_id=?", (time.time() + delay, order_id))
@@ -2795,6 +3342,10 @@ def shop_sender():
             shop_send_due()
         except Exception as e:
             log(f"shop: {e!r}")
+        try:
+            protection_tick()
+        except Exception as e:
+            log(f"security: {e!r}")
         time.sleep(60)
 
 
@@ -2915,12 +3466,20 @@ def housekeeping():
             x("DELETE FROM nonces WHERE ts < ?", (time.time() - 3600,))
             x("DELETE FROM pending_disconnect WHERE ts < ?", (time.time() - 300,))
             x("DELETE FROM peer_targets WHERE last < ?", (time.time() - PEER_WINDOW,))
+            x("DELETE FROM ip_strikes WHERE ts < ?", (time.time() - STRIKE_WINDOW,))
+            # A ban's level is remembered for a year after it ends.
+            x("DELETE FROM ip_bans WHERE until < ?", (time.time() - 365 * 86400,))
+            x("DELETE FROM shop_pending WHERE decision != '' AND decided < ?", (cutoff,))
             recheck_activations()
             # The audit API is public: cap what unauthenticated posts can grow to.
             for table, order in (("sessions", "started"), ("alarms", "ts"), ("devices", "last_seen")):
                 x(f"DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} "
                   f"ORDER BY {order} DESC LIMIT -1 OFFSET ?)", (MAX_ROWS,))
-            auto_backup()
+            try:
+                auto_backup()
+            except (OSError, RuntimeError, sqlite3.Error) as e:
+                log(f"backup: automatic backup failed: {e!r}")
+                alert("Backup automat eșuat", f"Backup-ul zilnic al serverului nu s-a putut face: {e}")
             # Sessions whose close never arrived (client crashed, network lost).
             x(
                 "UPDATE sessions SET ended=started WHERE ended IS NULL AND authed IS NULL AND started < ?",
@@ -2939,12 +3498,14 @@ def serve(handler, bind, port, name):
 
 
 def main():
-    if len(PANEL_PASSWORD) < 12:
-        sys.exit("PANEL_PASSWORD must be set and at least 12 characters (see server/.env)")
     init_db()
+    seed_admin()
+    if not setting("admin_pw_hash"):
+        sys.exit("PANEL_PASSWORD must be set and at least 12 characters (see server/.env)")
     sync_hbbr_blocklist()
     threading.Thread(target=housekeeping, daemon=True).start()
     threading.Thread(target=shop_sender, daemon=True).start()
+    threading.Thread(target=alert_sender, daemon=True).start()
     threading.Thread(target=serve, args=(ApiHandler, API_BIND, API_PORT, "audit API"), daemon=True).start()
     serve(PanelHandler, PANEL_BIND, PANEL_PORT, "dashboard")
 
