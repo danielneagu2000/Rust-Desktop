@@ -71,6 +71,8 @@ def decrypt(blob, password):
         return blob
     from nacl import exceptions, pwhash, secret
     off = len(ENC_MAGIC)
+    if len(blob) < off + 12 + pwhash.argon2id.SALTBYTES + secret.SecretBox.NONCE_SIZE + secret.SecretBox.MACBYTES:
+        raise ValueError("backup criptat: fișier incomplet")
     ops, mem = struct.unpack(">IQ", bytes(blob[off:off + 12]))
     salt = bytes(blob[off + 12:off + 12 + pwhash.argon2id.SALTBYTES])
     if not (1 <= ops <= 10 and 8 * 1024 * 1024 <= mem <= 1024 * 1024 * 1024) or not password:

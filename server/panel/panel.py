@@ -904,7 +904,7 @@ def activate(v, src_ip, auth=(None, b"")):
     if ban:
         return {"error": t(f"Adresa ta e blocată după prea multe încercări greșite, încă {minutes_text(ban - now)}.",
                            f"Your address is blocked after too many wrong attempts, for {minutes_text_en(ban - now)}.")}
-    if protection_active(now) and not admin_ip_trusted(src_ip):
+    if protection_active(now) and not admin_ip_trusted(src_ip) and attacking(src_ip):
         left = (as_int(setting("protect_until", "0")) or now) - now
         return {"error": t(f"Serverul de licențe se apără acum de un atac. Reîncearcă peste {minutes_text(left)}.",
                            f"The license server is fending off an attack. Try again in {minutes_text_en(left)}.")}
@@ -969,22 +969,26 @@ def activate(v, src_ip, auth=(None, b"")):
                       "acelei licențe sau contactează RDN Network Data.",
                       "This computer already has a license activated from another installation of the app. "
                       "Enter that license's code or contact RDN Network Data."))
+    full = False
     with DB_LOCK:
         already = DB.execute("SELECT 1 FROM activations WHERE uuid=? AND code=?", (uuid, code)).fetchone()
         used = DB.execute("SELECT COUNT(*) FROM activations WHERE code=?", (code,)).fetchone()[0]
-        if not already and used >= lic["seats"]:
-            return fail(t(f"Toate cele {lic['seats']} locuri ale licenței sunt ocupate.",
-                          f"All {lic['seats']} seats of the license are in use."))
-        if lic["starts"] is None:
+        full = not already and used >= lic["seats"]
+        if not full and lic["starts"] is None:
             expires = add_months(now, lic["months"]) if lic["months"] else None
             DB.execute("UPDATE licenses SET starts=?, expires=? WHERE code=?", (now, expires, code))
-        DB.execute(
-            """INSERT INTO activations(uuid, code, device_id, hostname, activated, last_seen)
-               VALUES(?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET code=excluded.code,
-               device_id=excluded.device_id, hostname=excluded.hostname,
-               activated=excluded.activated, last_seen=excluded.last_seen""",
-            (uuid, code, as_text(v.get("id"), 40) or None, as_text(v.get("hostname"), 100), now, now),
-        )
+        if not full:
+            DB.execute(
+                """INSERT INTO activations(uuid, code, device_id, hostname, activated, last_seen)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(uuid) DO UPDATE SET code=excluded.code,
+                   device_id=excluded.device_id, hostname=excluded.hostname,
+                   activated=excluded.activated, last_seen=excluded.last_seen""",
+                (uuid, code, as_text(v.get("id"), 40) or None, as_text(v.get("hostname"), 100), now, now),
+            )
+    # Outside DB_LOCK: fail() logs and counts with the database (strike, note_failure).
+    if full:
+        return fail(t(f"Toate cele {lic['seats']} locuri ale licenței sunt ocupate.",
+                      f"All {lic['seats']} seats of the license are in use."))
     if who == "key":
         bind_device_key(uuid, as_text(v.get("id"), 40), key, own)
     lic = q("SELECT * FROM licenses WHERE code = ?", (code,))[0]
@@ -1362,7 +1366,7 @@ def net_of(ip):
 
 
 def admin_ip_trusted(ip):
-    return bool(ip) and bool(q("SELECT 1 FROM admin_ips WHERE ip = ?", (ip,)))
+    return bool(ip) and bool(q("SELECT 1 FROM admin_ips WHERE ip = ? AND last > ?", (ip, time.time() - 90 * 86400)))
 
 
 def shop_ips():
@@ -1423,7 +1427,7 @@ def strike(ip, reason):
     net = net_of(ip)
     ban(ip, net, f"{n} blocări după încercări greșite ({reason})", now)
     in_net = q("SELECT COUNT(*) AS n FROM ip_bans WHERE net = ? AND ip NOT LIKE 'net:%' AND until > ?", (net, now))[0]["n"]
-    if in_net >= BAN_NETWORK and ban_until("net:" + net) <= now:
+    if in_net >= BAN_NETWORK and not q("SELECT 1 FROM ip_bans WHERE ip = ? AND until > ?", ("net:" + net, now)):
         ban("net:" + net, net, f"{in_net} adrese blocate în aceeași rețea", now)
 
 
@@ -1448,15 +1452,16 @@ def bans_clear(ip):
 
 # ---------------------------------------------------------------- protection mode
 #
-# Many wrong codes, passwords or signatures from several addresses in a short time are an
-# attack: license activations and shop orders wait until it is over, and the mode ends by itself
-# 15 minutes after the last such burst. Computers that already have a license are not affected.
+# Many wrong codes or passwords from several networks in a short time are an attack: the networks
+# that made them cannot activate licenses and shop orders wait until it is over; the mode ends by
+# itself 15 minutes after the last such burst. Computers that already have a license, and new
+# activations from other networks, are not affected.
 
 PROTECT_WINDOW = 15 * 60
 PROTECT_FAILS = 30
 PROTECT_IPS = 5
 PROTECT_HOLD = 15 * 60
-FAIL_EVENTS = collections.deque(maxlen=5000)  # (time, ip) of recent failures
+FAIL_EVENTS = collections.deque(maxlen=5000)  # (time, network) of recent failures
 PROTECT_LOCK = threading.Lock()
 
 
@@ -1469,8 +1474,8 @@ def note_failure(ip):
         return
     now = time.time()
     with PROTECT_LOCK:
-        FAIL_EVENTS.append((now, ip))
-        recent = [i for t, i in FAIL_EVENTS if t > now - PROTECT_WINDOW]
+        FAIL_EVENTS.append((now, net_of(ip)))
+        recent = [n for t, n in FAIL_EVENTS if t > now - PROTECT_WINDOW]
         if len(recent) < PROTECT_FAILS or len(set(recent)) < PROTECT_IPS:
             return
         starting = not protection_active(now)
@@ -1478,10 +1483,21 @@ def note_failure(ip):
         if starting:
             set_setting("protect_since", str(int(now)))
     if starting:
-        log(f"security: protection mode on ({len(recent)} failures from {len(set(recent))} addresses in 15 minutes)")
-        alert("Mod de protecție pornit", f"{len(recent)} încercări greșite de pe {len(set(recent))} adrese în 15 minute. "
-              "Activările de licențe și comenzile din shop așteaptă până se termină atacul; modul se oprește singur "
-              "după 15 minute fără încercări de acest fel. Calculatoarele cu licență merg normal.")
+        log(f"security: protection mode on ({len(recent)} failures from {len(set(recent))} networks in 15 minutes)")
+        alert("Mod de protecție pornit", f"{len(recent)} încercări greșite din {len(set(recent))} rețele în 15 minute. "
+              "Rețelele care greșesc nu mai pot activa licențe, iar comenzile din shop așteaptă până se termină atacul; "
+              "modul se oprește singur după 15 minute fără încercări de acest fel. Calculatoarele cu licență merg normal.")
+
+
+def attacking(ip):
+    """During protection mode: ip's network made some of the failures."""
+    try:
+        net = net_of(ip)
+    except ValueError:
+        return False
+    since = time.time() - PROTECT_HOLD - PROTECT_WINDOW
+    with PROTECT_LOCK:
+        return any(n == net and t > since for t, n in FAIL_EVENTS)
 
 
 def protection_tick():
@@ -1637,6 +1653,9 @@ def shop_decide(action, order_id):
         rows = q("SELECT * FROM shop_pending WHERE order_id = ? AND decision = ''", (order_id,))
         if not rows:
             return 409, {"error": "Comanda nu mai așteaptă aprobarea"}
+        status = (q("SELECT status FROM shop_orders WHERE order_id = ?", (order_id,)) or [{}])[0].get("status")
+        if action == "approve" and status not in conf("shop_statuses"):
+            return 409, {"error": f"Comanda e acum „{status}” în shop, nu plătită; nu se poate aproba"}
         x("UPDATE shop_pending SET decision=?, decided=? WHERE order_id=? AND decision=''",
           ("approved" if action == "approve" else "rejected", now, order_id))
         if action == "reject":
@@ -2006,7 +2025,8 @@ class PanelHandler(BaseHTTPRequestHandler):
                 AUTH_FAILS[ip] = (fails + 1, now + lock_seconds if fails + 1 >= max_fails else 0)
             log(f"panel: failed login from {ip}")
             note_failure(ip)
-            if fails + 1 >= max_fails:
+            # A strike per full lockout: the counter keeps growing after a lockout ends.
+            if (fails + 1) % max_fails == 0:
                 strike(ip, "autentificare în panou")
                 alert("Încercări greșite în panou", f"Adresa {ip} a fost blocată după {fails + 1} încercări greșite de intrare în panou.")
             return self.reply(200, page(message), html)
@@ -2094,8 +2114,6 @@ class PanelHandler(BaseHTTPRequestHandler):
         if not hmac.compare_digest(expected, self.headers.get("X-WC-Webhook-Signature", "")):
             ip = self.client_ip()
             log(f"shop: webhook with a bad signature from {ip}")
-            note_failure(ip)
-            strike(ip, "comandă din shop cu semnătură greșită")
             alert("Comandă din shop cu semnătură greșită", f"Panoul a primit de la {ip} o comandă cu semnătura greșită și a refuzat-o. "
                   "Dacă e shopul, verifică cheia secretă a webhook-ului.")
             return self.reply(401, {"error": "bad signature"})
@@ -2195,7 +2213,7 @@ class PanelHandler(BaseHTTPRequestHandler):
                 AUTH_FAILS[key] = (fails, now + lock_seconds if fails >= max_fails else 0)
             log(f"portal: failed login for {email if '@' in email else '(not an e-mail)'!r} from {ip}")
             note_failure(ip)
-            if fails >= max_fails:
+            if fails % max_fails == 0:
                 strike(ip, "autentificare în portal")
             return page("E-mail sau parolă greșită.")
         if not portal_user(rows[0]["id"]):
@@ -3251,6 +3269,7 @@ def shop_order(order, approved=False):
             return f"în așteptare ({status})"
         products, quantity_mode = shop_products(), conf("shop_quantity")
         items = [i for i in order.get("line_items") or [] if isinstance(i, dict) and str(as_int(i.get("product_id")) or "") in products]
+        approved = approved or bool(pending and pending[0]["decision"] == "approved")
         if items and not approved:
             reasons = shop_hold_reasons(order, items, now)
             if reasons:

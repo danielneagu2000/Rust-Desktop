@@ -177,8 +177,8 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     <div class="card">
       <h2>Blocare automată și mod de protecție</h2>
       <form id="protect-form" style="padding:12px 16px;display:grid;gap:10px">
-        <label class="sw"><input type="checkbox" id="auto_ban"> Blocare automată: o adresă blocată de 3 ori în 30 de zile (de regulile de mai sus sau de comenzi din shop cu semnătură greșită) e blocată 1 zi, apoi 3 zile, o săptămână și o lună; 3 adrese blocate din aceeași rețea blochează rețeaua. Adresele de la care ai intrat în panou și shopul nu se blochează niciodată. Blocările rămân și după repornire.</label>
-        <label class="sw"><input type="checkbox" id="protect_mode"> Mod de protecție: la 30 de încercări greșite de pe cel puțin 5 adrese în 15 minute, activările de licențe și comenzile din shop așteaptă; modul se oprește singur la 15 minute după ultimul val, iar comenzile oprite de el se procesează atunci automat. Calculatoarele cu licență merg normal.</label>
+        <label class="sw"><input type="checkbox" id="auto_ban"> Blocare automată: o adresă blocată de 3 ori în 30 de zile de regulile de mai sus e blocată 1 zi, apoi 3 zile, o săptămână și o lună; 3 adrese blocate din aceeași rețea blochează rețeaua. Adresele de la care ai intrat în panou în ultimele 90 de zile și shopul nu se blochează. Blocările rămân și după repornire.</label>
+        <label class="sw"><input type="checkbox" id="protect_mode"> Mod de protecție: la 30 de încercări greșite din cel puțin 5 rețele în 15 minute, rețelele care greșesc nu mai pot activa licențe, iar comenzile din shop așteaptă; modul se oprește singur la 15 minute după ultimul val, iar comenzile oprite de el se procesează atunci automat. Calculatoarele cu licență și activările din alte rețele merg normal.</label>
         <div><button class="primary" type="submit">Salvează</button> <span class="sub" id="protect-state"></span></div>
       </form>
     </div>
@@ -563,7 +563,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
     var sec = data.security || {}, pr = sec.protect || {};
     document.getElementById("protect-banner").style.display = pr.active ? "" : "none";
     if (pr.active) document.getElementById("protect-text").textContent = "din " + when(pr.since) + ", cel puțin până la " + when(pr.until) +
-      ": activările de licențe și comenzile din shop așteaptă; se oprește singur la 15 minute după ultimul val de încercări greșite.";
+      ": rețelele care atacă nu pot activa licențe, iar comenzile din shop așteaptă; se oprește singur la 15 minute după ultimul val de încercări greșite.";
     document.getElementById("protect-state").textContent = pr.active ? "Activ acum, până la " + when(pr.until) : "Inactiv acum.";
     var acc = sec.account || {};
     document.getElementById("account-state").textContent = (acc.password_changed ? "Parola a fost schimbată din panou." :

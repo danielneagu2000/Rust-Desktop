@@ -149,16 +149,17 @@ Schimbarea se aplică imediat. Dedesubt vezi adresele blocate acum și le poți 
 Tot în tab-ul **IP-uri blocate**, cardul **Blocare automată și mod de protecție** (ambele pornite
 implicit):
 
-- **Blocare automată:** o adresă blocată de 3 ori în 30 de zile (de regulile de mai sus sau pentru
-  că a trimis comenzi de shop cu semnătură greșită) e blocată 1 zi, a doua oară 3 zile, apoi o
-  săptămână și o lună. Dacă 3 adrese din aceeași rețea (/24 la IPv4, /64 la IPv6) sunt blocate, se
+- **Blocare automată:** o adresă blocată de 3 ori în 30 de zile de regulile de mai sus e blocată
+  1 zi, a doua oară 3 zile, apoi o săptămână și o lună. Dacă 3 adrese din aceeași rețea (/24 la IPv4, /64 la IPv6) sunt blocate, se
   blochează toată rețeaua. Blocarea oprește intrarea în panou și în portal, activarea licențelor și
   comenzile de shop de la acea adresă; calculatoarele care au deja licență merg normal. Blocările
   rămân și după repornirea serverului și apar în tabelul de mai sus, cu butonul **Deblochează**.
-  Adresele de la care ai intrat în panou și adresele shopului nu se blochează niciodată.
-- **Mod de protecție:** la 30 de încercări greșite (parole, coduri de licență, semnături) de pe cel
-  puțin 5 adrese în 15 minute, serverul consideră că e atacat. Cât durează atacul, activările de
-  licențe noi primesc „reîncearcă peste câteva minute”, iar comenzile din shop așteaptă. Modul se
+  Adresele de la care ai intrat în panou în ultimele 90 de zile și adresele shopului nu se
+  blochează.
+- **Mod de protecție:** la 30 de încercări greșite (parole, coduri de licență) din cel puțin 5 rețele
+  în 15 minute, serverul consideră că e atacat. Cât durează atacul, rețelele care au greșit nu mai
+  pot activa licențe („reîncearcă peste câteva minute”), iar comenzile din shop așteaptă; clienții
+  din alte rețele își activează licențele normal. Modul se
   oprește singur la 15 minute după ultimul val, iar comenzile oprite de el se procesează atunci
   automat. În panou apare o bandă roșie cu butonul **Oprește acum**. Calculatoarele cu licență și
   intrarea ta în panou nu sunt afectate.
@@ -378,8 +379,8 @@ Fluxul complet:
 
    Comportamentul se poate opri din **Reguli pentru comenzi**.
 
-Webhook-ul fără semnătura corectă e refuzat, iar adresa care l-a trimis primește o blocare (vezi
-**Blocare automată**); primești și un e-mail de alertă.
+Webhook-ul fără semnătura corectă e refuzat și primești un e-mail de alertă (de obicei înseamnă că
+cheia secretă din WooCommerce nu e aceeași cu cea din panou).
 
 ### Comenzi în așteptarea aprobării
 
