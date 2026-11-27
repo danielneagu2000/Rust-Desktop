@@ -316,7 +316,7 @@ input[type=date] { padding: 7px 10px; border: 1px solid var(--line); border-radi
         <input type="text" id="acc-code" placeholder="Cod Google Authenticator" inputmode="numeric" maxlength="7" style="width:200px">
         <button class="primary" type="submit">Schimbă parola</button>
       </form>
-      <p class="hint">Parola se păstrează doar criptată (hash), în baza de date a panoului. După ce o schimbi aici, parola din <span class="mono">server/.env</span> nu mai e valabilă; dacă o schimbi tu acolo, devine ea parola panoului la repornire.
+      <p class="hint">Parola se păstrează doar criptată (hash), în baza de date a panoului. După ce o schimbi aici, parola din <span class="mono">server/.env</span> nu mai e valabilă; dacă o schimbi tu acolo și rulezi pe server <span class="mono">docker compose up -d panel</span>, devine ea parola panoului.
         Telefon pierdut: pe server, în folderul serverului, rulează <span class="mono">sudo touch server/data/resetare-acces</span>; la următoarea intrare, după parolă, panoul îți cere o cheie Google Authenticator nouă.</p>
     </div>
     <div class="card">

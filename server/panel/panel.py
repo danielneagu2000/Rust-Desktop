@@ -1112,6 +1112,8 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         src_ip = self.client_ip()
+        if cross_site(self.headers):
+            return self.reply(403, {"error": "cross-site"})
         if not rate_ok(src_ip):
             return self.reply(429, {"error": "rate limited"})
         length = body_length(self.headers, MAX_BODY)
@@ -1360,6 +1362,12 @@ STRIKE_WINDOW = 30 * 86400
 _SHOP_IPS = [0, set()]
 
 
+def cross_site(headers):
+    """A browser post from another site (Sec-Fetch-Site), which could otherwise spend a visitor's
+    attempts and get its address banned. The apps send no such header."""
+    return headers.get("Sec-Fetch-Site", "none").strip().lower() not in ("none", "same-origin")
+
+
 def net_of(ip):
     addr = ipaddress.ip_address(ip)
     return str(ipaddress.ip_network(f"{addr}/{24 if addr.version == 4 else 64}", strict=False))
@@ -1509,6 +1517,10 @@ def protection_tick():
     log("security: protection mode off")
     alert("Mod de protecție oprit", "Atacul s-a oprit. Activările și comenzile din shop merg din nou normal.")
     for row in q("SELECT * FROM shop_pending WHERE decision = '' AND reasons LIKE '%protectie%'"):
+        # The held copy may be older than the shop's latest status (e.g. put on hold since).
+        cur = q("SELECT status FROM shop_orders WHERE order_id = ?", (row["order_id"],))
+        if not cur or cur[0]["status"] not in conf("shop_statuses"):
+            continue
         try:
             order = json.loads(row["payload"])
         except ValueError:
@@ -2003,6 +2015,8 @@ class PanelHandler(BaseHTTPRequestHandler):
 
     def login(self):
         """Step 1: user and password. Step 2 (when 2FA is set up): the code, on its own page."""
+        if cross_site(self.headers):
+            return self.reply(403, "cross-site")
         ip = self.client_ip()
         now = time.time()
         html = "text/html; charset=utf-8"
@@ -2043,8 +2057,12 @@ class PanelHandler(BaseHTTPRequestHandler):
                 return failed(totp_page, "Cod greșit sau expirat. Introdu codul afișat acum în aplicație.")
             with AUTH_LOCK:
                 PENDING_2FA.pop(pending, None)
+                taken = bool(enrolling and admin_totp_secret())
+                if enrolling and not taken:
+                    set_setting("admin_totp", enrolling)
+            if taken:
+                return self.reply(200, login_page("Între timp s-a configurat o cheie Google Authenticator. Autentifică-te din nou."), html)
             if enrolling:
-                set_setting("admin_totp", enrolling)
                 log(f"panel: Google Authenticator set up from {ip}")
                 alert("Verificare în doi pași configurată", f"La panou a fost configurată o cheie nouă Google Authenticator, de la adresa {ip}.")
             return self.start_session(ip, now, secure, clear_pending=True)
@@ -2188,6 +2206,8 @@ class PanelHandler(BaseHTTPRequestHandler):
         return portal_user(uid)
 
     def portal_login(self, prefix):
+        if cross_site(self.headers):
+            return self.reply(403, "cross-site")
         ip, now = self.client_ip(), time.time()
         key = "portal:" + ip
         page = lambda err: self.reply(200, portal_login_page(err), "text/html; charset=utf-8")

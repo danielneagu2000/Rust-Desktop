@@ -189,8 +189,9 @@ După 10 încercări greșite de pe același IP (parolă sau cod), accesul de pe
 pornire se ia din `server/.env` (`PANEL_PASSWORD`); apoi o schimbi din **Setări** → **Contul
 panoului** (cere parola actuală și codul din aplicație; celelalte sesiuni se închid). După
 schimbare, parola din `server/.env` nu mai e valabilă. Dacă ai uitat parola, scrie una nouă în
-`server/.env` la `PANEL_PASSWORD` și repornește panoul (`docker compose restart panel`): o parolă
-schimbată în `server/.env` devine parola panoului.
+`server/.env` la `PANEL_PASSWORD`, apoi, în folderul `server`, rulează `docker compose up -d panel`
+(un simplu `restart` nu citește din nou `server/.env`): o parolă schimbată în `server/.env` devine
+parola panoului.
 
 **Telefon pierdut:** pe server, în folderul `server`, rulează `sudo touch data/resetare-acces`. La
 următoarea intrare, după parolă, panoul îți cere să configurezi o cheie nouă (cea veche nu mai
