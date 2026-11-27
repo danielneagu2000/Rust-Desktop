@@ -594,12 +594,24 @@ După ce un release e final, totul merge singur, fără intervenția ta:
 | --- | --- | --- |
 | Pagina de descărcare | serverul aduce noile kituri de pe GitHub | la cel mult 15 minute după release |
 | Serverul (panou, site, configurație) | serverul trece la codul release-ului (`auto_update.sh`) | la fel |
-| Aplicația pe **Windows** | se descarcă și se instalează singură, când nu e nicio sesiune activă | la verificarea periodică a aplicației |
+| Aplicația pe **Windows**, instalată | se descarcă și se instalează singură, când nu e nicio sesiune activă | la verificarea periodică a aplicației |
+| Aplicația pe **Windows**, pornită fără instalare (portabilă) | mesajul „versiune nouă” are butonul **Instalează**: după instalare, aplicația trece singură pe ultima versiune; linkul **Descarcă** de sub buton duce la site | la fel |
 | Aplicația pe **macOS** | se actualizează prin serviciul de fundal (dacă aplicația e instalată) | la fel |
 | Aplicația pe **Linux** și **Android** | apare mesajul „versiune nouă”, cu link spre pagina de descărcare | la fel |
 
 Forțezi verificarea pe server cu `sudo systemctl start rdn-update` (jurnal:
 `journalctl -u rdn-update`).
+
+**Windows fără instalare, versiuni până la 1.5.1-5:** acolo mesajul „versiune nouă” are doar
+butonul **Descarcă**, care deschide site-ul, iar butonul **Instalează** nu apare. Fișierul nou
+descărcat nu ajută cât timp aplicația veche rulează: închiderea ferestrei doar o ascunde, iar
+la deschiderea fișierului nou Windows aduce înapoi fereastra veche. Ce îi spui clientului, o
+singură dată:
+
+1. Oprește aplicația veche: Ctrl+Shift+Esc → **RDN Remote** → **Termină activitatea** (sau
+   repornește calculatorul).
+2. Deschide fișierul descărcat de pe site: e ultima versiune, deci apare butonul **Instalează**.
+3. Apasă **Instalează**. De acum aplicația se actualizează singură.
 
 Actualizarea oprește serviciile cât mai puțin: paginile site-ului se schimbă din mers, panoul
 repornește în aproximativ o secundă, iar serverul web (Caddy) repornește, câteva secunde, doar
@@ -623,8 +635,10 @@ Reguli:
   mai veche. Backup-ul și restaurarea nu ating site-ul. Singurul lucru de pe site pe care
   actualizarea îl schimbă singură e lista de kituri din secțiunea de descărcări, când apare o
   versiune nouă a aplicației.
-- Actualizarea automată pe Windows/macOS e pornită implicit (`AUTO_UPDATE=Y` în
-  `branding/brand.env`); utilizatorul o poate opri din setările aplicației.
+- Actualizarea automată e obligatorie (`AUTO_UPDATE=FORCE` în `branding/brand.env`):
+  utilizatorul nu o poate opri din setări, iar mesajul „versiune nouă” nu se poate închide (pe
+  Mac se poate ascunde până la următoarea pornire a aplicației). Cu `AUTO_UPDATE=Y` e pornită
+  implicit și utilizatorul o poate opri; cu `N` e oprită.
 - Încap 9 versiuni (`1.5.0-1` … `1.5.0-9`) peste aceeași versiune RustDesk; după aceea
   treci la o versiune RustDesk nouă (vezi mai jos).
 
