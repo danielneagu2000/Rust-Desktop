@@ -144,6 +144,25 @@ până la repornirea aplicației. Calculatoarele primesc setarea în câteva sec
 versiunea 1.5.0-3 sau mai nouă a aplicației.
 Schimbarea se aplică imediat. Dedesubt vezi adresele blocate acum și le poți debloca.
 
+### Blocare automată și mod de protecție
+
+Tot în tab-ul **IP-uri blocate**, cardul **Blocare automată și mod de protecție** (ambele pornite
+implicit):
+
+- **Blocare automată:** o adresă blocată de 3 ori în 30 de zile (de regulile de mai sus sau pentru
+  că a trimis comenzi de shop cu semnătură greșită) e blocată 1 zi, a doua oară 3 zile, apoi o
+  săptămână și o lună. Dacă 3 adrese din aceeași rețea (/24 la IPv4, /64 la IPv6) sunt blocate, se
+  blochează toată rețeaua. Blocarea oprește intrarea în panou și în portal, activarea licențelor și
+  comenzile de shop de la acea adresă; calculatoarele care au deja licență merg normal. Blocările
+  rămân și după repornirea serverului și apar în tabelul de mai sus, cu butonul **Deblochează**.
+  Adresele de la care ai intrat în panou și adresele shopului nu se blochează niciodată.
+- **Mod de protecție:** la 30 de încercări greșite (parole, coduri de licență, semnături) de pe cel
+  puțin 5 adrese în 15 minute, serverul consideră că e atacat. Cât durează atacul, activările de
+  licențe noi primesc „reîncearcă peste câteva minute”, iar comenzile din shop așteaptă. Modul se
+  oprește singur la 15 minute după ultimul val, iar comenzile oprite de el se procesează atunci
+  automat. În panou apare o bandă roșie cu butonul **Oprește acum**. Calculatoarele cu licență și
+  intrarea ta în panou nu sunt afectate.
+
 ### Panoul pe internet, cu autentificare în doi pași
 
 Pe un VPS poți deschide panoul la o adresă proprie, de exemplu `https://panou.rdndata.ro`:
@@ -156,13 +175,28 @@ Pe un VPS poți deschide panoul la o adresă proprie, de exemplu `https://panou.
    codul de 6 cifre din aplicație. Pagina pentru cod e valabilă 5 minute; după aceea o iei de la
    capăt.
 
+Codul din aplicație e **obligatoriu**. Dacă panoul nu are încă o cheie (de exemplu `PANEL_TOTP_SECRET`
+e gol în `server/.env`), la prima intrare, după parolă, îți afișează o cheie nouă: în Google
+Authenticator apeși **+** → **Introdu o cheie de configurare**, nume „RDN Remote”, tip „bazat pe
+timp”, cheia afișată, apoi scrii în panou codul primit. Un cod folosit nu mai merge a doua oară.
+
 Sesiunea ține 12 ore (butonul **Ieșire** o închide; durata se schimbă din tab-ul **Setări**).
 După 10 încercări greșite de pe același IP (parolă sau cod), accesul de pe acel IP e blocat
-15 minute (valorile se schimbă din tab-ul **IP-uri blocate**). Cheia 2FA e în `server/.env` (`PANEL_TOTP_SECRET`) și
-în backup; dacă pierzi telefonul, o vezi acolo și o adaugi din nou în aplicație.
+15 minute (valorile se schimbă din tab-ul **IP-uri blocate**).
 
-Acces: implicit panoul ascultă doar local pe server (port 21120). Utilizatorul și parola sunt
-afișate de `install.sh` și salvate în `server/.env`.
+**Parola panoului** se păstrează doar criptată (hash), în baza de date a panoului. La prima
+pornire se ia din `server/.env` (`PANEL_PASSWORD`); apoi o schimbi din **Setări** → **Contul
+panoului** (cere parola actuală și codul din aplicație; celelalte sesiuni se închid). După
+schimbare, parola din `server/.env` nu mai e valabilă. Dacă ai uitat parola, scrie una nouă în
+`server/.env` la `PANEL_PASSWORD` și repornește panoul (`docker compose restart panel`): o parolă
+schimbată în `server/.env` devine parola panoului.
+
+**Telefon pierdut:** pe server, în folderul `server`, rulează `sudo touch data/resetare-acces`. La
+următoarea intrare, după parolă, panoul îți cere să configurezi o cheie nouă (cea veche nu mai
+merge), iar fișierul se șterge singur.
+
+Acces: implicit panoul ascultă doar local pe server (port 21120). Utilizatorul și parola de
+început sunt afișate de `install.sh` și salvate în `server/.env`.
 
 - De pe calculatorul tău, prin tunel SSH: `ssh -L 21120:127.0.0.1:21120 root@SERVER`, apoi
   deschide `http://localhost:21120/`.
@@ -344,13 +378,50 @@ Fluxul complet:
 
    Comportamentul se poate opri din **Reguli pentru comenzi**.
 
-Webhook-ul fără semnătura corectă e refuzat.
+Webhook-ul fără semnătura corectă e refuzat, iar adresa care l-a trimis primește o blocare (vezi
+**Blocare automată**); primești și un e-mail de alertă.
+
+### Comenzi în așteptarea aprobării
+
+O comandă ajunsă într-o stare plătită care arată ciudat nu primește licența automat: apare în
+tab-ul **Shop**, cardul **Comenzi în așteptarea aprobării**, cu motivul, produsele, totalul și
+metoda de plată, și primești un e-mail. Motivele (fiecare se poate opri din **Reguli pentru
+comenzi**):
+
+- fără dată de plată;
+- fără cod de tranzacție de la plată (de exemplu transfer bancar sau plată la livrare: verifici
+  plata, apoi aprobi);
+- total 0 la produsele RDN Remote;
+- comanda nu a fost plasată din pagina de comandă a shopului (de exemplu creată de mână în
+  WooCommerce);
+- peste **limita zilnică**: mai multe licențe create sau prelungite din shop în 24 de ore decât
+  limita aleasă (implicit 20);
+- mod de protecție activ: aceste comenzi se procesează singure când se oprește.
+
+**Aprobă** creează licența și trimite codul ca la orice comandă; **Respinge** nu creează nimic.
+Fiecare comandă se aprobă o singură dată, chiar dacă butonul e apăsat de două ori. O comandă
+anulată sau rambursată în shop înainte de aprobare se respinge singură. Dacă o comandă ajunge
+între timp în regulă (de exemplu primește data plății), se procesează automat.
 
 ## Setări generale
 
 Tab-ul **Setări**: cât durează sesiunea în panou și în portal, lungimea minimă a parolei din
 portal și câte zile se păstrează istoricul (înlocuiește `RETENTION_DAYS` din `server/.env`).
-Parola și 2FA-ul panoului rămân în `server/.env`, pe server.
+
+- **Licențe doar pentru aplicațiile care semnează** (din 1.5.1-4): aplicațiile noi semnează fiecare
+  cerere către server cu cheia calculatorului, iar serverul leagă licența de acea cheie (coloana
+  **Cheie** din fereastra unei licențe: „legată” sau „nelegată”). Cine cunoaște doar codul unic al
+  unui calculator nu-i mai poate folosi sau muta licența odată ce e legată. Cu setarea pornită,
+  aplicațiile vechi nu mai primesc licența: pornește-o abia când contorul de lângă ea arată că toate
+  calculatoarele cu licență au cheia.
+- **Contul panoului:** schimbarea parolei panoului și starea Google Authenticator (vezi mai sus).
+- **Alerte pe e-mail:** adresa (sau adresele, separate prin virgulă) care primește alertele și
+  serverul de e-mail (SMTP: server, port, STARTTLS sau SSL, utilizator, expeditor, parolă; parola nu
+  se mai afișează după salvare). **Trimite un e-mail de test** verifică setările. Panoul trimite
+  e-mail la: intrare în panou de la o adresă nouă, adrese blocate după încercări greșite sau blocate
+  automat, pornirea și oprirea modului de protecție, comenzi din shop în așteptarea aprobării sau cu
+  semnătură greșită, schimbarea parolei sau a cheii Google Authenticator și backup automat eșuat.
+  Cel mult un e-mail la 10 minute pentru același subiect (următorul spune câte s-au adunat).
 
 ## Raport pe client
 
@@ -400,17 +471,21 @@ toate aplicațiile instalate), ID-urile înregistrate, **licențele**, istoricul
 IP-urile blocate și setările (`server/.env`).
 
 - **Automat:** panoul face un backup pe zi în `server/data/backups/` și păstrează ultimele 14.
-- **Manual:** panoul → tab-ul **Backup** → **Creează backup acum**, apoi **Descarcă**.
+- **Manual:** panoul → tab-ul **Backup** → **Creează backup acum**, apoi **Descarcă (criptat)**.
 - **Important:** descarcă periodic (de ex. săptămânal) un backup pe alt dispozitiv (laptop,
   stick, cloud). Backup-urile de pe mini PC se pierd odată cu discul lui.
-- Fișierul conține cheia privată a serverului și parola panoului: păstrează-l în siguranță.
+- Un backup **descărcat** e criptat (fișier `.tar.gz.enc`) cu parola pe care o alegi la descărcare
+  (minim 12 caractere). Fără parolă nu se poate citi și nici restaura: păstreaz-o separat de fișier
+  (de exemplu într-un manager de parole). Backup-urile de pe server rămân necriptate, pentru
+  restaurarea rapidă.
 
-**Restaurare din panou** (același server): tab-ul **Backup** → alegi fișierul → **Restaurează**.
+**Restaurare din panou** (același server): tab-ul **Backup** → alegi fișierul, scrii parola
+backup-ului (pentru unul descărcat, criptat) → **Restaurează**.
 Se restaurează licențele, istoricul, dispozitivele și IP-urile blocate; înainte se face automat
 un backup al stării curente. Un backup de pe alt server (altă cheie) e refuzat aici.
 
 Restaurarea **nu schimbă site-ul**: fișierele lui nu sunt în backup. Rămân ca înainte și domeniul
-site-ului și al panoului, parola și codul 2FA ale panoului, precum și setările de blocare din
+site-ului și al panoului, parola și cheia Google Authenticator ale panoului, precum și setările din
 panou; din backup vin doar datele (licențe, istoric, dispozitive, IP-uri blocate) și restul
 setărilor din `server/.env`.
 
@@ -420,7 +495,7 @@ setărilor din `server/.env`.
 git clone https://github.com/danielneagu2000/Rust-Desktop.git
 cd Rust-Desktop/server
 sudo PANEL_BIND=0.0.0.0 ./install.sh remote.rdndata.ro     # instalează Docker și pornește
-sudo ./restore.sh /cale/rdn-backup-....tar.gz            # pune la loc cheia, licențele, setările
+sudo ./restore.sh /cale/rdn-backup-....tar.gz.enc        # cere parola backup-ului, pune la loc cheia, licențele, setările
 ```
 
 După restaurare, cheia publică afișată trebuie să fie aceeași cu `RS_PUB_KEY` din
