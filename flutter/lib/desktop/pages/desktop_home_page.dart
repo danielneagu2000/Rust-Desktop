@@ -445,6 +445,21 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           handleUpdate(updateUrl);
         };
       }
+      // The portable Windows app cannot update itself, and with forced updates this card cannot
+      // be closed to reach the Install card under it: install from here (the installed app then
+      // updates itself), and keep the new version downloadable from the site.
+      if (isWindows &&
+          !isToUpdate &&
+          isOptionFixed(kOptionAllowAutoUpdate) &&
+          !bind.isDisableInstallation()) {
+        return buildInstallCard(
+            "Status",
+            "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
+            "Install", () async {
+          await rustDeskWinManager.closeAllSubWindows();
+          bind.mainGotoInstall();
+        }, help: 'Download', link: 'https://remote.rdndata.ro/');
+      }
       final card = buildInstallCard(
           "Status",
           "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
